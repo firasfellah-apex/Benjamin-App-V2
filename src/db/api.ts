@@ -424,25 +424,84 @@ export async function getOrderById(orderId: string): Promise<OrderWithDetails | 
 }
 
 export async function acceptOrder(orderId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error("Accept order failed: No authenticated user");
+      return false;
+    }
 
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      runner_id: user.id,
-      status: "Runner Accepted",
-      runner_accepted_at: new Date().toISOString()
-    })
-    .eq("id", orderId)
-    .eq("status", "Pending");
+    // First, fetch the current order to verify it exists and is in Pending status
+    const { data: existingOrder, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
 
-  if (error) {
-    console.error("Error accepting order:", error);
+    if (fetchError) {
+      console.error("Error fetching order:", fetchError);
+      return false;
+    }
+
+    if (!existingOrder) {
+      console.error("Order not found:", orderId);
+      return false;
+    }
+
+    if (existingOrder.status !== "Pending") {
+      console.error("Order is not in Pending status. Current status:", existingOrder.status);
+      return false;
+    }
+
+    // Update the order status to "Runner Accepted"
+    const { data: updatedOrder, error: updateError } = await supabase
+      .from("orders")
+      .update({
+        runner_id: user.id,
+        status: "Runner Accepted",
+        runner_accepted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", orderId)
+      .eq("status", "Pending")
+      .select()
+      .maybeSingle();
+
+    if (updateError) {
+      console.error("Error updating order status:", updateError);
+      return false;
+    }
+
+    if (!updatedOrder) {
+      console.error("Order update returned no data. Order may have been accepted by another runner.");
+      return false;
+    }
+
+    // Create audit log entry
+    await createAuditLog(
+      "ACCEPT_ORDER",
+      "order",
+      orderId,
+      { status: "Pending", runner_id: null },
+      { 
+        status: "Runner Accepted", 
+        runner_id: user.id,
+        runner_accepted_at: updatedOrder.runner_accepted_at
+      }
+    );
+
+    console.log("Order accepted successfully:", {
+      orderId,
+      runnerId: user.id,
+      newStatus: updatedOrder.status,
+      timestamp: updatedOrder.runner_accepted_at
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Unexpected error in acceptOrder:", error);
     return false;
   }
-
-  return true;
 }
 
 export async function updateOrderStatus(
