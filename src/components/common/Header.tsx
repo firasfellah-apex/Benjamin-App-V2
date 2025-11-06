@@ -9,18 +9,34 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { profile } = useProfile();
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const confirmLogout = () => {
     logout();
+    setShowLogoutDialog(false);
     setIsAccountOpen(false);
     navigate("/login");
   };
@@ -184,19 +200,19 @@ const Header = () => {
                           </button>
                         )}
                       </div>
-                      <Separator />
-                      <div className="py-1">
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Logout
-                        </button>
-                      </div>
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleLogoutClick}
+                  className="ml-2"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log Out
+                </Button>
               </>
             )}
 
@@ -293,15 +309,17 @@ const Header = () => {
                   </>
                 )}
 
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => {
-                    handleLogout();
+                    handleLogoutClick();
                     setIsMenuOpen(false);
                   }}
-                  className="block w-full text-left px-3 py-2 text-base font-medium rounded-md hover:bg-muted"
+                  className="w-full mt-2"
                 >
-                  Logout
-                </button>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log Out
+                </Button>
               </>
             ) : (
               <Button
@@ -317,6 +335,24 @@ const Header = () => {
           </div>
         )}
       </nav>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out? You will need to sign in again to access your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLogout}>
+              Log Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 };
