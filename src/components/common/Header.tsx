@@ -5,16 +5,15 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "miaoda-auth-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -22,7 +21,13 @@ const Header = () => {
 
   const handleLogout = () => {
     logout();
+    setIsAccountOpen(false);
     navigate("/login");
+  };
+
+  const handleMenuItemClick = (path: string) => {
+    navigate(path);
+    setIsAccountOpen(false);
   };
 
   return (
@@ -136,41 +141,62 @@ const Header = () => {
                   </>
                 )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <Popover open={isAccountOpen} onOpenChange={setIsAccountOpen}>
+                  <PopoverTrigger asChild>
                     <Button variant="ghost" size="sm">
                       <User className="h-4 w-4 mr-2" />
                       {profile.first_name || 'Account'}
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {profile.role.includes('admin') && (
-                      <DropdownMenuItem onClick={() => navigate("/admin/dashboard")}>
-                        <Shield className="mr-2 h-4 w-4" />
-                        Admin Dashboard
-                      </DropdownMenuItem>
-                    )}
-                    {profile.role.includes('runner') && (
-                      <DropdownMenuItem onClick={() => navigate("/runner/orders")}>
-                        <Truck className="mr-2 h-4 w-4" />
-                        My Deliveries
-                      </DropdownMenuItem>
-                    )}
-                    {profile.role.includes('customer') && (
-                      <DropdownMenuItem onClick={() => navigate("/customer/orders")}>
-                        <Package className="mr-2 h-4 w-4" />
-                        My Orders
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56">
+                    <div className="space-y-1">
+                      <div className="px-2 py-1.5">
+                        <p className="text-sm font-semibold">My Account</p>
+                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      </div>
+                      <Separator />
+                      <div className="space-y-1 py-1">
+                        {profile.role.includes('admin') && (
+                          <button
+                            onClick={() => handleMenuItemClick("/admin/dashboard")}
+                            className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
+                            <Shield className="mr-2 h-4 w-4" />
+                            Admin Dashboard
+                          </button>
+                        )}
+                        {profile.role.includes('runner') && (
+                          <button
+                            onClick={() => handleMenuItemClick("/runner/orders")}
+                            className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
+                            <Truck className="mr-2 h-4 w-4" />
+                            My Deliveries
+                          </button>
+                        )}
+                        {profile.role.includes('customer') && (
+                          <button
+                            onClick={() => handleMenuItemClick("/customer/orders")}
+                            className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
+                            <Package className="mr-2 h-4 w-4" />
+                            My Orders
+                          </button>
+                        )}
+                      </div>
+                      <Separator />
+                      <div className="py-1">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </>
             )}
 
