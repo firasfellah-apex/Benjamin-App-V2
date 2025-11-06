@@ -52,12 +52,42 @@ export default function InvitationManagement() {
 
   const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      toast.success("Invitation link copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
+      // Try modern Clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        toast.success("Invitation link copied to clipboard!");
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) {
+            setCopied(true);
+            toast.success("Invitation link copied to clipboard!");
+            setTimeout(() => setCopied(false), 2000);
+          } else {
+            throw new Error('Copy command failed');
+          }
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      }
     } catch (error) {
-      toast.error("Failed to copy to clipboard");
+      // If all else fails, show the text for manual copying
+      toast.error("Please manually copy the link", {
+        description: text,
+        duration: 10000
+      });
     }
   };
 
