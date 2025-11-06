@@ -651,3 +651,66 @@ export function subscribeToOrder(orderId: string, callback: (payload: any) => vo
     .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, callback)
     .subscribe();
 }
+
+// Admin: Create a test/mock order for runner training
+export async function createTestOrder(): Promise<{ success: boolean; orderId?: string; message: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, message: "Not authenticated" };
+    }
+
+    // Verify user is admin
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('admin')) {
+      return { success: false, message: "Unauthorized: Admin access required" };
+    }
+
+    // Create a test order with mock data
+    const testOrderData = {
+      customer_id: user.id, // Use admin as customer for test
+      requested_amount: 100.00,
+      service_fee: 13.66,
+      delivery_fee: 8.16,
+      total_amount: 113.66,
+      customer_address: "ABC Bank ATM, 123 XYZ Street",
+      customer_name: "Test Customer",
+      customer_notes: "🎓 TRAINING ORDER: This is a test order. Use this to familiarize yourself with the acceptance and completion process. Delivery location: Central Office, 456 Main Avenue.",
+      status: "Pending" as const,
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(testOrderData)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error creating test order:", error);
+      return { success: false, message: "Failed to create test order" };
+    }
+
+    if (!data) {
+      return { success: false, message: "No data returned after creating test order" };
+    }
+
+    // Create audit log entry
+    await createAuditLog(
+      "CREATE_TEST_ORDER",
+      "order",
+      data.id,
+      {},
+      testOrderData
+    );
+
+    return { 
+      success: true, 
+      orderId: data.id,
+      message: "Test order created successfully" 
+    };
+  } catch (error) {
+    console.error("Error in createTestOrder:", error);
+    return { success: false, message: "An unexpected error occurred" };
+  }
+}

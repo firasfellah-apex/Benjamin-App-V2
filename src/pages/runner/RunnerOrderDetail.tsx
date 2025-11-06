@@ -7,7 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { getOrderById, updateOrderStatus, generateOTP, verifyOTP, subscribeToOrder } from "@/db/api";
-import type { OrderWithDetails } from "@/types/types";
+import type { OrderWithDetails, OrderStatus } from "@/types/types";
+
+const statusColors: Record<OrderStatus, string> = {
+  "Pending": "bg-muted text-muted-foreground",
+  "Runner Accepted": "bg-accent text-accent-foreground",
+  "Runner at ATM": "bg-accent text-accent-foreground",
+  "Cash Withdrawn": "bg-accent text-accent-foreground",
+  "Pending Handoff": "bg-accent text-accent-foreground",
+  "Completed": "bg-success text-success-foreground",
+  "Cancelled": "bg-destructive text-destructive-foreground"
+};
 
 export default function RunnerOrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -139,7 +149,7 @@ export default function RunnerOrderDetail() {
                   Accepted {order.runner_accepted_at ? new Date(order.runner_accepted_at).toLocaleString() : 'Just now'}
                 </CardDescription>
               </div>
-              <Badge className="bg-accent text-accent-foreground">
+              <Badge className={statusColors[order.status]}>
                 {order.status}
               </Badge>
             </div>

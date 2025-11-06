@@ -154,6 +154,16 @@ const Header = () => {
                     >
                       Orders
                     </Link>
+                    <Link
+                      to="/admin/training"
+                      className={`text-sm font-medium transition-colors hover:text-primary ${
+                        location.pathname === "/admin/training"
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      Training
+                    </Link>
                   </>
                 )}
 
@@ -305,6 +315,13 @@ const Header = () => {
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Orders
+                    </Link>
+                    <Link
+                      to="/admin/training"
+                      className="block px-3 py-2 text-base font-medium rounded-md hover:bg-muted"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Training
                     </Link>
                   </>
                 )}
