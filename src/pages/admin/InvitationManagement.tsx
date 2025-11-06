@@ -51,42 +51,33 @@ export default function InvitationManagement() {
   };
 
   const copyToClipboard = async (text: string) => {
+    // Fallback method using textarea (works in all environments)
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
     try {
-      // Try modern Clipboard API first
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
         setCopied(true);
         toast.success("Invitation link copied to clipboard!");
         setTimeout(() => setCopied(false), 2000);
       } else {
-        // Fallback for older browsers or non-secure contexts
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {
-          const successful = document.execCommand('copy');
-          if (successful) {
-            setCopied(true);
-            toast.success("Invitation link copied to clipboard!");
-            setTimeout(() => setCopied(false), 2000);
-          } else {
-            throw new Error('Copy command failed');
-          }
-        } finally {
-          document.body.removeChild(textArea);
-        }
+        toast.info("Copy not supported", {
+          description: "Please select and copy the link manually from the input field above"
+        });
       }
     } catch (error) {
-      // If all else fails, show the text for manual copying
-      toast.error("Please manually copy the link", {
-        description: text,
-        duration: 10000
+      document.body.removeChild(textArea);
+      toast.info("Copy not supported", {
+        description: "Please select and copy the link manually from the input field above"
       });
     }
   };
