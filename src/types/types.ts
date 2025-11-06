@@ -75,6 +75,7 @@ export interface Order {
   cash_withdrawn_at: string | null;
   handoff_completed_at: string | null;
   cancelled_at: string | null;
+  cancelled_by: string | null;
   cancellation_reason: string | null;
   created_at: string;
   updated_at: string;

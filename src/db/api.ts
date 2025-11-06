@@ -527,22 +527,77 @@ export async function verifyOTP(orderId: string, otp: string): Promise<boolean> 
   return true;
 }
 
-export async function cancelOrder(orderId: string, reason: string): Promise<boolean> {
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: "Cancelled",
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: reason
-    })
-    .eq("id", orderId);
+// Admin: Cancel a pending order
+export async function cancelOrder(orderId: string, reason: string): Promise<{ success: boolean; message: string }> {
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, message: "Not authenticated" };
+    }
 
-  if (error) {
-    console.error("Error cancelling order:", error);
-    return false;
+    // Verify user is admin
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('admin')) {
+      return { success: false, message: "Unauthorized: Admin access required" };
+    }
+
+    // Get the order to verify it exists and is in Pending status
+    const { data: order, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("Error fetching order:", fetchError);
+      return { success: false, message: "Failed to fetch order" };
+    }
+
+    if (!order) {
+      return { success: false, message: "Order not found" };
+    }
+
+    if (order.status !== 'Pending') {
+      return { success: false, message: `Order cannot be cancelled because it is no longer pending (current status: ${order.status})` };
+    }
+
+    // Update the order to cancelled status
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({
+        status: 'Cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: user.id,
+        cancellation_reason: reason,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", orderId);
+
+    if (updateError) {
+      console.error("Error cancelling order:", updateError);
+      return { success: false, message: "Failed to cancel order" };
+    }
+
+    // Create audit log entry
+    await createAuditLog(
+      "CANCEL_ORDER",
+      "order",
+      orderId,
+      { status: order.status },
+      { 
+        status: 'Cancelled', 
+        cancelled_by: user.id, 
+        cancellation_reason: reason,
+        cancelled_at: new Date().toISOString()
+      }
+    );
+
+    return { success: true, message: "Order cancelled successfully" };
+  } catch (error) {
+    console.error("Error in cancelOrder:", error);
+    return { success: false, message: "An unexpected error occurred" };
   }
-
-  return true;
 }
 
 // Audit Log APIs

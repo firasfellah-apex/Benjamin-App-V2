@@ -6,7 +6,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getOrderById, subscribeToOrder } from "@/db/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { getOrderById, subscribeToOrder, cancelOrder } from "@/db/api";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
 
 const statusColors: Record<OrderStatus, string> = {
@@ -34,12 +54,46 @@ export default function AdminOrderDetail() {
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState<string>("");
+  const [customReason, setCustomReason] = useState<string>("");
+  const [cancelling, setCancelling] = useState(false);
 
   const loadOrder = async () => {
     if (!orderId) return;
     const data = await getOrderById(orderId);
     setOrder(data);
     setLoading(false);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!orderId) return;
+
+    if (!cancellationReason) {
+      toast.error("Please select a cancellation reason");
+      return;
+    }
+
+    if (cancellationReason === "Other" && !customReason.trim()) {
+      toast.error("Please provide a custom reason");
+      return;
+    }
+
+    const finalReason = cancellationReason === "Other" ? customReason : cancellationReason;
+
+    setCancelling(true);
+    const result = await cancelOrder(orderId, finalReason);
+    setCancelling(false);
+
+    if (result.success) {
+      toast.success(result.message);
+      setShowCancelDialog(false);
+      setCancellationReason("");
+      setCustomReason("");
+      loadOrder();
+    } else {
+      toast.error(result.message);
+    }
   };
 
   useEffect(() => {
@@ -111,10 +165,23 @@ export default function AdminOrderDetail() {
                   Created {new Date(order.created_at).toLocaleString()}
                 </CardDescription>
               </div>
-              <Badge className={statusColors[order.status]}>
-                <StatusIcon className="mr-2 h-4 w-4" />
-                {order.status}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge className={statusColors[order.status]}>
+                  <StatusIcon className="mr-2 h-4 w-4" />
+                  {order.status}
+                </Badge>
+                {order.status === 'Pending' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCancelDialog(true)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancel Order
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
         </Card>
@@ -348,6 +415,65 @@ export default function AdminOrderDetail() {
           </Card>
         )}
       </div>
+
+      {/* Cancel Order Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Pending Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this pending order? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancellation-reason">Cancellation Reason *</Label>
+              <Select value={cancellationReason} onValueChange={setCancellationReason}>
+                <SelectTrigger id="cancellation-reason">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Customer Request">Customer Request</SelectItem>
+                  <SelectItem value="Suspected Fraud">Suspected Fraud</SelectItem>
+                  <SelectItem value="Item Unavailable">Item Unavailable</SelectItem>
+                  <SelectItem value="Duplicate Order">Duplicate Order</SelectItem>
+                  <SelectItem value="Payment Issue">Payment Issue</SelectItem>
+                  <SelectItem value="System Error">System Error</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancellationReason === "Other" && (
+              <div className="space-y-2">
+                <Label htmlFor="custom-reason">Custom Reason *</Label>
+                <Textarea
+                  id="custom-reason"
+                  placeholder="Please provide a detailed reason for cancellation..."
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Go Back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleCancelOrder();
+              }}
+              disabled={cancelling || !cancellationReason}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling ? "Cancelling..." : "Confirm Cancellation"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
