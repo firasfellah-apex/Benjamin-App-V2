@@ -174,6 +174,14 @@ export default function RunnerOrderDetail() {
               <div className="text-sm font-medium pl-6">
                 Customer: {order.customer_name}
               </div>
+              {order.customer_notes && (
+                <div className="pl-6 mt-3">
+                  <div className="text-sm font-medium mb-1">Delivery Notes:</div>
+                  <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    {order.customer_notes}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

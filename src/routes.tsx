@@ -15,6 +15,7 @@ import Dashboard from './pages/admin/Dashboard';
 import UserManagement from './pages/admin/UserManagement';
 import InvitationManagement from './pages/admin/InvitationManagement';
 import OrderMonitoring from './pages/admin/OrderMonitoring';
+import AdminOrderDetail from './pages/admin/AdminOrderDetail';
 
 export interface RouteConfig {
   name: string;
@@ -94,6 +95,12 @@ const routes: RouteConfig[] = [
     name: 'Order Monitoring',
     path: '/admin/orders',
     element: <OrderMonitoring />,
+    visible: false
+  },
+  {
+    name: 'Admin Order Detail',
+    path: '/admin/orders/:orderId',
+    element: <AdminOrderDetail />,
     visible: false
   },
   {

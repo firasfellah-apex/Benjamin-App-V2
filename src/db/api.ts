@@ -289,7 +289,8 @@ export async function revokeInvitation(invitationId: string): Promise<boolean> {
 export async function createOrder(
   requestedAmount: number,
   customerAddress: string,
-  customerName: string
+  customerName: string,
+  customerNotes?: string
 ): Promise<Order | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -308,6 +309,7 @@ export async function createOrder(
       total_payment: fees.totalPayment,
       customer_address: customerAddress,
       customer_name: customerName,
+      customer_notes: customerNotes || null,
       status: "Pending"
     })
     .select()

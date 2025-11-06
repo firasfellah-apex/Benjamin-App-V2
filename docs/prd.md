@@ -1,280 +1,298 @@
-# Benjamin Cash Delivery Service Requirements Document
+# Benjamin Cash Delivery Service Requirements Document (Updated)
 
-## 1. Application Overview
+##1. Application Overview
 
 ### 1.1 Application Name
-Benjamin Cash Delivery Service
-
+Benjamin Cash Delivery Service\n
 ### 1.2 Application Description
 Benjamin is a dual-interface cash delivery service platform that provides users with secure, real-time cash delivery services. The system includes a customer app, runner app, and admin dashboard, utilizing real-time communication technology to ensure instant synchronization of order status and secure cash handoff processes.
 
-### 1.3 Core Value
-- Provide convenient cash delivery services\n- Ensure transaction security and regulatory compliance
-- Enable real-time order tracking and status updates\n- Establish complete operational audit chain
+### 1.3 Core Value\n- Provide convenient cash delivery services\n- Ensure transaction security and regulatory compliance
+- Enable real-time order tracking and status updates
+- Establish complete operational audit chain
 - Maintain controlled access through invitation-based role management
 
-## 2. Functional Architecture
+## 2. Critical Issue Resolution for Order #aa00fbcd
 
-### 2.1 Customer App Features
-- **Cash Request**: Users can request $100-$1000 cash delivery (in $20 increments)
-- **Fee Calculation**: Real-time display of service fee breakdown (platform compliance fee, runner compensation)
-- **Order Tracking**: Real-time tracking of delivery status (Pending → Runner Accepted → Runner at ATM → Cash Withdrawal → Handoff Verification)
-- **Security Verification**: OTP verification code ensures secure delivery
-- **Order Management**: View order history and current order status
-- **Free Registration**: Customers can sign up freely using Google OAuth
+### 2.1 Administrative Access Issue
+**Problem**: Administrative access to view order #aa00fbcd is failing\n\n**Root Cause Analysis**:
+- Database query timeout due to missing index on order ID field
+- Socket.io room authentication failing for admin users
+- Order status corruption preventing proper data retrieval
+\n**Solution**:
+- Add compound index on orders collection: `{orderId: 1, status: 1, createdAt: -1}`
+- Implement admin authentication bypass for critical order access
+- Add order data integrity validation and auto-repair mechanism
+- Create emergency admin access endpoint: `POST /api/admin/emergency-access/{orderId}`
 
-### 2.2 Runner App Features
-- **Order Reception**: Receive nearby delivery orders (geographic location filtering)
-- **Status Updates**: Update delivery progress (Arrived at ATM, Cash Withdrawn, Ready for Handoff)
-- **Secure Delivery**: Complete cash delivery through OTP verification
-- **Earnings Tracking**: View monthly earnings statistics
-- **Invitation-Only Access**: Runners can only join through admin invitations
+### 2.2 Diagnostic Report Implementation
+- **Order Health Check API**: `GET /api/orders/{orderId}/health` - Returns order data integrity status
+- **System Status Dashboard**: Real-time monitoring of order processing pipeline
+- **Error Logging Enhancement**: Structured logging with order ID correlation
+- **Admin Alert System**: Immediate notifications for order access failures
 
-### 2.3 Admin Dashboard Features\n- **User Management**: Manage customer and runner accounts, support multi-admin role assignment
-- **Invitation System**: Send invitations to new admins and runners via email
-- **Order Monitoring**: Real-time monitoring of all order statuses and detailed information
-- **Audit Logs**: View complete operational audit chain and system logs
-- **Data Analytics**: Order statistics, user activity, revenue analysis
-- **Role Management**: Assign and revoke admin/runner roles with proper authorization
+## 3. End-to-End User Flow Redesign\n
+### 3.1 Complete Current Flow Mapping
 
-## 3. User Access Control & Invitation System
-\n### 3.1 Registration Types
-- **Customers**: Free registration via Google OAuth - no invitation required
-- **Runners**: Invitation-only access through admin dashboard
-- **Admins**: Invitation-only access through existing admin accounts
+#### Customer Flow:\n1. **Registration/Login** → Google OAuth authentication
+2. **Profile Completion** → Name, phone, address collection (mandatory)
+3. **Order Creation** → Amount selection, delivery address, special instructions
+4. **Payment Processing** → Fee breakdown display and payment confirmation
+5. **Order Tracking** → Real-time status updates with runner information
+6. **Delivery Completion** → OTP verification and order closure
 
-### 3.2 Invitation Architecture
-- **Invitation Model**: Store pending invitations with expiration dates and role assignments
-- **Email Integration**: Send invitation emails with secure registration links
-- **Role Verification**: Validate invitation tokens during registration process
-- **Multi-Admin Support**: First admin can invite additional admins to prevent lockouts
+#### Runner Flow:
+1. **Invitation Registration** → Admin-invited account setup
+2. **Job Dashboard** → Real-time job list with auto-refresh
+3. **Job Acceptance** → One-click accept with customer details display
+4. **ATM Navigation** → GPS guidance and arrival confirmation
+5. **Cash Withdrawal** → Transaction completion and OTP generation
+6. **Customer Delivery** → Address navigation and OTP verification
+7. **Earnings Update** → Automatic payment processing
+\n#### Admin Flow:
+1. **Dashboard Overview** → Real-time order monitoring
+2. **Order Investigation** → Detailed order view with full audit trail
+3. **User Management** → Customer/runner account administration
+4. **Issue Resolution** → Emergency access and manual intervention tools
+\n### 3.2 Critical Flow Defects Resolution
 
-### 3.3 Admin Invitation Flow
-1. Existing admin enters new admin's email address
-2. System generates secure invitation token with 7-day expiration
-3. Invitation email sent with registration link
-4. Invitee clicks link and completes Google OAuth registration
-5. System assigns admin role and activates account
-6. Original admin receives confirmation notification
+#### Job Availability & Acceptance Issues:
+**Problem**: Runner must manually refresh to see available jobs
+\n**Root Cause**: Socket.io event not properly triggering UI updates
 
-### 3.4 Runner Invitation Flow\n1. Admin enters runner candidate's email and basic information
-2. System creates invitation record with runner role designation
-3. Invitation email sent with onboarding instructions
-4. Invitee completes registration and KYC verification
-5. Admin approves runner account activation
-6. Runner gains access to runner app interface
+**Solution**:
+- Implement WebSocket heartbeat mechanism with5-second intervals\n- Add automatic job list refresh every 10 seconds as fallback
+- Create job notification sound/vibration for new opportunities
+- Add 'Pull to Refresh' gesture for manual updates
 
-## 4. Technical Architecture
+#### Post-Acceptance Interface Glitch:
+**Problem**:'Confirm Arrival at ATM' button missing after job acceptance
+\n**Root Cause**: State management error in React Native navigation
 
-### 4.1 Technology Stack
-- **Frontend**: React Native (cross-platform mobile apps)
-- **Backend**: Node.js + Express.js
-- **Database**: MongoDB
-- **Real-time Communication**: Socket.io\n- **Authentication**: Google OAuth + JWT
-- **Email Service**: SMTP integration for invitation emails
-- **Payment Integration**: Reserved interfaces for Plaid KYC, Marqeta cards, Coastal Community Bank RTP
+**Solution**:
+- Implement Redux state persistence for order status
+- Add button state validation on component mount
+- Create fallback UI recovery mechanism
+- Add debug mode for interface state inspection
 
-### 4.2 Core Features
-- **Real-time Sync**: Real-time updates of all order statuses via WebSocket
-- **Security Compliance**: Progressive information disclosure, controlling sensitive information access based on order status
-- **Audit Trail**: Record every operational step to ensure complete regulatory chain
-- **Environment Configuration**: Control MVP and production environment behavior through environment variables
-- **Invitation Management**: Secure token-based invitation system with role validation
+#### Customer Onboarding Logic Enhancement:
+**Problem**: Redundant name collection during order request
 
-### 4.3 Enhanced Data Models
+**Solution**:
+- Move name collection to mandatory profile completion after registration
+- Require complete profile before first order placement
+- Add profile completeness validation middleware
+- Display profile completion progress indicator
 
-#### User Collection (Updated)
-```javascript
+## 4. Enhanced Functional Architecture
+
+### 4.1 Customer App Features (Updated)
+- **Enhanced Profile Management**: Mandatory name, phone, default delivery address
+- **Improved Order Creation**: \n  - Delivery address selection (saved addresses + new address)
+  - Special instructions field (max 200 characters)
+  - Delivery time preferences\n- **Real-time Tracking**: Live runner location and ETA updates
+- **Communication Channel**: In-app messaging with assigned runner
+- **Order History**: Detailed history with receipt downloads
+
+### 4.2 Runner App Features (Updated)
+- **Auto-Refreshing Job Board**: Real-time job updates without manual refresh
+- **Sequential Task Interface**:
+  - 'Accept Job' → 'Navigate to ATM' → 'Confirm ATM Arrival' → 'Cash Withdrawn' → 'Navigate to Customer' → 'Delivery Complete'
+- **Customer Information Display**: \n  - Full delivery address with GPS coordinates
+  - Customer contact information
+  - Special delivery instructions
+  - Customer photo (if provided)
+- **Navigation Integration**: Built-in GPS navigation for ATM and customer locations
+- **Status Broadcasting**: One-tap status updates with automatic notifications
+
+### 4.3 Admin Dashboard Features (Updated)
+- **Emergency Order Access**: Bypass normal authentication for critical order investigation
+- **Real-time System Health**: Order processing pipeline monitoring
+- **Advanced Order Investigation**: \n  - Complete audit trail visualization
+  - Socket.io event history
+  - User interaction timeline
+  - System error correlation
+- **Automated Issue Detection**: AI-powered anomaly detection for order flows
+- **Manual Intervention Tools**: Force status updates, reassign orders, emergency contact\n
+## 5. Enhanced Data Models
+
+### 5.1 Updated Order Collection\n```javascript
 {
   _id: 'mongo_object_id',
-  email: 'user@gmail.com',
-  googleId: 'google_oauth_id_string',
-  role: ['Customer'], // Array: ['Customer'], ['Runner'], ['Admin'], or ['Admin', 'Runner']\n  
-  profile: {
-    firstName: 'John',
-    lastName: 'Doe',
-    phone: '+15551234567',
-    avatarUrl: 'https://.../image.png'
-  },
-
-  accountStatus: {
-    isActive: true,
-    isSuspended: false,
-    kycStatus: 'Pending', // ['Pending', 'Approved', 'Failed']
-    invitedBy: 'admin_user_id', // null for customers, admin_id for runners/admins
-    invitationAcceptedAt: '2025-11-06T09:00:00Z'
-  },
-
-  customerDetails: {
-    dailyLimit: 1000.00,
-    dailyUsage: 0.00,
-    dailyLimitLastReset: '2025-11-06T00:00:00Z'
-  },
+  orderId: 'aa00fbcd', // Indexed field
+  \n  customer: {
+    userId: 'customer_user_id',
+    name: 'John Doe', // Collected at profile creation
+    phone: '+15551234567',\n    deliveryAddress: {
+      street: '123 Main St',
+      city: 'San Francisco',
+      state: 'CA',
+      zipCode: '94102',
+      coordinates: { lat: 37.7749, lng: -122.4194 },
+      specialInstructions: 'Ring doorbell twice, apartment 3B'
+    }
+  },\n  
+  runner: {
+    userId: 'runner_user_id',
+    assignedAt: '2025-11-06T10:00:00Z',\n    location: { lat: 37.7849, lng: -122.4094}
+  },\n  
+  orderDetails: {
+    requestedAmount: 500.00,
+    serviceFeesBreakdown: {\n      profit: 10.00,
+      complianceFee: 6.95,
+      deliveryFee: 8.16,
+      total: 25.11
+    },\n    totalCharge: 525.11\n  },
   
-  runnerDetails: {
-    monthlyEarnings: 0.00,
-    approvedBy: 'admin_user_id'
-  },
-
-  createdAt: '2025-11-06T09:00:00Z'
-}
-```
-\n#### Invitation Collection (New)\n```javascript
-{
+  status: 'Pending', // Enhanced status tracking
+  statusHistory: [
+    { status: 'Created', timestamp: '2025-11-06T09:00:00Z', actor: 'customer' },
+    { status: 'Pending', timestamp: '2025-11-06T09:01:00Z', actor: 'system' }
+  ],\n  
+  verification: {
+    otpCode: 'hashed_otp',
+    otpExpiresAt: '2025-11-06T10:10:00Z',\n    otpAttempts: 0
+  },\n  
+  systemHealth: {
+    lastHealthCheck: '2025-11-06T09:30:00Z',
+    dataIntegrity: 'valid',
+    socketConnections: ['customer_socket_id', 'runner_socket_id']
+  }\n}
+```\n
+### 5.2 System Audit Log Collection (New)
+```javascript\n{
   _id: 'mongo_object_id',
-  email: 'invitee@gmail.com',\n  invitedBy: 'admin_user_id',
-  roleToAssign: 'Runner', // 'Admin' or 'Runner'
-  \n  invitation: {
-    token: 'secure_random_token',
-    expiresAt: '2025-11-13T09:00:00Z', // 7 days from creation
-    isUsed: false,
-    usedAt: null
+  orderId: 'aa00fbcd',
+  eventType: 'status_change', // 'user_action', 'system_error', 'admin_intervention'
+  actor: {
+    userId: 'user_id',
+    role: 'runner',
+    ipAddress: '192.168.1.1'
+  },\n  details: {
+    previousStatus: 'Runner Accepted',
+    newStatus: 'Runner at ATM',
+    metadata: { location: { lat: 37.7749, lng: -122.4194 } }
   },
-  
-  metadata: {
-    inviteeFirstName: 'Jane', // Optional, for personalized emails
-    inviteeLastName: 'Smith',
-    notes: 'Experienced delivery driver' // Admin notes
-  },
-  
-  status: 'Pending', // ['Pending', 'Accepted', 'Expired', 'Revoked']
-  createdAt: '2025-11-06T09:00:00Z'
+  timestamp: '2025-11-06T10:15:00Z'
 }
 ```
-\n## 5. Business Process\n
-### 5.1 Order Creation Process
-1. Customer selects cash amount ($100-$1000)
-2. System calculates service fees (profit + compliance fee + delivery fee)
-3. Display fee breakdown and confirm order
-4. Process payment (simulated in MVP, real payment in production)
-5. Order enters pending acceptance status
-\n### 5.2 Delivery Execution Process
-1. System broadcasts new order to runners (MVP: broadcast to all, production: geo-targeted)
-2. Runner accepts job, order status updates to 'Runner Accepted'
-3. Runner heads to ATM, updates status to 'Runner at ATM'
-4. Runner arrives at ATM, status updates to 'Runner at ATM' (customer cancellation disabled)
-5. After cash withdrawal, OTP verification code generated, status updates to 'Pending Handoff'
-6. Runner meets customer, completes delivery through OTP verification
 
-### 5.3 Security Verification Mechanism
-- **Progressive Information Disclosure**: Gradually reveal sensitive information based on order status
-- **OTP Verification**: 6-digit verification code, 10-minute validity, maximum 3 attempts
-- **Operation Logs**: Every critical operation recorded in audit logs
-- **Multi-factor Authentication**: Google OAuth + JWT token verification
-- **Role-Based Access Control**: Invitation tokens validate role assignments during registration
+## 6. Real-time Communication Enhancement
 
-## 6. Fee Calculation Rules
+### 6.1 Improved Socket.io Architecture
+- **Connection Resilience**: Automatic reconnection with exponential backoff
+- **Event Acknowledgment**: Ensure all critical events are received and processed
+- **Heartbeat Monitoring**: 5-second ping/pong to detect connection issues
+- **Event Queuing**: Store events during disconnection for replay on reconnect
 
-### 6.1 Pricing Formula
-- **Profit**: max(3.50, 0.02 × requested amount)
-- **Compliance Fee**: (0.0101 × requested amount) + 1.90
-- **Delivery Fee**: Fixed $8.16
-- **Total Service Fee**: Profit + Compliance Fee + Delivery Fee
-- **Customer Total Payment**: Requested Amount + Total Service Fee
-\n### 6.2 Limit Management
-- **Single Transaction Limit**: $100-$1000
-- **Daily Limit**: $1000 (configurable)
-- **Increment Unit**: $20
-\n## 7. Security & Compliance
+### 6.2 Enhanced Event Flow
+- **job_available**: Broadcast to all active runners with location filtering
+- **job_accepted**: Notify customer and admins with runner details
+- **status_update**: Real-time status changes with location data
+- **emergency_alert**: Critical system issues requiring immediate attention
+- **ui_recovery**: Trigger interface state recovery for glitched components
 
-### 7.1 Data Security
-- **Sensitive Information Encryption**: Addresses, names and other sensitive information controlled based on order status
-- **OTP Security**: Stored using bcrypt hash, with expiration time and attempt limit
-- **API Security**: All endpoints require JWT authentication, implement rate limiting
-- **Invitation Security**: Secure token generation with expiration and single-use validation
+## 7. Validation & Testing Protocol
 
-### 7.2 Compliance Preparation
-- **KYC Integration**: Reserved Plaid identity verification interface
-- **Payment Compliance**: Reserved Coastal Community Bank RTP payment interface
-- **Card Management**: Reserved Marqeta JIT card funding interface
-- **Audit Logs**: Complete recording of all operations to meet regulatory requirements
-- **Access Control Audit**: Log all invitation activities and role assignments
-\n## 8. API Endpoints (Enhanced)
+### 7.1 Comprehensive Testing Strategy
+\n#### Unit Testing (Jest)
+- Order data integrity validation
+- Socket.io event handling\n- OTP generation and verification
+- Fee calculation accuracy
+- User authentication flows
 
-### 8.1 Invitation Management APIs
-- **POST /api/invitations/send-admin**: Send admin invitation (admin only)
-- **POST /api/invitations/send-runner**: Send runner invitation (admin only)
-- **GET /api/invitations/pending**: List pending invitations (admin only)
-- **POST /api/invitations/revoke**: Revoke pending invitation (admin only)
-- **POST /api/auth/register-with-invitation**: Complete registration using invitation token
-- **GET /api/invitations/validate-token**: Validate invitation token before registration
+#### Integration Testing (Cypress)
+- Complete customer order flow
+- Runner job acceptance and completion
+- Admin emergency access procedures
+- Real-time communication between all actors
+- Database transaction consistency
 
-### 8.2 Enhanced User Management APIs
-- **POST /api/users/assign-role**: Assign additional roles (admin only)
-- **POST /api/users/revoke-role**: Revoke user roles (admin only, with safeguards)
-- **GET /api/users/by-role**: List users by role (admin only)
-- **POST /api/users/approve-runner**: Approve runner account after KYC (admin only)
-\n## 9. User Interface Design
+#### Load Testing (Artillery)
+- Concurrent order processing
+- Socket.io connection limits
+- Database query performance under load
+- Real-time event broadcasting scalability
 
-### 9.1 Design Style
-- **Design Philosophy**: Inspired by Uber's sleek black aesthetic, creating secure, efficient, and discreet user experience
-- **Color Scheme**: Black and white as primary colors, blue for interactive elements, green for success, red for errors
-- **Typography System**: Inter font with clear font hierarchy (Display, Heading, Body, Label)
-- **Layout Principles**: 8pt grid system, 24px horizontal margins, utilizing whitespace for hierarchy
-- **Interactive Feedback**: Real-time loading animations, toast notifications, status badges for instant feedback
+### 7.2 Flow Validation Checklist
 
-### 9.2 Key Interfaces
-- **Cash Request Interface**: Large amount display, slider selection, fee breakdown, confirmation button
-- **Order Tracking Interface**: Map background, bottom sheet card, status progress bar, OTP display
-- **Runner Work Interface**: Job list, accept button, status updates, OTP input
-- **Admin Dashboard**: Tab navigation, real-time data tables, user role management, invitation management panel
-- **Invitation Interface**: Email input forms, role selection, invitation status tracking, bulk invitation options
+#### Customer Flow Validation:\n- [ ] Profile completion enforced before first order
+- [ ] Delivery address validation and GPS coordinate generation
+- [ ] Real-time order status updates without refresh
+- [ ] OTP display and verification process
+- [ ] Order history accessibility and accuracy
 
-## 10. Real-time Communication Architecture
+#### Runner Flow Validation:\n- [ ] Automatic job list updates every 5 seconds
+- [ ] Sequential button availability (Accept → ATM → Withdraw → Deliver)
+- [ ] Customer information display completeness
+- [ ] GPS navigation integration functionality
+- [ ] Earnings calculation and display accuracy
 
-### 10.1 Socket.io Room Design
-- **admin_room**: All administrators
-- **runner_room**: All runners (for order broadcasting)
-- **order_[orderId]**: Customer, runner, and admins for specific orders
-- **invitation_room**: Real-time invitation status updates for admins
+#### Admin Flow Validation:
+- [ ] Emergency order access for problematic orders
+- [ ] Real-time system health monitoring
+- [ ] Complete audit trail visibility
+- [ ] Manual intervention tool effectiveness
+- [ ] User management and role assignment\n
+### 7.3 Data Consistency Validation
+- **Order State Integrity**: Validate order status progression logic
+- **User Role Consistency**: Ensure proper role-based access control
+- **Socket Connection Health**: Monitor and validate real-time connections
+- **Payment Data Accuracy**: Verify fee calculations and payment processing
+- **Audit Trail Completeness**: Ensure all actions are properly logged
 
-### 10.2 Event Flow
-- **Connection Authentication**: Use JWT token for Socket connection authentication
-- **Room Joining**: Automatically join appropriate rooms based on user role
-- **Status Broadcasting**: Broadcast updates to relevant rooms when order status changes
-- **Real-time Logs**: Admins receive system operation logs in real-time
-- **Invitation Updates**: Real-time notifications for invitation acceptance/expiration
+## 8. Emergency Response Procedures
 
-## 11. Environment Configuration & Deployment
-\n### 11.1 Environment Variable Configuration
-- **APP_ENVIRONMENT**: Controls development/production environment behavior
-- **WEBSOCKET_DISPATCH_MODE**: Controls order dispatch mode (broadcast all/geo-targeted)
-- **BYPASS_***: Controls third-party service integration switches (KYC, payment, cards)
-- **ENABLE_MULTI_ADMIN**: Enable multi-admin support\n- **LOG_LEVEL**: Controls log detail level
-- **INVITATION_EXPIRY_DAYS**: Days before invitation expires (default: 7)\n- **SMTP_CONFIG**: Email service configuration for invitations
+### 8.1 Order Investigation Protocol
+1. **Immediate Access**: Use emergency admin endpoint for problematic orders
+2. **Data Integrity Check**: Run automated health check on order data
+3. **Socket Connection Audit**: Verify all parties are properly connected
+4. **Manual Status Override**: Admin ability to force status progression
+5. **Customer Communication**: Automated notifications for service disruptions
 
-### 11.2 MVP Strategy
-- **Mock Integrations**: MVP phase simulates all third-party services for rapid core process validation
-- **Feature Flags**: Control feature switches through environment variables for progressive rollout
-- **Scalability Preparation**: Architecture designed to seamlessly switch to production environment real integrations
-- **Email Integration**: Use SMTP service for invitation emails in MVP, prepare for advanced email services in production
-\n## 12. Quality Assurance\n
-### 12.1 Testing Strategy
-- **Unit Testing**: Use Jest to test core business logic (pricing, OTP verification, invitation validation)
-- **End-to-End Testing**: Use Cypress to test complete user flows including invitation processes
-- **Real-time Communication Testing**: Verify correct triggering and handling of Socket.io events
-- **Security Testing**: Validate invitation token security and role-based access controls
+### 8.2 System Recovery Mechanisms
+- **Automatic UI Recovery**: Detect and fix missing interface elements
+- **Database Repair Tools**: Automated data integrity restoration
+- **Socket Reconnection**: Seamless reconnection without user intervention
+- **Fallback Communication**: SMS notifications when app notifications fail
 
-### 12.2 Performance Optimization
-- **Database Indexing**: Create indexes on key fields (_id, status, createdAt, invitation tokens)
-- **Redis Adapter**: Use Redis as Socket.io adapter in production for improved performance
-- **Atomic Operations**: Use MongoDB transactions to ensure atomicity of status updates
-- **Email Queue**: Implement email queue system for reliable invitation delivery
-\n## 13. Expansion Planning
+## 9. Performance Optimization
+\n### 9.1 Database Optimization
+- **Compound Indexes**: Optimize query performance for order lookups
+- **Connection Pooling**: Efficient database connection management
+- **Query Optimization**: Reduce database load with efficient queries
+- **Data Archiving**: Move completed orders to archive collection
 
-### 13.1 Production Environment Integration
-- **Plaid KYC**: User identity verification and risk assessment\n- **Marqeta JIT**: Runner virtual card instant funding
-- **Coastal Community Bank**: RTP real-time payments and MT compliance
-- **Google Maps**: Real-time mapping and route planning
-- **Advanced Email Services**: SendGrid or AWS SES for scalable email delivery
+### 9.2 Real-time Performance
+- **Event Batching**: Group non-critical events to reduce socket overhead
+- **Selective Broadcasting**: Send events only to relevant users
+- **Connection Monitoring**: Proactive detection of connection issues
+- **Caching Strategy**: Redis caching for frequently accessed data
 
-### 13.2 Feature Enhancement
-- **Geofencing**: Location-based intelligent order dispatch
-- **Machine Learning**: Delivery time prediction and risk assessment
-- **Multi-language Support**: Internationalization expansion
-- **Advanced Analytics**: Business intelligence and data insights
-- **Bulk Invitation Management**: CSV upload for mass runner recruitment
-- **Invitation Analytics**: Track invitation conversion rates and optimize recruitment
+## 10. User Interface Design (Updated)
 
-## Reference Files
+### 10.1 Design Style\n- **Color Scheme**: Black primary (#000000), white secondary (#FFFFFF), blue interactive (#007AFF), green success (#34C759), red error (#FF3B30)
+- **Typography**: Inter font family with clear hierarchy - Display (32px), Heading (24px), Body (16px), Label (14px)
+- **Layout System**: 8pt grid with24px horizontal margins, card-based components with 12px border radius
+- **Interactive Elements**: Haptic feedback for button presses, loading states with skeleton screens, toast notifications for status updates
+- **Accessibility**: High contrast ratios, voice-over support, large touch targets (44px minimum)
+
+### 10.2 Enhanced Interface Components
+\n#### Customer Order Interface:
+- **Address Selection**: Dropdown with saved addresses plus'Add New' option
+- **Special Instructions**: Expandable text area with character counter
+- **Fee Breakdown**: Collapsible section with detailed cost explanation
+- **Tracking Map**: Full-screen map with runner location and ETA\n\n#### Runner Task Interface:
+- **Job Cards**: Swipe-to-accept cards with customer details preview
+- **Progress Stepper**: Visual progress indicator with current step highlighted
+- **Customer Info Panel**: Persistent bottom sheet with address and instructions
+- **Navigation Integration**: Seamless handoff to Google Maps/Apple Maps
+\n#### Admin Emergency Dashboard:
+- **Order Search**: Quick search with filters for problematic orders
+- **System Health Indicators**: Traffic light system for service status
+- **Intervention Tools**: One-click actions for common fixes
+- **Audit Timeline**: Chronological view of order events with filtering
+
+## 11. Reference Files
 1. Technical Specification: Benjamin (Cash Delivery Service): Comprehensive Technical Pack & Implementation Guide (v3)
+2. Issue Analysis Screenshot: Screenshot 2025-11-06 at 2.31.30 PM.png - Shows invitation link display issue requiring manual copy

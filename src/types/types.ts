@@ -69,6 +69,7 @@ export interface Order {
   otp_attempts: number;
   customer_address: string | null;
   customer_name: string | null;
+  customer_notes: string | null;
   runner_accepted_at: string | null;
   runner_at_atm_at: string | null;
   cash_withdrawn_at: string | null;

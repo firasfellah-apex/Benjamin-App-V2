@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { calculateFees, createOrder } from "@/db/api";
@@ -16,6 +17,7 @@ export default function CashRequest() {
   const [amount, setAmount] = useState(100);
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
   const fees = calculateFees(amount);
@@ -43,7 +45,7 @@ export default function CashRequest() {
 
     setLoading(true);
     try {
-      const order = await createOrder(amount, customerAddress, customerName);
+      const order = await createOrder(amount, customerAddress, customerName, customerNotes);
       if (order) {
         toast.success("Order created successfully!");
         navigate(`/customer/orders/${order.id}`);
@@ -113,6 +115,21 @@ export default function CashRequest() {
                   value={customerAddress}
                   onChange={(e) => setCustomerAddress(e.target.value)}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="notes">Delivery Notes (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="e.g., Ring doorbell, meet at lobby, call when arriving..."
+                  value={customerNotes}
+                  onChange={(e) => setCustomerNotes(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Provide any special instructions for the runner
+                </p>
               </div>
             </div>
           </CardContent>

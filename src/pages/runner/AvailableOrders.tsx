@@ -101,6 +101,11 @@ export default function AvailableOrders() {
                       {order.customer_address}
                     </span>
                   </div>
+                  {order.customer_notes && (
+                    <div className="bg-muted p-2 rounded text-xs text-muted-foreground">
+                      <strong>Note:</strong> {order.customer_notes}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2 space-y-2">
