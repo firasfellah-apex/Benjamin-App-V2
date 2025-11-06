@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { useAuth } from "miaoda-auth-react";
 import { getCurrentProfile } from "@/db/api";
 import type { Profile, UserRole } from "@/types/types";
@@ -20,7 +20,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       setLoading(false);
@@ -35,11 +35,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadProfile();
-  }, [user]);
+  }, [loadProfile]);
 
   const hasRole = (role: UserRole): boolean => {
     return profile?.role?.includes(role) || false;
