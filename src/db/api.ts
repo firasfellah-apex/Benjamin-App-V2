@@ -236,7 +236,10 @@ export async function validateInvitationToken(token: string): Promise<Invitation
   return data;
 }
 
-export async function acceptInvitation(token: string, userId: string): Promise<boolean> {
+export async function acceptInvitation(token: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
   const invitation = await validateInvitationToken(token);
   if (!invitation) return false;
 
@@ -255,7 +258,7 @@ export async function acceptInvitation(token: string, userId: string): Promise<b
   }
 
   const roleToAdd = invitation.role_to_assign as UserRole;
-  await assignRole(userId, roleToAdd);
+  await assignRole(user.id, roleToAdd);
 
   await supabase
     .from("profiles")
@@ -263,7 +266,7 @@ export async function acceptInvitation(token: string, userId: string): Promise<b
       invited_by: invitation.invited_by,
       invitation_accepted_at: new Date().toISOString()
     })
-    .eq("id", userId);
+    .eq("id", user.id);
 
   return true;
 }

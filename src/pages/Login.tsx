@@ -1,4 +1,9 @@
+import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { LoginPanel } from "miaoda-auth-react";
+import { useAuth } from "miaoda-auth-react";
+import { toast } from "sonner";
+import { validateInvitationToken, acceptInvitation } from "@/db/api";
 
 const login_config = {
   title: 'Benjamin Cash Delivery',
@@ -11,9 +16,62 @@ const login_config = {
 };
 
 export default function Login() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [invitationValid, setInvitationValid] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const token = searchParams.get('invitation');
+    if (token) {
+      setInvitationToken(token);
+      validateInvitationToken(token).then(invitation => {
+        if (invitation) {
+          setInvitationValid(true);
+          toast.success(`You've been invited to join as ${invitation.role_to_assign}`);
+        } else {
+          setInvitationValid(false);
+          toast.error("Invalid or expired invitation link");
+        }
+      });
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (user && invitationToken && invitationValid) {
+      acceptInvitation(invitationToken).then(success => {
+        if (success) {
+          toast.success("Invitation accepted! Your account has been updated.");
+          navigate("/");
+        } else {
+          toast.error("Failed to accept invitation");
+        }
+      });
+    }
+  }, [user, invitationToken, invitationValid, navigate]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <LoginPanel {...login_config} />
+      <div className="w-full max-w-md">
+        {invitationToken && invitationValid && (
+          <div className="mb-4 p-4 bg-accent/10 border border-accent rounded-lg text-center">
+            <p className="text-sm font-medium">You're joining via invitation</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sign in to accept your invitation
+            </p>
+          </div>
+        )}
+        {invitationToken && invitationValid === false && (
+          <div className="mb-4 p-4 bg-destructive/10 border border-destructive rounded-lg text-center">
+            <p className="text-sm font-medium">Invalid Invitation</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              This invitation link is invalid or has expired
+            </p>
+          </div>
+        )}
+        <LoginPanel {...login_config} />
+      </div>
     </div>
   );
 }

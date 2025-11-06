@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Mail, UserPlus, X } from "lucide-react";
+import { Mail, UserPlus, X, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getAllInvitations, createInvitation, revokeInvitation } from "@/db/api";
-import type { InvitationWithDetails, InvitationStatus } from "@/types/types";
+import type { InvitationWithDetails, InvitationStatus, Invitation } from "@/types/types";
 
 const statusColors: Record<InvitationStatus, string> = {
   "Pending": "bg-muted text-muted-foreground",
@@ -24,6 +24,9 @@ export default function InvitationManagement() {
   const [invitations, setInvitations] = useState<InvitationWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [invitationLinkDialog, setInvitationLinkDialog] = useState(false);
+  const [createdInvitation, setCreatedInvitation] = useState<Invitation | null>(null);
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     roleToAssign: "runner" as 'runner' | 'admin',
@@ -43,6 +46,21 @@ export default function InvitationManagement() {
     loadInvitations();
   }, []);
 
+  const getInvitationUrl = (token: string) => {
+    return `${window.location.origin}/login?invitation=${token}`;
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Invitation link copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.email) {
       toast.error("Email is required");
@@ -51,14 +69,20 @@ export default function InvitationManagement() {
 
     setSubmitting(true);
     try {
-      await createInvitation(
+      const invitation = await createInvitation(
         formData.email,
         formData.roleToAssign,
         formData.firstName || undefined,
         formData.lastName || undefined,
         formData.notes || undefined
       );
-      toast.success("Invitation sent successfully");
+      
+      if (invitation) {
+        setCreatedInvitation(invitation);
+        setInvitationLinkDialog(true);
+        toast.success("Invitation created successfully");
+      }
+      
       setDialogOpen(false);
       setFormData({
         email: "",
@@ -69,7 +93,7 @@ export default function InvitationManagement() {
       });
       loadInvitations();
     } catch (error) {
-      toast.error("Failed to send invitation");
+      toast.error("Failed to create invitation");
     } finally {
       setSubmitting(false);
     }
@@ -183,7 +207,69 @@ export default function InvitationManagement() {
               </Button>
               <Button onClick={handleSubmit} disabled={submitting}>
                 <Mail className="mr-2 h-4 w-4" />
-                {submitting ? "Sending..." : "Send Invitation"}
+                {submitting ? "Creating..." : "Create Invitation"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invitation Link Dialog */}
+        <Dialog open={invitationLinkDialog} onOpenChange={setInvitationLinkDialog}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Invitation Created Successfully!</DialogTitle>
+              <DialogDescription>
+                Share this invitation link with {formData.email || 'the invitee'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Invitation Link</Label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={createdInvitation ? getInvitationUrl(createdInvitation.token) : ''}
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => createdInvitation && copyToClipboard(getInvitationUrl(createdInvitation.token))}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This link will expire in 7 days
+                </p>
+              </div>
+
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <p className="text-sm font-medium">Next Steps:</p>
+                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>Copy the invitation link above</li>
+                  <li>Send it to {formData.email || 'the invitee'} via email or messaging app</li>
+                  <li>They will click the link and complete registration</li>
+                  <li>Their account will be assigned the {formData.roleToAssign} role automatically</li>
+                </ol>
+              </div>
+
+              {createdInvitation && (
+                <div className="space-y-2">
+                  <Label>Invitation Details</Label>
+                  <div className="text-sm space-y-1">
+                    <p><span className="font-medium">Email:</span> {createdInvitation.email}</p>
+                    <p><span className="font-medium">Role:</span> {createdInvitation.role_to_assign}</p>
+                    <p><span className="font-medium">Expires:</span> {new Date(createdInvitation.expires_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button onClick={() => setInvitationLinkDialog(false)}>
+                Done
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -280,14 +366,24 @@ export default function InvitationManagement() {
                       </TableCell>
                       <TableCell className="text-right">
                         {invitation.status === "Pending" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRevoke(invitation.id)}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Revoke
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(getInvitationUrl(invitation.token))}
+                            >
+                              <Copy className="mr-2 h-4 w-4" />
+                              Copy Link
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRevoke(invitation.id)}
+                            >
+                              <X className="mr-2 h-4 w-4" />
+                              Revoke
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
