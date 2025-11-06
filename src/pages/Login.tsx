@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { LoginPanel } from "miaoda-auth-react";
 import { useAuth } from "miaoda-auth-react";
 import { toast } from "sonner";
-import { validateInvitationToken, acceptInvitation } from "@/db/api";
+import { validateInvitationToken, acceptInvitation, getCurrentProfile } from "@/db/api";
 
 const login_config = {
   title: 'Benjamin Cash Delivery',
@@ -21,6 +21,7 @@ export default function Login() {
   const { user } = useAuth();
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [invitationValid, setInvitationValid] = useState<boolean | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get('invitation');
@@ -39,17 +40,51 @@ export default function Login() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (user && invitationToken && invitationValid) {
-      acceptInvitation(invitationToken).then(success => {
-        if (success) {
-          toast.success("Invitation accepted! Your account has been updated.");
-          navigate("/");
-        } else {
-          toast.error("Failed to accept invitation");
-        }
-      });
+    if (user && !redirecting) {
+      setRedirecting(true);
+      
+      if (invitationToken && invitationValid) {
+        // Handle invitation acceptance first
+        acceptInvitation(invitationToken).then(success => {
+          if (success) {
+            toast.success("Invitation accepted! Your account has been updated.");
+            // Get updated profile and redirect
+            getCurrentProfile().then(profile => {
+              if (profile) {
+                if (profile.role.includes('admin')) {
+                  navigate("/admin/dashboard", { replace: true });
+                } else if (profile.role.includes('runner')) {
+                  navigate("/runner/available", { replace: true });
+                } else {
+                  navigate("/customer/request", { replace: true });
+                }
+              } else {
+                navigate("/", { replace: true });
+              }
+            });
+          } else {
+            toast.error("Failed to accept invitation");
+            navigate("/", { replace: true });
+          }
+        });
+      } else {
+        // Regular login redirect
+        getCurrentProfile().then(profile => {
+          if (profile) {
+            if (profile.role.includes('admin')) {
+              navigate("/admin/dashboard", { replace: true });
+            } else if (profile.role.includes('runner')) {
+              navigate("/runner/available", { replace: true });
+            } else {
+              navigate("/customer/request", { replace: true });
+            }
+          } else {
+            navigate("/", { replace: true });
+          }
+        });
+      }
     }
-  }, [user, invitationToken, invitationValid, navigate]);
+  }, [user, invitationToken, invitationValid, navigate, redirecting]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
