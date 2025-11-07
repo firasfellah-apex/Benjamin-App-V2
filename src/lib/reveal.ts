@@ -140,3 +140,22 @@ export function isOrderFinal(status: OrderStatus): boolean {
 export function canCustomerCancel(status: OrderStatus): boolean {
   return status === 'Pending' || status === 'Runner Accepted';
 }
+
+/**
+ * Can customer contact the runner?
+ * 
+ * Returns true only after cash is secured (same gate as live location).
+ * This prevents harassment before runner commits and ensures alignment
+ * with non-cancellable phase.
+ * 
+ * Timeline:
+ * - Before Cash Withdrawn: No contact allowed
+ * - Cash Withdrawn onwards: Contact enabled (message/call)
+ */
+export function canContactRunner(status: OrderStatus): boolean {
+  return [
+    'Cash Withdrawn',
+    'Pending Handoff',
+    'Completed'
+  ].includes(status);
+}
