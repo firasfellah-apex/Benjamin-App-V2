@@ -77,6 +77,32 @@ export interface Invitation {
   created_at: string;
 }
 
+export interface CustomerAddress {
+  id: string;
+  customer_id: string;
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface AddressSnapshot {
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 export interface Order {
   id: string;
   customer_id: string;
@@ -92,7 +118,9 @@ export interface Order {
   otp_hash: string | null;
   otp_expires_at: string | null;
   otp_attempts: number;
-  customer_address: string | null;
+  address_id: string | null;
+  address_snapshot: AddressSnapshot | null;
+  customer_address: string | null; // Legacy field, will be deprecated
   customer_name: string | null;
   customer_notes: string | null;
   runner_accepted_at: string | null;
@@ -135,4 +163,24 @@ export interface FeeCalculation {
   deliveryFee: number;
   totalServiceFee: number;
   totalPayment: number;
+}
+
+export interface PricingInput {
+  amount: number;
+  customerAddress?: {
+    lat: number;
+    lng: number;
+  };
+  // Future fields for distance-based pricing:
+  // runnerLocation?: { lat: number; lng: number };
+  // atmLocation?: { lat: number; lng: number };
+  // timeOfDay?: string;
+}
+
+export interface PricingBreakdown {
+  platformFee: number;
+  complianceFee: number;
+  deliveryFee: number;
+  totalServiceFee: number;
+  total: number;
 }

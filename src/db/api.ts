@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Profile, Invitation, Order, OrderWithDetails, InvitationWithDetails, UserRole, OrderStatus, FeeCalculation, OrderEventWithDetails } from "@/types/types";
+import type { Profile, Invitation, Order, OrderWithDetails, InvitationWithDetails, UserRole, OrderStatus, FeeCalculation, OrderEventWithDetails, CustomerAddress, AddressSnapshot } from "@/types/types";
 
 // Fee Calculation
 export function calculateFees(requestedAmount: number): FeeCalculation {
@@ -307,11 +307,173 @@ export async function revokeInvitation(invitationId: string): Promise<boolean> {
   return true;
 }
 
+// Customer Address APIs
+export async function getCustomerAddresses(): Promise<CustomerAddress[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("customer_addresses")
+    .select("*")
+    .eq("customer_id", user.id)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching addresses:", error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getDefaultAddress(): Promise<CustomerAddress | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("customer_addresses")
+    .select("*")
+    .eq("customer_id", user.id)
+    .eq("is_default", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching default address:", error);
+    return null;
+  }
+
+  return data;
+}
+
+export async function getAddressById(addressId: string): Promise<CustomerAddress | null> {
+  const { data, error } = await supabase
+    .from("customer_addresses")
+    .select("*")
+    .eq("id", addressId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching address:", error);
+    return null;
+  }
+
+  return data;
+}
+
+export async function createAddress(address: {
+  label: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  latitude?: number;
+  longitude?: number;
+  is_default?: boolean;
+}): Promise<CustomerAddress | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("customer_addresses")
+    .insert({
+      customer_id: user.id,
+      label: address.label,
+      line1: address.line1,
+      line2: address.line2 || null,
+      city: address.city,
+      state: address.state,
+      postal_code: address.postal_code,
+      latitude: address.latitude || null,
+      longitude: address.longitude || null,
+      is_default: address.is_default || false
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error creating address:", error);
+    return null;
+  }
+
+  return data;
+}
+
+export async function updateAddress(
+  addressId: string,
+  updates: {
+    label?: string;
+    line1?: string;
+    line2?: string | null;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    is_default?: boolean;
+  }
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("customer_addresses")
+    .update(updates)
+    .eq("id", addressId);
+
+  if (error) {
+    console.error("Error updating address:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function deleteAddress(addressId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("customer_addresses")
+    .delete()
+    .eq("id", addressId);
+
+  if (error) {
+    console.error("Error deleting address:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function setDefaultAddress(addressId: string): Promise<boolean> {
+  return await updateAddress(addressId, { is_default: true });
+}
+
+export function createAddressSnapshot(address: CustomerAddress): AddressSnapshot {
+  return {
+    label: address.label,
+    line1: address.line1,
+    line2: address.line2,
+    city: address.city,
+    state: address.state,
+    postal_code: address.postal_code,
+    latitude: address.latitude,
+    longitude: address.longitude
+  };
+}
+
+export function formatAddress(address: CustomerAddress | AddressSnapshot): string {
+  const parts = [
+    address.line1,
+    address.line2,
+    `${address.city}, ${address.state} ${address.postal_code}`
+  ].filter(Boolean);
+  
+  return parts.join(", ");
+}
+
 // Order APIs
 export async function createOrder(
   requestedAmount: number,
   customerAddress: string,
-  customerNotes?: string
+  customerNotes?: string,
+  addressId?: string
 ): Promise<Order | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -330,6 +492,15 @@ export async function createOrder(
 
   const fees = calculateFees(requestedAmount);
 
+  // If addressId is provided, fetch the address and create snapshot
+  let addressSnapshot: AddressSnapshot | null = null;
+  if (addressId) {
+    const address = await getAddressById(addressId);
+    if (address) {
+      addressSnapshot = createAddressSnapshot(address);
+    }
+  }
+
   const { data, error } = await supabase
     .from("orders")
     .insert({
@@ -340,7 +511,9 @@ export async function createOrder(
       delivery_fee: fees.deliveryFee,
       total_service_fee: fees.totalServiceFee,
       total_payment: fees.totalPayment,
-      customer_address: customerAddress,
+      address_id: addressId || null,
+      address_snapshot: addressSnapshot,
+      customer_address: customerAddress, // Legacy field for backward compatibility
       customer_name: customerName,
       customer_notes: customerNotes || null,
       status: "Pending"
