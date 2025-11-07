@@ -15,6 +15,7 @@ import { SafetyBanner } from "@/components/common/SafetyBanner";
 import { Chip } from "@/components/common/Chip";
 import { triggerConfetti } from "@/lib/confetti";
 import { canRevealRunner } from "@/lib/reveal";
+import { strings } from "@/lib/strings";
 
 export default function OrderTracking() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -32,7 +33,7 @@ export default function OrderTracking() {
       // Trigger confetti on completion
       if (data && previousStatus && previousStatus !== "Completed" && data.status === "Completed") {
         triggerConfetti(3000);
-        toast.success("Order completed! 🎉");
+        toast.success(strings.toasts.otpVerified);
       }
       
       if (data) {
@@ -67,10 +68,10 @@ export default function OrderTracking() {
     try {
       const success = await cancelOrder(orderId, "Cancelled by customer");
       if (success) {
-        toast.success("Order cancelled successfully");
+        toast.success(strings.toasts.orderCanceled);
       }
     } catch (error) {
-      toast.error("Failed to cancel order");
+      toast.error(strings.errors.generic);
     }
   };
 
@@ -78,7 +79,7 @@ export default function OrderTracking() {
     return (
       <div className="container max-w-4xl mx-auto py-8 px-4">
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading order details...</div>
+          <div className="text-muted-foreground">{strings.emptyStates.loading}</div>
         </div>
       </div>
     );
@@ -88,9 +89,9 @@ export default function OrderTracking() {
     return (
       <div className="container max-w-4xl mx-auto py-8 px-4">
         <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <div className="text-muted-foreground">Order not found</div>
+          <div className="text-muted-foreground">{strings.errors.orderNotFound}</div>
           <Button onClick={() => navigate("/customer/orders")}>
-            View All Orders
+            {strings.customer.trackingBackButton}
           </Button>
         </div>
       </div>
@@ -108,14 +109,14 @@ export default function OrderTracking() {
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Orders
+        {strings.customer.trackingBackButton}
       </Button>
 
       <div className="space-y-6">
         {/* Safety Banner - shown before runner reveal */}
         {!showRunnerInfo && order.runner_id && (
           <SafetyBanner
-            message="Runner photo and live location will be visible after cash pickup for your safety"
+            message={strings.helpers.safetyBanner}
             storageKey="benjamin-safety-banner-dismissed"
           />
         )}
@@ -138,7 +139,7 @@ export default function OrderTracking() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <DollarSign className="h-4 w-4" />
-                  <span>Cash Amount</span>
+                  <span>{strings.customer.cashAmount}</span>
                 </div>
                 <div className="text-2xl font-bold">${order.requested_amount.toFixed(2)}</div>
               </div>
@@ -146,7 +147,7 @@ export default function OrderTracking() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <DollarSign className="h-4 w-4" />
-                  <span>Total Payment</span>
+                  <span>{strings.customer.totalPayment}</span>
                 </div>
                 <div className="text-2xl font-bold">${order.total_payment.toFixed(2)}</div>
               </div>
@@ -157,7 +158,7 @@ export default function OrderTracking() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <MapPin className="h-4 w-4" />
-                Delivery Address
+                {strings.customer.deliveryAddress}
               </div>
               <div className="text-sm text-muted-foreground pl-6">
                 {order.customer_address}
@@ -183,8 +184,8 @@ export default function OrderTracking() {
         {/* Order Timeline */}
         <Card>
           <CardHeader>
-            <CardTitle>Delivery Progress</CardTitle>
-            <CardDescription>Track your cash delivery in real-time</CardDescription>
+            <CardTitle>{strings.customer.deliveryProgress}</CardTitle>
+            <CardDescription>{strings.customer.deliveryProgressDesc}</CardDescription>
           </CardHeader>
           <CardContent>
             <OrderTimeline
@@ -217,9 +218,9 @@ export default function OrderTracking() {
         {order.status === "Pending Handoff" && order.otp_code && (
           <Card>
             <CardHeader>
-              <CardTitle>Verification Code</CardTitle>
+              <CardTitle>{strings.customer.otpTitle}</CardTitle>
               <CardDescription>
-                Share this code with the runner to complete delivery
+                {strings.customer.otpPrompt}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -247,7 +248,7 @@ export default function OrderTracking() {
                 onClick={handleCancel}
                 className="w-full"
               >
-                Cancel Order
+                {strings.customer.cancelButton}
               </Button>
             </CardContent>
           </Card>
