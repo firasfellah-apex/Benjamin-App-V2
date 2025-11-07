@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { DollarSign, ChevronDown, ChevronUp, MapPin, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { createOrder, formatAddress } from "@/db/api";
@@ -25,9 +23,8 @@ export default function CashRequest() {
   const [step, setStep] = useState<Step>(1);
   const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
   const [amount, setAmount] = useState(100);
-  const [customerNotes, setCustomerNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showFeeDetails, setShowFeeDetails] = useState(false);
+  const [showFeeDetails, setShowFeeDetails] = useState(true); // Expanded by default
 
   // Calculate pricing
   const pricing = selectedAddress 
@@ -75,10 +72,13 @@ export default function CashRequest() {
 
     setLoading(true);
     try {
+      // Auto-pull delivery notes from selected address
+      const deliveryNotes = selectedAddress.delivery_notes || "";
+      
       const order = await createOrder(
         amount,
         formatAddress(selectedAddress),
-        customerNotes,
+        deliveryNotes,
         selectedAddress.id
       );
       if (order) {
@@ -193,6 +193,11 @@ export default function CashRequest() {
                         <br />
                         {selectedAddress.city}, {selectedAddress.state} {selectedAddress.postal_code}
                       </p>
+                      {selectedAddress.delivery_notes && (
+                        <p className="text-xs text-muted-foreground mt-2 italic">
+                          Note: {selectedAddress.delivery_notes}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Button
@@ -209,13 +214,14 @@ export default function CashRequest() {
             </Card>
           )}
 
-          {/* Amount Selection */}
+          {/* Amount Selection with Integrated Pricing */}
           <Card>
             <CardHeader>
               <CardTitle>Cash Amount</CardTitle>
               <CardDescription>Choose between $100 and $1,000</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Amount Slider */}
               <div className="space-y-4">
                 <div className="flex items-center justify-center">
                   <div className="text-6xl font-bold transition-all duration-200">
@@ -238,81 +244,64 @@ export default function CashRequest() {
                 </div>
               </div>
 
-              {/* Delivery Notes */}
-              <div>
-                <Label htmlFor="notes" className="text-sm">
-                  Anything we should know for the handoff?
-                </Label>
-                <Textarea
-                  id="notes"
-                  placeholder="e.g., Ring doorbell, meet in lobby, etc."
-                  value={customerNotes}
-                  onChange={(e) => setCustomerNotes(e.target.value)}
-                  rows={3}
-                  className="resize-none mt-2"
-                />
-              </div>
+              {/* Integrated Pricing Summary */}
+              {pricing && (
+                <div className="space-y-4 pt-4 border-t">
+                  {/* Top-line Summary */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">You'll receive</span>
+                      <span className="text-2xl font-bold">${amount.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b">
+                      <span className="text-sm text-muted-foreground">Total charge</span>
+                      <span className="text-xl font-semibold">${pricing.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Fee Breakdown Toggle */}
+                  <button
+                    onClick={() => setShowFeeDetails(!showFeeDetails)}
+                    className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <span>See how it adds up</span>
+                    <div className="flex items-center gap-1">
+                      <span className="underline">
+                        {showFeeDetails ? 'Hide details' : 'Show details'}
+                      </span>
+                      {showFeeDetails ? (
+                        <ChevronUp className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Fee Breakdown */}
+                  {showFeeDetails && (
+                    <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Cash amount</span>
+                        <span>${amount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Platform fee</span>
+                        <span>${pricing.platformFee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Compliance fee</span>
+                        <span>${pricing.complianceFee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Delivery fee</span>
+                        <span>${pricing.deliveryFee.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
-
-          {/* Pricing Summary */}
-          {pricing && (
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                {/* Top-line Summary */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">You'll receive</span>
-                    <span className="text-2xl font-bold">${amount.toFixed(0)}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Total charge</span>
-                    <span className="text-xl font-semibold">${pricing.total.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Transparent Pricing Collapsible */}
-                <button
-                  onClick={() => setShowFeeDetails(!showFeeDetails)}
-                  className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <span>Transparent pricing</span>
-                  <div className="flex items-center gap-1">
-                    <span className="underline">
-                      {showFeeDetails ? 'Hide details' : 'See details'}
-                    </span>
-                    {showFeeDetails ? (
-                      <ChevronUp className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                  </div>
-                </button>
-
-                {/* Fee Breakdown */}
-                {showFeeDetails && (
-                  <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Cash amount</span>
-                      <span>${amount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Platform fee</span>
-                      <span>${pricing.platformFee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Compliance fee</span>
-                      <span>${pricing.complianceFee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Delivery fee</span>
-                      <span>${pricing.deliveryFee.toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Sticky CTA */}
           <div className="sticky bottom-4 pt-6 space-y-3">

@@ -89,6 +89,7 @@ export interface CustomerAddress {
   latitude: number | null;
   longitude: number | null;
   is_default: boolean;
+  delivery_notes: string | null;
   created_at: string;
 }
 

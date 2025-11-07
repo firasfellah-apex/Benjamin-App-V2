@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createAddress, updateAddress } from "@/db/api";
@@ -24,6 +25,7 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
     city: address?.city || "",
     state: address?.state || "",
     postal_code: address?.postal_code || "",
+    delivery_notes: address?.delivery_notes || "",
     is_default: address?.is_default || false
   });
 
@@ -164,6 +166,21 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
               maxLength={10}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="delivery_notes">Notes for this location (optional)</Label>
+            <Textarea
+              id="delivery_notes"
+              placeholder="e.g., Ring doorbell, meet in lobby, call when you arrive"
+              value={formData.delivery_notes}
+              onChange={(e) => setFormData({ ...formData, delivery_notes: e.target.value })}
+              rows={3}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              These notes will be used for all deliveries to this address
+            </p>
           </div>
 
           <div className="flex items-center space-x-2">
