@@ -133,6 +133,14 @@ export const strings = {
     platformFee: "Platform Fee",
     deliveryFee: "Delivery Fee",
     complianceFee: "Compliance Fee",
+    runnerHidden: "Runner (hidden)",
+    unknown: "Unknown",
+    waitingForRunner: "Waiting for runner",
+    runnerAccepted: "Runner accepted",
+    runnerAtATM: "Runner at ATM",
+    cashWithdrawn: "Cash withdrawn",
+    deliveryComplete: "Delivery complete",
+    orderCancelled: "Order was cancelled",
   },
 
   // Runner-specific strings

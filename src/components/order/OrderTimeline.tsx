@@ -11,6 +11,7 @@ import { OrderStatus } from '@/types/types';
 import { cn } from '@/lib/utils';
 import { Check, Clock, Package, MapPin, Banknote, HandCoins, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { strings } from '@/lib/strings';
 
 interface TimelineStep {
   status: OrderStatus;
@@ -22,39 +23,39 @@ interface TimelineStep {
 const TIMELINE_STEPS: TimelineStep[] = [
   {
     status: 'Pending',
-    label: 'Pending',
+    label: strings.status.pending,
     icon: <Clock className="h-4 w-4" />,
-    description: 'Waiting for runner'
+    description: strings.customer.waitingForRunner
   },
   {
     status: 'Runner Accepted',
-    label: 'Accepted',
+    label: strings.status.accepted,
     icon: <Package className="h-4 w-4" />,
-    description: 'Runner accepted'
+    description: strings.customer.runnerAccepted
   },
   {
     status: 'Runner at ATM',
-    label: 'At ATM',
+    label: strings.status.runnerAtATM,
     icon: <MapPin className="h-4 w-4" />,
-    description: 'Runner at ATM'
+    description: strings.customer.runnerAtATM
   },
   {
     status: 'Cash Withdrawn',
-    label: 'Cash Picked',
+    label: strings.status.cashPicked,
     icon: <Banknote className="h-4 w-4" />,
-    description: 'Cash withdrawn'
+    description: strings.customer.cashWithdrawn
   },
   {
     status: 'Pending Handoff',
-    label: 'En Route',
+    label: strings.status.enRoute,
     icon: <HandCoins className="h-4 w-4" />,
-    description: 'On the way'
+    description: strings.status.enRoute
   },
   {
     status: 'Completed',
-    label: 'Delivered',
+    label: strings.status.delivered,
     icon: <CheckCircle2 className="h-4 w-4" />,
-    description: 'Delivery complete'
+    description: strings.customer.deliveryComplete
   }
 ];
 
@@ -144,7 +145,7 @@ export function OrderTimeline({
       {isCancelled && (
         <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
           <p className="text-sm text-destructive text-center">
-            Order was cancelled
+            {strings.customer.orderCancelled}
           </p>
         </div>
       )}

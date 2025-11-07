@@ -9,6 +9,7 @@
 import { Badge } from '@/components/ui/badge';
 import { OrderStatus } from '@/types/types';
 import { cn } from '@/lib/utils';
+import { strings } from '@/lib/strings';
 
 interface ChipProps {
   status: OrderStatus;
@@ -18,31 +19,31 @@ interface ChipProps {
 const STATUS_CONFIG: Record<OrderStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
   'Pending': {
     variant: 'outline',
-    label: 'Pending'
+    label: strings.status.pending
   },
   'Runner Accepted': {
     variant: 'secondary',
-    label: 'Accepted'
+    label: strings.status.accepted
   },
   'Runner at ATM': {
     variant: 'secondary',
-    label: 'At ATM'
+    label: strings.status.runnerAtATM
   },
   'Cash Withdrawn': {
     variant: 'default',
-    label: 'Cash Picked'
+    label: strings.status.cashPicked
   },
   'Pending Handoff': {
     variant: 'default',
-    label: 'En Route'
+    label: strings.status.enRoute
   },
   'Completed': {
     variant: 'default',
-    label: 'Delivered'
+    label: strings.status.delivered
   },
   'Cancelled': {
     variant: 'destructive',
-    label: 'Cancelled'
+    label: strings.status.canceled
   }
 };
 

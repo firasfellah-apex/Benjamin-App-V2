@@ -11,6 +11,7 @@ import { canRevealRunner } from '@/lib/reveal';
 import { OrderStatus } from '@/types/types';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
+import { strings } from '@/lib/strings';
 
 interface RunnerIdentityProps {
   runnerName?: string;
@@ -72,7 +73,7 @@ export function RunnerIdentity({
       <div className="flex flex-col">
         {showLabel && (
           <span className="text-xs text-muted-foreground">
-            {canReveal ? 'Runner' : 'Runner (hidden)'}
+            {canReveal ? strings.customer.runner : strings.customer.runnerHidden}
           </span>
         )}
         <span
@@ -82,7 +83,7 @@ export function RunnerIdentity({
             !canReveal && 'blur-sm select-none'
           )}
         >
-          {canReveal ? runnerName || 'Unknown' : initial}
+          {canReveal ? runnerName || strings.customer.unknown : initial}
         </span>
       </div>
     </div>
