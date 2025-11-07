@@ -13,6 +13,31 @@ export type InvitationStatus = 'Pending' | 'Accepted' | 'Expired' | 'Revoked';
 
 export type KYCStatus = 'Pending' | 'Approved' | 'Failed';
 
+// Order Event for audit trail
+export interface OrderEvent {
+  id: string;
+  order_id: string;
+  from_status: OrderStatus | null;
+  to_status: OrderStatus;
+  actor_id: string | null;
+  actor_role: UserRole | null;
+  client_action_id: string | null;
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
+// Order Event with actor details (from rpc_get_order_history)
+export interface OrderEventWithDetails extends OrderEvent {
+  actor_name: string | null;
+}
+
+// Status transition validation
+export interface StatusTransition {
+  from_status: OrderStatus;
+  to_status: OrderStatus;
+  description: string | null;
+}
+
 export interface Profile {
   id: string;
   email: string | null;

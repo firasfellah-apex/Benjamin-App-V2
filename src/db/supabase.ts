@@ -1,10 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
+import { env } from "@/lib/env";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables");
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Supabase client singleton
+ * Uses validated environment variables from @/lib/env
+ * 
+ * DO NOT create new clients in components/hooks
+ * Always import and use this singleton instance
+ */
+export const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);

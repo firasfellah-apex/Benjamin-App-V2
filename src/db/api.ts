@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Profile, Invitation, Order, OrderWithDetails, InvitationWithDetails, UserRole, OrderStatus, FeeCalculation } from "@/types/types";
+import type { Profile, Invitation, Order, OrderWithDetails, InvitationWithDetails, UserRole, OrderStatus, FeeCalculation, OrderEventWithDetails } from "@/types/types";
 
 // Fee Calculation
 export function calculateFees(requestedAmount: number): FeeCalculation {
@@ -537,33 +537,8 @@ export async function acceptOrder(orderId: string): Promise<boolean> {
   }
 }
 
-export async function updateOrderStatus(
-  orderId: string,
-  status: OrderStatus,
-  additionalData?: Partial<Order>
-): Promise<boolean> {
-  const updates: Partial<Order> = { status, ...additionalData };
-
-  if (status === "Runner at ATM") {
-    updates.runner_at_atm_at = new Date().toISOString();
-  } else if (status === "Cash Withdrawn") {
-    updates.cash_withdrawn_at = new Date().toISOString();
-  } else if (status === "Completed") {
-    updates.handoff_completed_at = new Date().toISOString();
-  }
-
-  const { error } = await supabase
-    .from("orders")
-    .update(updates)
-    .eq("id", orderId);
-
-  if (error) {
-    console.error("Error updating order status:", error);
-    return false;
-  }
-
-  return true;
-}
+// Note: updateOrderStatus has been moved to FSM section below (line ~864)
+// It now uses advanceOrderStatus for proper FSM validation
 
 export async function generateOTP(orderId: string): Promise<string | null> {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -727,6 +702,156 @@ export async function getAuditLogs(limit = 100): Promise<any[]> {
   }
 
   return Array.isArray(data) ? data : [];
+}
+
+// ============================================================================
+// Finite State Machine (FSM) Functions
+// ============================================================================
+
+/**
+ * Advance order status using FSM with validation and audit trail
+ * This is the ONLY way to change order status - prevents illegal transitions
+ * 
+ * @param orderId - Order ID to update
+ * @param nextStatus - Target status
+ * @param clientActionId - Idempotency key (optional but recommended)
+ * @param metadata - Additional data to store in audit trail
+ * @returns Updated order or null if failed
+ */
+export async function advanceOrderStatus(
+  orderId: string,
+  nextStatus: OrderStatus,
+  clientActionId?: string,
+  metadata?: Record<string, any>
+): Promise<Order | null> {
+  try {
+    // Generate idempotency key if not provided
+    const actionId = clientActionId || crypto.randomUUID();
+    
+    const { data, error } = await supabase.rpc('rpc_advance_order', {
+      p_order_id: orderId,
+      p_next_status: nextStatus,
+      p_client_action_id: actionId,
+      p_metadata: metadata || {}
+    });
+
+    if (error) {
+      console.error('Error advancing order status:', error);
+      throw new Error(error.message);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to advance order status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get complete audit trail for an order
+ * Shows all status transitions with actor information
+ * 
+ * @param orderId - Order ID
+ * @returns Array of order events with details
+ */
+export async function getOrderHistory(orderId: string): Promise<OrderEventWithDetails[]> {
+  try {
+    const { data, error } = await supabase.rpc('rpc_get_order_history', {
+      p_order_id: orderId
+    });
+
+    if (error) {
+      console.error('Error fetching order history:', error);
+      return [];
+    }
+
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Failed to fetch order history:', error);
+    return [];
+  }
+}
+
+/**
+ * Check if a status transition is valid
+ * Useful for UI to show/hide action buttons
+ * 
+ * @param fromStatus - Current status
+ * @param toStatus - Target status
+ * @returns True if transition is allowed
+ */
+export async function isValidTransition(
+  fromStatus: OrderStatus,
+  toStatus: OrderStatus
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('is_valid_transition', {
+      p_from_status: fromStatus,
+      p_to_status: toStatus
+    });
+
+    if (error) {
+      console.error('Error checking transition validity:', error);
+      return false;
+    }
+
+    return data === true;
+  } catch (error) {
+    console.error('Failed to check transition validity:', error);
+    return false;
+  }
+}
+
+/**
+ * Get all valid next statuses for current order status
+ * Useful for showing available actions in UI
+ * 
+ * @param currentStatus - Current order status
+ * @returns Array of valid next statuses
+ */
+export async function getValidNextStatuses(currentStatus: OrderStatus): Promise<OrderStatus[]> {
+  try {
+    const { data, error } = await supabase
+      .from('order_status_transitions')
+      .select('to_status')
+      .eq('from_status', currentStatus);
+
+    if (error) {
+      console.error('Error fetching valid next statuses:', error);
+      return [];
+    }
+
+    return Array.isArray(data) ? data.map(row => row.to_status) : [];
+  } catch (error) {
+    console.error('Failed to fetch valid next statuses:', error);
+    return [];
+  }
+}
+
+// ============================================================================
+// Legacy function - DEPRECATED - Use advanceOrderStatus instead
+// ============================================================================
+
+/**
+ * @deprecated Use advanceOrderStatus instead for FSM validation
+ * This function bypasses FSM validation and should not be used
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  additionalData?: Partial<Order>
+): Promise<boolean> {
+  console.warn('⚠️ updateOrderStatus is deprecated. Use advanceOrderStatus instead for FSM validation.');
+  
+  // For backward compatibility, call the new FSM function
+  try {
+    const metadata = additionalData ? { legacy_data: additionalData } : {};
+    const result = await advanceOrderStatus(orderId, status, undefined, metadata);
+    return result !== null;
+  } catch (error) {
+    console.error('Error in legacy updateOrderStatus:', error);
+    return false;
+  }
 }
 
 // Real-time subscriptions
