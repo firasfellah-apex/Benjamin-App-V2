@@ -18,7 +18,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Avatar } from '@/components/common/Avatar';
-import { OrderTimeline } from '@/components/order/OrderTimeline';
+import { OrderProgressTimeline } from '@/components/order/OrderProgressTimeline';
 import { Chip } from '@/components/common/Chip';
 import { OrderWithDetails } from '@/types/types';
 import { MapPin, User, DollarSign, Clock } from 'lucide-react';
@@ -68,16 +68,9 @@ export function AdminOrderDrawer({
             {/* Timeline */}
             <div>
               <h3 className="text-sm font-medium mb-3">Order Progress</h3>
-              <OrderTimeline
+              <OrderProgressTimeline
                 currentStatus={order.status}
-                timestamps={{
-                  'Pending': order.created_at,
-                  'Runner Accepted': order.runner_accepted_at || undefined,
-                  'Runner at ATM': order.runner_at_atm_at || undefined,
-                  'Cash Withdrawn': order.cash_withdrawn_at || undefined,
-                  'Pending Handoff': order.handoff_completed_at || undefined,
-                  'Completed': order.status === 'Completed' ? order.updated_at : undefined
-                }}
+                variant="internal"
               />
             </div>
 

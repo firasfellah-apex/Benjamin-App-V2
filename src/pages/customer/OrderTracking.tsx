@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { getOrderById, subscribeToOrder, cancelOrder } from "@/db/api";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { OrderTimeline } from "@/components/order/OrderTimeline";
+import { OrderProgressTimeline } from "@/components/order/OrderProgressTimeline";
 import { RunnerIdentity } from "@/components/order/RunnerIdentity";
 import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
 import { SafetyBanner } from "@/components/common/SafetyBanner";
@@ -199,16 +199,8 @@ export default function OrderTracking() {
             <CardDescription>{strings.customer.deliveryProgressDesc}</CardDescription>
           </CardHeader>
           <CardContent>
-            <OrderTimeline
+            <OrderProgressTimeline
               currentStatus={order.status}
-              timestamps={{
-                'Pending': order.created_at,
-                'Runner Accepted': order.runner_accepted_at || undefined,
-                'Runner at ATM': order.runner_at_atm_at || undefined,
-                'Cash Withdrawn': order.cash_withdrawn_at || undefined,
-                'Pending Handoff': order.handoff_completed_at || undefined,
-                'Completed': order.status === 'Completed' ? order.updated_at : undefined
-              }}
               variant="customer"
             />
           </CardContent>

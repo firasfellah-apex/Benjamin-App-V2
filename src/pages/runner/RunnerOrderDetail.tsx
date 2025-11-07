@@ -9,7 +9,7 @@ import { getOrderById, updateOrderStatus, generateOTP, verifyOTP, subscribeToOrd
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
 import { Chip } from "@/components/common/Chip";
 import { Avatar } from "@/components/common/Avatar";
-import { OrderTimeline } from "@/components/order/OrderTimeline";
+import { OrderProgressTimeline } from "@/components/order/OrderProgressTimeline";
 import { RunnerOrderMap } from "@/components/order/RunnerOrderMap";
 import { triggerConfetti } from "@/lib/confetti";
 import { strings } from "@/lib/strings";
@@ -215,16 +215,9 @@ export default function RunnerOrderDetail() {
             <CardDescription>{strings.runner.deliveryProgressDesc}</CardDescription>
           </CardHeader>
           <CardContent>
-            <OrderTimeline
+            <OrderProgressTimeline
               currentStatus={order.status}
-              timestamps={{
-                'Pending': order.created_at,
-                'Runner Accepted': order.runner_accepted_at || undefined,
-                'Runner at ATM': order.runner_at_atm_at || undefined,
-                'Cash Withdrawn': order.cash_withdrawn_at || undefined,
-                'Pending Handoff': order.handoff_completed_at || undefined,
-                'Completed': order.status === 'Completed' ? order.updated_at : undefined
-              }}
+              variant="internal"
             />
           </CardContent>
         </Card>
