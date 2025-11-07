@@ -1,29 +1,22 @@
 import { useEffect, useState } from "react";
-import { Eye, Filter } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Filter, Package } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAllOrders, subscribeToOrders } from "@/db/api";
-import type { OrderWithDetails, OrderStatus } from "@/types/types";
-
-const statusColors: Record<OrderStatus, string> = {
-  "Pending": "bg-muted text-muted-foreground",
-  "Runner Accepted": "bg-accent text-accent-foreground",
-  "Runner at ATM": "bg-accent text-accent-foreground",
-  "Cash Withdrawn": "bg-accent text-accent-foreground",
-  "Pending Handoff": "bg-accent text-accent-foreground",
-  "Completed": "bg-success text-success-foreground",
-  "Cancelled": "bg-destructive text-destructive-foreground"
-};
+import type { OrderWithDetails } from "@/types/types";
+import { Chip } from "@/components/common/Chip";
+import { Avatar } from "@/components/common/Avatar";
+import { OrderListSkeleton } from "@/components/order/OrderListSkeleton";
+import { EmptyState } from "@/components/common/EmptyState";
+import { AdminOrderDrawer } from "@/components/admin/AdminOrderDrawer";
 
 export default function OrderMonitoring() {
-  const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const loadOrders = async () => {
     const data = await getAllOrders();
@@ -134,13 +127,13 @@ export default function OrderMonitoring() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading orders...
-            </div>
+            <OrderListSkeleton count={5} />
           ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No orders found</p>
-            </div>
+            <EmptyState
+              icon={Package}
+              title="No orders found"
+              description={statusFilter === "all" ? "Orders will appear here once customers make requests" : `No orders with status: ${statusFilter}`}
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -158,22 +151,45 @@ export default function OrderMonitoring() {
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
+                    <TableRow 
+                      key={order.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setDrawerOpen(true);
+                      }}
+                    >
                       <TableCell className="font-mono text-sm">
                         #{order.id.slice(0, 8)}
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
-                          {order.customer?.first_name} {order.customer?.last_name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {order.customer?.email}
+                        <div className="flex items-center gap-2">
+                          <Avatar
+                            src={order.customer?.avatar_url}
+                            fallback={`${order.customer?.first_name} ${order.customer?.last_name}`}
+                            size="sm"
+                          />
+                          <div>
+                            <div className="text-sm font-medium">
+                              {order.customer?.first_name} {order.customer?.last_name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {order.customer?.email}
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         {order.runner ? (
-                          <div className="text-sm">
-                            {order.runner.first_name} {order.runner.last_name}
+                          <div className="flex items-center gap-2">
+                            <Avatar
+                              src={order.runner.avatar_url}
+                              fallback={`${order.runner.first_name} ${order.runner.last_name}`}
+                              size="sm"
+                            />
+                            <div className="text-sm">
+                              {order.runner.first_name} {order.runner.last_name}
+                            </div>
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">Unassigned</span>
@@ -186,22 +202,13 @@ export default function OrderMonitoring() {
                         ${order.total_payment.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[order.status]}>
-                          {order.status}
-                        </Badge>
+                        <Chip status={order.status} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(order.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/admin/orders/${order.id}`)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
+                        <span className="text-xs text-muted-foreground">Click to view</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -211,6 +218,15 @@ export default function OrderMonitoring() {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin Order Drawer */}
+      {selectedOrder && (
+        <AdminOrderDrawer
+          order={selectedOrder}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+        />
+      )}
     </div>
   );
 }
