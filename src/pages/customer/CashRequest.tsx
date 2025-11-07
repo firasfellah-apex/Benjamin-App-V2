@@ -25,6 +25,7 @@ export default function CashRequest() {
   const [amount, setAmount] = useState(100);
   const [loading, setLoading] = useState(false);
   const [showFeeDetails, setShowFeeDetails] = useState(true); // Expanded by default
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
 
   // Calculate pricing
   const pricing = selectedAddress 
@@ -153,18 +154,21 @@ export default function CashRequest() {
             selectedAddressId={selectedAddress?.id || null}
             onAddressSelect={handleAddressSelect}
             onAddressChange={() => {}}
+            onEditingChange={setIsEditingAddress}
           />
 
-          {/* Sticky CTA */}
-          <div className="sticky bottom-4 pt-6">
-            <Button
-              onClick={handleNextStep}
-              disabled={!selectedAddress}
-              className="w-full h-11 rounded-xl bg-black text-white text-sm font-semibold hover:bg-black/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              Next · Set amount
-            </Button>
-          </div>
+          {/* Sticky CTA - Hidden while editing address */}
+          {!isEditingAddress && (
+            <div className="sticky bottom-4 pt-6">
+              <Button
+                onClick={handleNextStep}
+                disabled={!selectedAddress}
+                className="w-full h-11 rounded-xl bg-black text-white text-sm font-semibold hover:bg-black/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Next · Set amount
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
