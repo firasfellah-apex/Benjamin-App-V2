@@ -14,7 +14,7 @@ export function CustomerBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Only render on customer routes
+  // Only show on /customer routes
   if (!location.pathname.startsWith('/customer')) return null;
 
   return (
@@ -22,7 +22,7 @@ export function CustomerBottomNav() {
       <div className="container max-w-4xl mx-auto px-4 py-3">
         <button
           onClick={() => navigate('/customer/request')}
-          className="w-full h-14 rounded-2xl bg-black text-white font-semibold text-[15px] flex items-center justify-center shadow-lg hover:bg-black/90 transition-all active:scale-95"
+          className="w-full h-14 rounded-2xl bg-black text-white font-semibold text-[15px] flex items-center justify-center shadow-[0_-4px_18px_rgba(0,0,0,0.18)] hover:bg-black/90 active:scale-[0.98] transition-all"
         >
           Request Cash
         </button>
