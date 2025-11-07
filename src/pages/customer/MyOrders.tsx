@@ -10,6 +10,7 @@ import { Chip } from "@/components/common/Chip";
 import { Avatar } from "@/components/common/Avatar";
 import { OrderListSkeleton } from "@/components/order/OrderListSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
+import { strings } from "@/lib/strings";
 
 export default function MyOrders() {
   const navigate = useNavigate();
@@ -38,22 +39,22 @@ export default function MyOrders() {
     <div className="container max-w-6xl mx-auto py-8 px-4">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">My Orders</h1>
+          <h1 className="text-3xl font-bold mb-2">{strings.customer.ordersTitle}</h1>
           <p className="text-muted-foreground">
-            View and track your cash delivery orders
+            {strings.customer.ordersSubtitle}
           </p>
         </div>
         <Button onClick={() => navigate("/customer/request")}>
           <Plus className="mr-2 h-4 w-4" />
-          New Request
+          {strings.customer.newOrderButton}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Order History</CardTitle>
+          <CardTitle>{strings.customer.orderHistoryTitle}</CardTitle>
           <CardDescription>
-            All your cash delivery requests
+            {strings.customer.orderHistoryDesc}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -62,9 +63,9 @@ export default function MyOrders() {
           ) : orders.length === 0 ? (
             <EmptyState
               icon={Package}
-              title="No orders yet"
-              description="Your cash delivery orders will appear here once you make a request"
-              actionLabel="Create Your First Order"
+              title={strings.emptyStates.noOrders}
+              description={strings.emptyStates.noOrdersDesc}
+              actionLabel={strings.customer.createFirstOrder}
               onAction={() => navigate("/customer/request")}
             />
           ) : (
@@ -72,13 +73,13 @@ export default function MyOrders() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Runner</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>{strings.admin.orderId}</TableHead>
+                    <TableHead>{strings.customer.runner}</TableHead>
+                    <TableHead>{strings.admin.amount}</TableHead>
+                    <TableHead>{strings.admin.total}</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{strings.admin.created}</TableHead>
+                    <TableHead className="text-right">{strings.admin.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -100,7 +101,7 @@ export default function MyOrders() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Not assigned</span>
+                          <span className="text-sm text-muted-foreground">{strings.admin.notAssigned}</span>
                         )}
                       </TableCell>
                       <TableCell className="font-semibold">
