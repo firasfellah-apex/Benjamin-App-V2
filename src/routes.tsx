@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
+import Account from './pages/Account';
 
 import CashRequest from './pages/customer/CashRequest';
 import MyOrders from './pages/customer/MyOrders';
@@ -36,6 +37,12 @@ const routes: RouteConfig[] = [
     name: 'Login',
     path: '/login',
     element: <Login />,
+    visible: false
+  },
+  {
+    name: 'Account',
+    path: '/account',
+    element: <Account />,
     visible: false
   },
   {

@@ -38,6 +38,28 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   return data;
 }
 
+export async function updateCurrentProfile(updates: {
+  first_name?: string;
+  last_name?: string;
+  phone?: string | null;
+  email?: string;
+}): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("Error updating profile:", error);
+    return false;
+  }
+
+  return true;
+}
+
 export async function updateProfile(id: string, updates: Partial<Profile>): Promise<Profile | null> {
   const { data, error } = await supabase
     .from("profiles")

@@ -182,6 +182,13 @@ const Header = () => {
                       </div>
                       <Separator />
                       <div className="space-y-1 py-1">
+                        <button
+                          onClick={() => handleMenuItemClick("/account")}
+                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          <User className="mr-2 h-4 w-4" />
+                          My Profile
+                        </button>
                         {profile.role.includes('admin') && (
                           <button
                             onClick={() => handleMenuItemClick("/admin/dashboard")}
@@ -325,6 +332,17 @@ const Header = () => {
                     </Link>
                   </>
                 )}
+
+                <Separator className="my-2" />
+                
+                <Link
+                  to="/account"
+                  className="block px-3 py-2 text-base font-medium rounded-md hover:bg-muted"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User className="inline-block h-4 w-4 mr-2" />
+                  My Profile
+                </Link>
 
                 <Button
                   variant="outline"
