@@ -9,6 +9,7 @@ import { createOrder, formatAddress } from "@/db/api";
 import { useProfile } from "@/contexts/ProfileContext";
 import { strings } from "@/lib/strings";
 import { AddressSelector } from "@/components/address/AddressSelector";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { CustomerAddress } from "@/types/types";
 import { calculatePricing } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
@@ -221,14 +222,19 @@ export default function CashRequest() {
           {/* Amount Selection with Integrated Pricing */}
           <Card>
             <CardHeader>
-              <CardTitle>Cash Amount</CardTitle>
-              <CardDescription>Choose between $100 and $1,000</CardDescription>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-muted-foreground" />
+                <CardTitle>Cash Amount</CardTitle>
+              </div>
+              <CardDescription>
+                Choose between $100 and $1,000. Adjust anytime before you confirm.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Amount Slider */}
               <div className="space-y-4">
                 <div className="flex items-center justify-center">
-                  <div className="text-6xl font-bold transition-all duration-200">
+                  <div className="text-6xl font-bold transition-all duration-200 hover:scale-105">
                     ${amount}
                   </div>
                 </div>
@@ -264,12 +270,22 @@ export default function CashRequest() {
                   </div>
 
                   {/* Fee Breakdown Toggle */}
-                  <button
-                    onClick={() => setShowFeeDetails(!showFeeDetails)}
-                    className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <span>See how it adds up</span>
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setShowFeeDetails(!showFeeDetails)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        See how it adds up
+                      </button>
+                      <InfoTooltip label="Pricing transparency">
+                        Benjamin includes all service, delivery, and compliance costs upfront — no hidden extras, no surprises.
+                      </InfoTooltip>
+                    </div>
+                    <button
+                      onClick={() => setShowFeeDetails(!showFeeDetails)}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
                       <span className="underline">
                         {showFeeDetails ? 'Hide details' : 'Show details'}
                       </span>
@@ -278,8 +294,8 @@ export default function CashRequest() {
                       ) : (
                         <ChevronDown className="h-3 w-3" />
                       )}
-                    </div>
-                  </button>
+                    </button>
+                  </div>
 
                   {/* Fee Breakdown */}
                   {showFeeDetails && (
@@ -312,7 +328,7 @@ export default function CashRequest() {
             <Button
               onClick={handleSubmit}
               disabled={loading || !selectedAddress || !pricing}
-              className="w-full h-12 rounded-xl bg-black text-white text-base font-semibold hover:bg-black/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="w-full h-12 rounded-xl bg-black text-white text-base font-semibold hover:bg-black/90 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               {loading ? (
                 "Processing..."
@@ -323,9 +339,14 @@ export default function CashRequest() {
                 </>
               )}
             </Button>
-            <p className="text-xs text-center text-muted-foreground px-4">
-              By confirming, you agree to Benjamin's terms and understand this request is binding once a runner prepares your order.
-            </p>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-center text-muted-foreground px-4">
+              <p>
+                By confirming, you agree to Benjamin's terms and understand this request is binding once a runner prepares your order.
+              </p>
+              <InfoTooltip label="Binding request">
+                Once a runner commits to your request, we reserve your slot and begin handling cash. That's why cancellations may be limited.
+              </InfoTooltip>
+            </div>
           </div>
         </div>
       )}
