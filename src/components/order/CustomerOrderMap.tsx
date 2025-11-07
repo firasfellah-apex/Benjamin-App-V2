@@ -8,13 +8,11 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { SafetyBanner } from '@/components/common/SafetyBanner';
 import { canShowLiveRoute } from '@/lib/reveal';
 import { OrderStatus } from '@/types/types';
-import { MapPin, Lock, Navigation, Copy, Clock } from 'lucide-react';
+import { MapPin, Lock, Navigation, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface Location {
   lat: number;
@@ -48,13 +46,6 @@ export function CustomerOrderMap({
       setTimeout(() => setIsRevealing(false), 500);
     }
   }, [canShowMap]);
-
-  const handleCopyAddress = () => {
-    if (customerLocation?.address) {
-      navigator.clipboard.writeText(customerLocation.address);
-      toast.success('Address copied to clipboard');
-    }
-  };
 
   const getStaticMapUrl = (lat: number, lng: number, zoom = 15) => {
     // Using OpenStreetMap static map service
@@ -135,9 +126,9 @@ export function CustomerOrderMap({
           )}
         </div>
 
-        {/* Address & Actions */}
+        {/* Address Display */}
         {customerLocation?.address && (
-          <div className="p-4 space-y-3">
+          <div className="p-4">
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
@@ -145,16 +136,6 @@ export function CustomerOrderMap({
                 <p className="text-sm text-muted-foreground">{customerLocation.address}</p>
               </div>
             </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={handleCopyAddress}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copy Address
-            </Button>
           </div>
         )}
       </CardContent>
