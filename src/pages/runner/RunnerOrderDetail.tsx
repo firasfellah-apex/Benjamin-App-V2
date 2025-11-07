@@ -3,21 +3,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, DollarSign, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { getOrderById, updateOrderStatus, generateOTP, verifyOTP, subscribeToOrder } from "@/db/api";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
-
-const statusColors: Record<OrderStatus, string> = {
-  "Pending": "bg-muted text-muted-foreground",
-  "Runner Accepted": "bg-accent text-accent-foreground",
-  "Runner at ATM": "bg-accent text-accent-foreground",
-  "Cash Withdrawn": "bg-accent text-accent-foreground",
-  "Pending Handoff": "bg-accent text-accent-foreground",
-  "Completed": "bg-success text-success-foreground",
-  "Cancelled": "bg-destructive text-destructive-foreground"
-};
+import { Chip } from "@/components/common/Chip";
+import { Avatar } from "@/components/common/Avatar";
+import { OrderTimeline } from "@/components/order/OrderTimeline";
+import { RunnerOrderMap } from "@/components/order/RunnerOrderMap";
+import { triggerConfetti } from "@/lib/confetti";
 
 export default function RunnerOrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -96,8 +90,9 @@ export default function RunnerOrderDetail() {
     try {
       const success = await verifyOTP(orderId, otpValue);
       if (success) {
-        toast.success("Delivery completed successfully!");
-        navigate("/runner/orders");
+        triggerConfetti(3000);
+        toast.success("Delivery completed successfully! 🎉");
+        setTimeout(() => navigate("/runner/orders"), 2000);
       } else {
         toast.error("Invalid or expired OTP code");
         setOtpValue("");
@@ -153,9 +148,7 @@ export default function RunnerOrderDetail() {
                   Accepted {order.runner_accepted_at ? new Date(order.runner_accepted_at).toLocaleString() : 'Just now'}
                 </CardDescription>
               </div>
-              <Badge className={statusColors[order.status]}>
-                {order.status}
-              </Badge>
+              <Chip status={order.status} />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -185,9 +178,23 @@ export default function RunnerOrderDetail() {
               <div className="text-sm text-muted-foreground pl-6">
                 {order.customer_address}
               </div>
-              <div className="text-sm font-medium pl-6">
-                Customer: {order.customer_name}
-              </div>
+              
+              {/* Customer Info with Avatar */}
+              {order.customer && (
+                <div className="flex items-center gap-3 pl-6 mt-3">
+                  <Avatar
+                    src={order.customer.avatar_url}
+                    fallback={order.customer_name || 'Customer'}
+                    size="sm"
+                  />
+                  <div>
+                    <div className="text-sm font-medium">
+                      Customer: {order.customer_name}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {order.customer_notes && (
                 <div className="pl-6 mt-3">
                   <div className="text-sm font-medium mb-1">Delivery Notes:</div>
@@ -199,6 +206,44 @@ export default function RunnerOrderDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Order Timeline */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Delivery Progress</CardTitle>
+            <CardDescription>Track your delivery progress</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OrderTimeline
+              currentStatus={order.status}
+              timestamps={{
+                'Pending': order.created_at,
+                'Runner Accepted': order.runner_accepted_at || undefined,
+                'Runner at ATM': order.runner_at_atm_at || undefined,
+                'Cash Withdrawn': order.cash_withdrawn_at || undefined,
+                'Pending Handoff': order.handoff_completed_at || undefined,
+                'Completed': order.status === 'Completed' ? order.updated_at : undefined
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Map Component */}
+        {order.customer_address && (
+          <RunnerOrderMap
+            orderStatus={order.status}
+            customerLocation={{
+              lat: 40.7128,
+              lng: -74.0060,
+              address: order.customer_address
+            }}
+            atmLocation={{
+              lat: 40.7580,
+              lng: -73.9855,
+              address: 'ATM at 123 Main St'
+            }}
+          />
+        )}
 
         <Card>
           <CardHeader>
