@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Eye, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShellCard } from "@/components/ui/ShellCard";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getCustomerOrders, subscribeToOrders } from "@/db/api";
 import type { OrderWithDetails } from "@/types/types";
-import { Chip } from "@/components/common/Chip";
 import { Avatar } from "@/components/common/Avatar";
 import { OrderListSkeleton } from "@/components/order/OrderListSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -36,28 +36,32 @@ export default function MyOrders() {
   }, []);
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-between mb-8">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">{strings.customer.ordersTitle}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-black mb-2">{strings.customer.ordersTitle}</h1>
+          <p className="text-sm text-neutral-500">
             {strings.customer.ordersSubtitle}
           </p>
         </div>
-        <Button onClick={() => navigate("/customer/request")}>
+        <Button 
+          onClick={() => navigate("/customer/request")}
+          className="bg-black text-white hover:bg-black/90 rounded-full"
+        >
           <Plus className="mr-2 h-4 w-4" />
           {strings.customer.newOrderButton}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{strings.customer.orderHistoryTitle}</CardTitle>
-          <CardDescription>
-            {strings.customer.orderHistoryDesc}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ShellCard variant="customer">
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-black">{strings.customer.orderHistoryTitle}</h2>
+            <p className="text-sm text-neutral-500 mt-1">
+              {strings.customer.orderHistoryDesc}
+            </p>
+          </div>
+          
           {loading ? (
             <OrderListSkeleton count={3} />
           ) : orders.length === 0 ? (
@@ -101,7 +105,7 @@ export default function MyOrders() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">{strings.admin.notAssigned}</span>
+                          <span className="text-sm text-neutral-500">{strings.admin.notAssigned}</span>
                         )}
                       </TableCell>
                       <TableCell className="font-semibold">
@@ -111,9 +115,9 @@ export default function MyOrders() {
                         ${order.total_payment.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Chip status={order.status} />
+                        <StatusChip status={order.status} tone="customer" />
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-neutral-500">
                         {new Date(order.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
@@ -121,6 +125,7 @@ export default function MyOrders() {
                           variant="ghost"
                           size="sm"
                           onClick={() => navigate(`/customer/orders/${order.id}`)}
+                          className="hover:bg-neutral-100"
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View
@@ -132,8 +137,8 @@ export default function MyOrders() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ShellCard>
     </div>
   );
 }

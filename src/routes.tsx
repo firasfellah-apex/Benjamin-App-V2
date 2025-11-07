@@ -49,6 +49,12 @@ const routes: RouteConfig[] = [
     visible: false
   },
   {
+    name: 'Customer',
+    path: '/customer',
+    element: <CustomerLayout><CustomerHome /></CustomerLayout>,
+    visible: false
+  },
+  {
     name: 'Customer Home',
     path: '/customer/home',
     element: <CustomerLayout><CustomerHome /></CustomerLayout>,

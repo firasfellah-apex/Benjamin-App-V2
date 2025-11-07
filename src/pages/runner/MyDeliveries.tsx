@@ -2,22 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ShellCard } from "@/components/ui/ShellCard";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getRunnerOrders, subscribeToOrders } from "@/db/api";
-import type { OrderWithDetails, OrderStatus } from "@/types/types";
+import type { OrderWithDetails } from "@/types/types";
 import { useProfile } from "@/contexts/ProfileContext";
-
-const statusColors: Record<OrderStatus, string> = {
-  "Pending": "bg-muted text-muted-foreground",
-  "Runner Accepted": "bg-accent text-accent-foreground",
-  "Runner at ATM": "bg-accent text-accent-foreground",
-  "Cash Withdrawn": "bg-accent text-accent-foreground",
-  "Pending Handoff": "bg-accent text-accent-foreground",
-  "Completed": "bg-success text-success-foreground",
-  "Cancelled": "bg-destructive text-destructive-foreground"
-};
 
 export default function MyDeliveries() {
   const navigate = useNavigate();
@@ -49,87 +39,88 @@ export default function MyDeliveries() {
   const completedOrders = orders.filter(o => o.status === "Completed");
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-between mb-8">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">My Deliveries</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-white mb-2">My Deliveries</h1>
+          <p className="text-sm text-slate-400">
             Track your delivery orders and earnings
           </p>
         </div>
-        <Button onClick={() => navigate("/runner/available")}>
+        <Button 
+          onClick={() => navigate("/runner/available")}
+          className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl"
+        >
           View Available Orders
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 mb-8">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Monthly Earnings</CardDescription>
-            <CardTitle className="text-3xl">
+      <div className="grid gap-6 md:grid-cols-3">
+        <ShellCard variant="runner">
+          <div className="space-y-1">
+            <p className="text-sm text-slate-400">Monthly Earnings</p>
+            <p className="text-3xl font-bold text-white">
               ${profile?.monthly_earnings.toFixed(2) || '0.00'}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+            </p>
+          </div>
+        </ShellCard>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Active Deliveries</CardDescription>
-            <CardTitle className="text-3xl">
+        <ShellCard variant="runner">
+          <div className="space-y-1">
+            <p className="text-sm text-slate-400">Active Deliveries</p>
+            <p className="text-3xl font-bold text-white">
               {activeOrders.length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+            </p>
+          </div>
+        </ShellCard>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Completed This Month</CardDescription>
-            <CardTitle className="text-3xl">
+        <ShellCard variant="runner">
+          <div className="space-y-1">
+            <p className="text-sm text-slate-400">Completed This Month</p>
+            <p className="text-3xl font-bold text-white">
               {completedOrders.length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+            </p>
+          </div>
+        </ShellCard>
       </div>
 
       {activeOrders.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Active Deliveries</CardTitle>
-            <CardDescription>
-              Orders currently in progress
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ShellCard variant="runner">
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Active Deliveries</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Orders currently in progress
+              </p>
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Earnings</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Accepted</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                    <TableHead className="text-slate-300">Order ID</TableHead>
+                    <TableHead className="text-slate-300">Amount</TableHead>
+                    <TableHead className="text-slate-300">Earnings</TableHead>
+                    <TableHead className="text-slate-300">Status</TableHead>
+                    <TableHead className="text-slate-300">Accepted</TableHead>
+                    <TableHead className="text-right text-slate-300">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {activeOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
+                    <TableRow key={order.id} className="border-slate-700 hover:bg-slate-800/50">
+                      <TableCell className="font-mono text-sm text-slate-300">
                         #{order.id.slice(0, 8)}
                       </TableCell>
-                      <TableCell className="font-semibold">
+                      <TableCell className="font-semibold text-white">
                         ${order.requested_amount.toFixed(2)}
                       </TableCell>
-                      <TableCell className="font-semibold text-success">
+                      <TableCell className="font-semibold text-emerald-400">
                         ${order.delivery_fee.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[order.status]}>
-                          {order.status}
-                        </Badge>
+                        <StatusChip status={order.status} tone="runner" />
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-slate-400">
                         {order.runner_accepted_at ? new Date(order.runner_accepted_at).toLocaleString() : '-'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -137,6 +128,7 @@ export default function MyDeliveries() {
                           variant="ghost"
                           size="sm"
                           onClick={() => navigate(`/runner/orders/${order.id}`)}
+                          className="text-slate-300 hover:text-white hover:bg-slate-700"
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View
@@ -147,26 +139,29 @@ export default function MyDeliveries() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ShellCard>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Delivery History</CardTitle>
-          <CardDescription>
-            All your completed deliveries
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ShellCard variant="runner">
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Delivery History</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              All your completed deliveries
+            </p>
+          </div>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-slate-400">
               Loading deliveries...
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">No deliveries yet</p>
-              <Button onClick={() => navigate("/runner/available")}>
+              <p className="text-slate-400 mb-4">No deliveries yet</p>
+              <Button 
+                onClick={() => navigate("/runner/available")}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl"
+              >
                 View Available Orders
               </Button>
             </div>
@@ -174,33 +169,31 @@ export default function MyDeliveries() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Earnings</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                    <TableHead className="text-slate-300">Order ID</TableHead>
+                    <TableHead className="text-slate-300">Amount</TableHead>
+                    <TableHead className="text-slate-300">Earnings</TableHead>
+                    <TableHead className="text-slate-300">Status</TableHead>
+                    <TableHead className="text-slate-300">Completed</TableHead>
+                    <TableHead className="text-right text-slate-300">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
+                    <TableRow key={order.id} className="border-slate-700 hover:bg-slate-800/50">
+                      <TableCell className="font-mono text-sm text-slate-300">
                         #{order.id.slice(0, 8)}
                       </TableCell>
-                      <TableCell className="font-semibold">
+                      <TableCell className="font-semibold text-white">
                         ${order.requested_amount.toFixed(2)}
                       </TableCell>
-                      <TableCell className="font-semibold text-success">
+                      <TableCell className="font-semibold text-emerald-400">
                         ${order.delivery_fee.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[order.status]}>
-                          {order.status}
-                        </Badge>
+                        <StatusChip status={order.status} tone="runner" />
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-slate-400">
                         {order.handoff_completed_at ? new Date(order.handoff_completed_at).toLocaleDateString() : '-'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -208,6 +201,7 @@ export default function MyDeliveries() {
                           variant="ghost"
                           size="sm"
                           onClick={() => navigate(`/runner/orders/${order.id}`)}
+                          className="text-slate-300 hover:text-white hover:bg-slate-700"
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View
@@ -219,8 +213,8 @@ export default function MyDeliveries() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ShellCard>
     </div>
   );
 }

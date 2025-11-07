@@ -317,6 +317,7 @@ export default function OrderTracking() {
                 <OrderProgressTimeline
                   currentStatus={order.status}
                   variant="customer"
+                  tone="customer"
                 />
               </div>
 
