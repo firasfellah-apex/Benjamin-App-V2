@@ -10,6 +10,7 @@ import CashRequest from './pages/customer/CashRequest';
 import MyOrders from './pages/customer/MyOrders';
 import OrderTracking from './pages/customer/OrderTracking';
 
+import { RunnerLayout } from './components/layout/RunnerLayout';
 import AvailableOrders from './pages/runner/AvailableOrders';
 import MyDeliveries from './pages/runner/MyDeliveries';
 import RunnerOrderDetail from './pages/runner/RunnerOrderDetail';
@@ -74,19 +75,19 @@ const routes: RouteConfig[] = [
   {
     name: 'Available Orders',
     path: '/runner/available',
-    element: <AvailableOrders />,
+    element: <RunnerLayout><AvailableOrders /></RunnerLayout>,
     visible: false
   },
   {
     name: 'My Deliveries',
     path: '/runner/orders',
-    element: <MyDeliveries />,
+    element: <RunnerLayout><MyDeliveries /></RunnerLayout>,
     visible: false
   },
   {
     name: 'Runner Order Detail',
     path: '/runner/orders/:orderId',
-    element: <RunnerOrderDetail />,
+    element: <RunnerLayout><RunnerOrderDetail /></RunnerLayout>,
     visible: false
   },
   {
