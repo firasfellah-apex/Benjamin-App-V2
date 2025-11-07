@@ -4,6 +4,8 @@ import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 import Account from './pages/Account';
 
+import { CustomerLayout } from './components/layout/CustomerLayout';
+import CustomerHome from './pages/customer/CustomerHome';
 import CashRequest from './pages/customer/CashRequest';
 import MyOrders from './pages/customer/MyOrders';
 import OrderTracking from './pages/customer/OrderTracking';
@@ -46,21 +48,27 @@ const routes: RouteConfig[] = [
     visible: false
   },
   {
+    name: 'Customer Home',
+    path: '/customer/home',
+    element: <CustomerLayout><CustomerHome /></CustomerLayout>,
+    visible: false
+  },
+  {
     name: 'Request Cash',
     path: '/customer/request',
-    element: <CashRequest />,
+    element: <CustomerLayout><CashRequest /></CustomerLayout>,
     visible: false
   },
   {
     name: 'My Orders',
     path: '/customer/orders',
-    element: <MyOrders />,
+    element: <CustomerLayout><MyOrders /></CustomerLayout>,
     visible: false
   },
   {
     name: 'Order Tracking',
     path: '/customer/orders/:orderId',
-    element: <OrderTracking />,
+    element: <CustomerLayout><OrderTracking /></CustomerLayout>,
     visible: false
   },
   {

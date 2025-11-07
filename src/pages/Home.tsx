@@ -17,7 +17,7 @@ export default function Home() {
       } else if (profile.role.includes('runner')) {
         navigate("/runner/available", { replace: true });
       } else if (profile.role.includes('customer')) {
-        navigate("/customer/request", { replace: true });
+        navigate("/customer/home", { replace: true });
       }
     }
   }, [profile, loading, navigate]);
