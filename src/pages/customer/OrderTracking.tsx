@@ -1,45 +1,44 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Clock, MapPin, User, DollarSign } from "lucide-react";
+import { ArrowLeft, MapPin, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { getOrderById, subscribeToOrder, cancelOrder } from "@/db/api";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-
-const statusSteps: OrderStatus[] = [
-  "Pending",
-  "Runner Accepted",
-  "Runner at ATM",
-  "Cash Withdrawn",
-  "Pending Handoff",
-  "Completed"
-];
-
-const statusColors: Record<OrderStatus, string> = {
-  "Pending": "bg-muted text-muted-foreground",
-  "Runner Accepted": "bg-accent text-accent-foreground",
-  "Runner at ATM": "bg-accent text-accent-foreground",
-  "Cash Withdrawn": "bg-accent text-accent-foreground",
-  "Pending Handoff": "bg-accent text-accent-foreground",
-  "Completed": "bg-success text-success-foreground",
-  "Cancelled": "bg-destructive text-destructive-foreground"
-};
+import { OrderTimeline } from "@/components/order/OrderTimeline";
+import { RunnerIdentity } from "@/components/order/RunnerIdentity";
+import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
+import { SafetyBanner } from "@/components/common/SafetyBanner";
+import { Chip } from "@/components/common/Chip";
+import { triggerConfetti } from "@/lib/confetti";
+import { canRevealRunner } from "@/lib/reveal";
 
 export default function OrderTracking() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [previousStatus, setPreviousStatus] = useState<OrderStatus | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
 
     const loadOrder = async () => {
       const data = await getOrderById(orderId);
+      
+      // Trigger confetti on completion
+      if (data && previousStatus && previousStatus !== "Completed" && data.status === "Completed") {
+        triggerConfetti(3000);
+        toast.success("Order completed! 🎉");
+      }
+      
+      if (data) {
+        setPreviousStatus(data.status);
+      }
+      
       setOrder(data);
       setLoading(false);
     };
@@ -55,7 +54,7 @@ export default function OrderTracking() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [orderId]);
+  }, [orderId, previousStatus]);
 
   const handleCancel = async () => {
     if (!orderId || !order) return;
@@ -98,8 +97,8 @@ export default function OrderTracking() {
     );
   }
 
-  const currentStepIndex = statusSteps.indexOf(order.status);
   const canCancel = order.status === "Pending" || order.status === "Runner Accepted";
+  const showRunnerInfo = canRevealRunner(order.status);
 
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
@@ -113,6 +112,15 @@ export default function OrderTracking() {
       </Button>
 
       <div className="space-y-6">
+        {/* Safety Banner - shown before runner reveal */}
+        {!showRunnerInfo && order.runner_id && (
+          <SafetyBanner
+            message="Runner photo and live location will be visible after cash pickup for your safety"
+            storageKey="benjamin-safety-banner-dismissed"
+          />
+        )}
+
+        {/* Order Header */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
@@ -122,9 +130,7 @@ export default function OrderTracking() {
                   Created {new Date(order.created_at).toLocaleString()}
                 </CardDescription>
               </div>
-              <Badge className={statusColors[order.status]}>
-                {order.status}
-              </Badge>
+              <Chip status={order.status} />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -158,82 +164,55 @@ export default function OrderTracking() {
               </div>
             </div>
 
+            {/* Runner Identity with Safe Reveal */}
             {order.runner && (
               <>
                 <Separator />
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <User className="h-4 w-4" />
-                    Runner
-                  </div>
-                  <div className="text-sm text-muted-foreground pl-6">
-                    {order.runner.first_name} {order.runner.last_name}
-                  </div>
-                </div>
+                <RunnerIdentity
+                  runnerName={`${order.runner.first_name} ${order.runner.last_name}`}
+                  runnerAvatarUrl={order.runner.avatar_url}
+                  orderStatus={order.status}
+                  size="md"
+                  showLabel={true}
+                />
               </>
             )}
           </CardContent>
         </Card>
 
+        {/* Order Timeline */}
         <Card>
           <CardHeader>
             <CardTitle>Delivery Progress</CardTitle>
             <CardDescription>Track your cash delivery in real-time</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {statusSteps.map((status, index) => {
-                const isCompleted = index < currentStepIndex;
-                const isCurrent = index === currentStepIndex;
-                const isUpcoming = index > currentStepIndex;
-
-                return (
-                  <div key={status} className="flex items-start gap-4">
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                          isCompleted
-                            ? "border-success bg-success text-success-foreground"
-                            : isCurrent
-                              ? "border-accent bg-accent text-accent-foreground"
-                              : "border-muted bg-background text-muted-foreground"
-                        }`}
-                      >
-                        {isCompleted ? (
-                          <CheckCircle2 className="h-5 w-5" />
-                        ) : (
-                          <Clock className="h-5 w-5" />
-                        )}
-                      </div>
-                      {index < statusSteps.length - 1 && (
-                        <div
-                          className={`h-12 w-0.5 ${
-                            isCompleted ? "bg-success" : "bg-muted"
-                          }`}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-8">
-                      <div className={`font-medium ${isCurrent ? "text-foreground" : "text-muted-foreground"}`}>
-                        {status}
-                      </div>
-                      {isCompleted && (
-                        <div className="text-sm text-muted-foreground">
-                          Completed
-                        </div>
-                      )}
-                      {isCurrent && status !== "Completed" && (
-                        <div className="text-sm text-accent">
-                          In Progress
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <OrderTimeline
+              currentStatus={order.status}
+              timestamps={{
+                'Pending': order.created_at,
+                'Runner Accepted': order.runner_accepted_at || undefined,
+                'Runner at ATM': order.runner_at_atm_at || undefined,
+                'Cash Withdrawn': order.cash_withdrawn_at || undefined,
+                'Pending Handoff': order.handoff_completed_at || undefined,
+                'Completed': order.status === 'Completed' ? order.updated_at : undefined
+              }}
+            />
           </CardContent>
         </Card>
+
+        {/* Map Component */}
+        {order.customer_address && (
+          <CustomerOrderMap
+            orderStatus={order.status}
+            customerLocation={{
+              lat: 40.7128,
+              lng: -74.0060,
+              address: order.customer_address
+            }}
+            estimatedArrival="5 minutes"
+          />
+        )}
 
         {order.status === "Pending Handoff" && order.otp_code && (
           <Card>

@@ -1,22 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Eye } from "lucide-react";
+import { Plus, Eye, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getCustomerOrders, subscribeToOrders } from "@/db/api";
-import type { OrderWithDetails, OrderStatus } from "@/types/types";
-
-const statusColors: Record<OrderStatus, string> = {
-  "Pending": "bg-muted text-muted-foreground",
-  "Runner Accepted": "bg-accent text-accent-foreground",
-  "Runner at ATM": "bg-accent text-accent-foreground",
-  "Cash Withdrawn": "bg-accent text-accent-foreground",
-  "Pending Handoff": "bg-accent text-accent-foreground",
-  "Completed": "bg-success text-success-foreground",
-  "Cancelled": "bg-destructive text-destructive-foreground"
-};
+import type { OrderWithDetails } from "@/types/types";
+import { Chip } from "@/components/common/Chip";
+import { Avatar } from "@/components/common/Avatar";
+import { OrderListSkeleton } from "@/components/order/OrderListSkeleton";
+import { EmptyState } from "@/components/common/EmptyState";
 
 export default function MyOrders() {
   const navigate = useNavigate();
@@ -65,23 +58,22 @@ export default function MyOrders() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading orders...
-            </div>
+            <OrderListSkeleton count={3} />
           ) : orders.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">No orders yet</p>
-              <Button onClick={() => navigate("/customer/request")}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Order
-              </Button>
-            </div>
+            <EmptyState
+              icon={Package}
+              title="No orders yet"
+              description="Your cash delivery orders will appear here once you make a request"
+              actionLabel="Create Your First Order"
+              onAction={() => navigate("/customer/request")}
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order ID</TableHead>
+                    <TableHead>Runner</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Status</TableHead>
@@ -95,6 +87,22 @@ export default function MyOrders() {
                       <TableCell className="font-mono text-sm">
                         #{order.id.slice(0, 8)}
                       </TableCell>
+                      <TableCell>
+                        {order.runner ? (
+                          <div className="flex items-center gap-2">
+                            <Avatar
+                              src={order.runner.avatar_url}
+                              fallback={`${order.runner.first_name} ${order.runner.last_name}`}
+                              size="sm"
+                            />
+                            <span className="text-sm">
+                              {order.runner.first_name} {order.runner.last_name}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Not assigned</span>
+                        )}
+                      </TableCell>
                       <TableCell className="font-semibold">
                         ${order.requested_amount.toFixed(2)}
                       </TableCell>
@@ -102,9 +110,7 @@ export default function MyOrders() {
                         ${order.total_payment.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[order.status]}>
-                          {order.status}
-                        </Badge>
+                        <Chip status={order.status} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(order.created_at).toLocaleDateString()}
