@@ -58,6 +58,8 @@ export default function RunnerOrderDetail() {
       const success = await updateOrderStatus(orderId, newStatus as any);
       if (success) {
         toast.success(`Status updated to ${newStatus}`);
+        // Immediately reload order data for instant UI update
+        await loadOrder();
       }
     } catch (error) {
       toast.error("Failed to update status");
@@ -74,6 +76,8 @@ export default function RunnerOrderDetail() {
       const otp = await generateOTP(orderId);
       if (otp) {
         toast.success("OTP generated and sent to customer");
+        // Immediately reload order data for instant UI update
+        await loadOrder();
       }
     } catch (error) {
       toast.error("Failed to generate OTP");

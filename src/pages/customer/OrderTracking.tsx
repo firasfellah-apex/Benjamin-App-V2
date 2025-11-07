@@ -222,7 +222,7 @@ export default function OrderTracking() {
                           Completed
                         </div>
                       )}
-                      {isCurrent && (
+                      {isCurrent && status !== "Completed" && (
                         <div className="text-sm text-accent">
                           In Progress
                         </div>
@@ -256,9 +256,6 @@ export default function OrderTracking() {
                   </InputOTPGroup>
                 </InputOTP>
               </div>
-              <p className="text-sm text-muted-foreground text-center mt-4">
-                Code expires in 10 minutes
-              </p>
             </CardContent>
           </Card>
         )}
