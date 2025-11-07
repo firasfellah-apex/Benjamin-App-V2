@@ -12,12 +12,18 @@ type TimelineStep = {
 type OrderProgressTimelineProps = {
   currentStatus: OrderStatus;
   variant: 'customer' | 'internal';
+  tone?: 'customer' | 'runner';
 };
 
-export function OrderProgressTimeline({ currentStatus, variant }: OrderProgressTimelineProps) {
+export function OrderProgressTimeline({ 
+  currentStatus, 
+  variant,
+  tone = 'customer'
+}: OrderProgressTimelineProps) {
   let steps: TimelineStep[] = [];
   let currentIndex = -1;
   const isCanceled = currentStatus === 'Cancelled';
+  const isRunner = tone === 'runner';
 
   if (variant === 'customer') {
     const { step: currentStep } = getCustomerFacingStatus(currentStatus);
@@ -47,10 +53,18 @@ export function OrderProgressTimeline({ currentStatus, variant }: OrderProgressT
   }
 
   return (
-    <div className="rounded-2xl bg-white border border-black/5 shadow-sm p-6">
+    <div className={cn(
+      "rounded-2xl border shadow-sm p-6",
+      isRunner 
+        ? "bg-[#0B1020] border-[rgba(148,163,253,0.14)]"
+        : "bg-white border-black/5"
+    )}>
       <div className="relative">
         {/* Vertical line */}
-        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-neutral-200" />
+        <div className={cn(
+          "absolute left-[11px] top-2 bottom-2 w-px",
+          isRunner ? "bg-slate-700" : "bg-neutral-200"
+        )} />
         
         {/* Steps */}
         <div className="space-y-6">
@@ -66,9 +80,15 @@ export function OrderProgressTimeline({ currentStatus, variant }: OrderProgressT
                   <div
                     className={cn(
                       'flex items-center justify-center rounded-full transition-all duration-200',
-                      isCompleted && 'w-6 h-6 bg-black',
-                      isCurrent && 'w-7 h-7 bg-black ring-4 ring-black/10',
-                      isFuture && 'w-6 h-6 border-2 border-neutral-300 bg-white'
+                      isRunner ? (
+                        isCompleted && 'w-6 h-6 bg-[#6366F1]' ||
+                        isCurrent && 'w-7 h-7 bg-[#6366F1] ring-4 ring-[#6366F1]/20' ||
+                        isFuture && 'w-6 h-6 border-2 border-slate-700 bg-[#0B1020]'
+                      ) : (
+                        isCompleted && 'w-6 h-6 bg-black' ||
+                        isCurrent && 'w-7 h-7 bg-black ring-4 ring-black/10' ||
+                        isFuture && 'w-6 h-6 border-2 border-neutral-300 bg-white'
+                      )
                     )}
                   >
                     {isCompleted && (
@@ -84,14 +104,23 @@ export function OrderProgressTimeline({ currentStatus, variant }: OrderProgressT
                 <div
                   className={cn(
                     'flex-1 pb-2 transition-all duration-200',
-                    isCurrent && 'bg-neutral-50 -ml-2 -mt-1 pl-6 pr-4 py-3 rounded-xl shadow-sm scale-[1.02]'
+                    isCurrent && (
+                      isRunner 
+                        ? 'bg-[#6366F1]/10 -ml-2 -mt-1 pl-6 pr-4 py-3 rounded-xl shadow-sm scale-[1.02]'
+                        : 'bg-neutral-50 -ml-2 -mt-1 pl-6 pr-4 py-3 rounded-xl shadow-sm scale-[1.02]'
+                    )
                   )}
                 >
                   <div
                     className={cn(
                       'text-sm font-semibold transition-colors',
-                      (isCompleted || isCurrent) && 'text-black',
-                      isFuture && 'text-neutral-400'
+                      isRunner ? (
+                        (isCompleted || isCurrent) && 'text-white' ||
+                        isFuture && 'text-slate-500'
+                      ) : (
+                        (isCompleted || isCurrent) && 'text-black' ||
+                        isFuture && 'text-neutral-400'
+                      )
                     )}
                   >
                     {step.label}
@@ -100,8 +129,13 @@ export function OrderProgressTimeline({ currentStatus, variant }: OrderProgressT
                     <div
                       className={cn(
                         'text-xs mt-1 transition-colors',
-                        (isCompleted || isCurrent) && 'text-muted-foreground',
-                        isFuture && 'text-neutral-300'
+                        isRunner ? (
+                          (isCompleted || isCurrent) && 'text-slate-300' ||
+                          isFuture && 'text-slate-600'
+                        ) : (
+                          (isCompleted || isCurrent) && 'text-muted-foreground' ||
+                          isFuture && 'text-neutral-300'
+                        )
                       )}
                     >
                       {step.description}
@@ -116,15 +150,24 @@ export function OrderProgressTimeline({ currentStatus, variant }: OrderProgressT
           {isCanceled && (
             <div className="relative flex items-start gap-4">
               <div className="relative z-10 flex-shrink-0">
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-400">
+                <div className={cn(
+                  "flex items-center justify-center w-6 h-6 rounded-full",
+                  isRunner ? "bg-slate-700" : "bg-neutral-400"
+                )}>
                   <div className="w-2 h-2 bg-white rounded-full" />
                 </div>
               </div>
               <div className="flex-1 pb-2">
-                <div className="text-sm font-semibold text-neutral-600">
+                <div className={cn(
+                  "text-sm font-semibold",
+                  isRunner ? "text-slate-400" : "text-neutral-600"
+                )}>
                   Canceled
                 </div>
-                <div className="text-xs mt-1 text-neutral-400">
+                <div className={cn(
+                  "text-xs mt-1",
+                  isRunner ? "text-slate-600" : "text-neutral-400"
+                )}>
                   This request has been canceled
                 </div>
               </div>

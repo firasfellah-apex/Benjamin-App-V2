@@ -66,6 +66,32 @@ All colors MUST be HSL.
     --chart-4: 280 67% 55%;
     --chart-5: 0 84% 60%;
   }
+
+  /* Benjamin Customer Theme (Light) */
+  .app-customer {
+    --bg-page: 245 245 247;
+    --bg-card: 255 255 255;
+    --border-subtle: 0 0 0 / 0.05;
+    --text-main: 0 0 0;
+    --text-muted: 107 114 128;
+    --accent: 0 0 0;
+    --danger: 239 68 68;
+    --success: 22 163 74;
+    --warning: 249 115 22;
+  }
+
+  /* Benjamin Runner Theme (Dark) */
+  .app-runner {
+    --bg-page-runner: 2 8 23;
+    --bg-card-runner: 11 16 32;
+    --border-subtle-runner: 148 163 253 / 0.14;
+    --text-main-runner: 249 250 251;
+    --text-muted-runner: 156 163 175;
+    --accent-runner: 99 102 241;
+    --danger-runner: 249 115 115;
+    --success-runner: 34 197 94;
+    --warning-runner: 251 191 36;
+  }
 }
 
 @layer base {
