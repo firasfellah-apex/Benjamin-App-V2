@@ -109,16 +109,16 @@ export function AddressSelector({
 
   return (
     <>
-      <Card>
+      <Card className="bg-white border-black/5 rounded-3xl shadow-sm">
         <CardHeader>
-          <CardTitle>{strings.customer.addressSectionTitle}</CardTitle>
-          <CardDescription>Choose where we should deliver your cash</CardDescription>
+          <CardTitle className="text-black">{strings.customer.addressSectionTitle}</CardTitle>
+          <CardDescription className="text-neutral-500">Choose where we should deliver your cash</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {addresses.length === 0 ? (
-            <Alert>
-              <MapPin className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="bg-neutral-50 border-neutral-200">
+              <MapPin className="h-4 w-4 text-neutral-500" />
+              <AlertDescription className="text-neutral-500">
                 {strings.customer.addressRequiredError}
               </AlertDescription>
             </Alert>
@@ -131,51 +131,64 @@ export function AddressSelector({
               }}
             >
               <div className="space-y-3">
-                {addresses.map((address) => (
-                  <div
-                    key={address.id}
-                    className="flex items-start space-x-3 rounded-lg border p-4 hover:bg-accent/50 transition-colors"
-                  >
-                    <RadioGroupItem value={address.id} id={address.id} className="mt-1" />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor={address.id} className="flex items-center gap-2 cursor-pointer">
-                        <span className="font-semibold">{address.label}</span>
-                        {address.is_default && (
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            Default
-                          </span>
-                        )}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {formatAddress(address)}
-                      </p>
-                      {address.delivery_notes && (
-                        <p className="text-xs text-muted-foreground italic mt-1">
-                          Note: {address.delivery_notes}
+                {addresses.map((address) => {
+                  const isSelected = selectedAddressId === address.id;
+                  return (
+                    <div
+                      key={address.id}
+                      className={cn(
+                        "flex items-start space-x-3 rounded-2xl border p-4 transition-all cursor-pointer",
+                        isSelected 
+                          ? "bg-white border-black shadow-sm" 
+                          : "bg-white border-neutral-200 hover:bg-neutral-50"
+                      )}
+                      onClick={() => onAddressSelect(address)}
+                    >
+                      <RadioGroupItem value={address.id} id={address.id} className="mt-1" />
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor={address.id} className="flex items-center gap-2 cursor-pointer">
+                          <span className="font-semibold text-black">{address.label}</span>
+                          {address.is_default && (
+                            <span className="text-xs bg-black/5 text-black px-2 py-0.5 rounded-full font-medium">
+                              Default
+                            </span>
+                          )}
+                        </Label>
+                        <p className="text-sm text-neutral-500">
+                          {formatAddress(address)}
                         </p>
+                        {address.delivery_notes && (
+                          <p className="text-xs text-neutral-500 italic mt-1">
+                            Note: {address.delivery_notes}
+                          </p>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <div className="flex items-center gap-2">
+                          <Check className="h-5 w-5 text-black" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(address);
+                            }}
+                            className="text-black hover:bg-neutral-100"
+                          >
+                            {strings.customer.addressEdit}
+                          </Button>
+                        </div>
                       )}
                     </div>
-                    {selectedAddressId === address.id && (
-                      <div className="flex items-center gap-2">
-                        <Check className="h-5 w-5 text-primary" />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(address)}
-                        >
-                          {strings.customer.addressEdit}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </RadioGroup>
           )}
 
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full border-neutral-200 hover:bg-neutral-50 text-black rounded-full"
             onClick={() => {
               setEditingAddress(null);
               setShowForm(true);
@@ -197,13 +210,13 @@ export function AddressSelector({
           />
           
           {/* Modal Content */}
-          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="sticky top-0 z-10 bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
               <div>
-                <h2 className="text-xl font-bold">
+                <h2 className="text-xl font-bold text-black">
                   {editingAddress ? 'Edit delivery address' : 'Add delivery address'}
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-neutral-500 mt-1">
                   Choose where we should deliver your cash
                 </p>
               </div>
@@ -211,7 +224,7 @@ export function AddressSelector({
                 variant="ghost"
                 size="sm"
                 onClick={handleCancelForm}
-                className="text-xs text-muted-foreground hover:text-black"
+                className="text-neutral-500 hover:text-black hover:bg-neutral-100"
               >
                 <X className="h-4 w-4" />
               </Button>
