@@ -1,57 +1,109 @@
 /**
- * Safe Reveal Logic for Runner Information
+ * Runner Identity Reveal Logic
  * 
- * Runner identity (photo, full name, live location) should only be revealed
- * after the runner has picked up the cash to ensure safety and privacy.
+ * Controls when and how runner information is revealed to customers.
+ * This protects runner safety while maintaining customer trust.
+ * 
+ * Key principle: No premature location/face reveal until cash is secured.
  * 
  * Status Flow:
- * 1. Pending
- * 2. Runner Accepted
- * 3. Runner at ATM
- * 4. Cash Withdrawn ← REVEAL POINT (runner has cash)
- * 5. Pending Handoff (en route to customer)
- * 6. Completed
+ * 1. Pending → No runner info
+ * 2. Runner Accepted → First name + blurred avatar, no location
+ * 3. Runner at ATM → Still blurred, no location
+ * 4. Cash Withdrawn → TRUST SWITCH: Unblur avatar, show full name, start live map
+ * 5. Pending Handoff → Continue live tracking
+ * 6. Completed → Map stops, confirmation
  */
 
-import { OrderStatus } from '@/types/types';
-
-/**
- * Statuses where runner identity can be revealed
- * Only after cash is withdrawn should customer see runner photo and name
- */
-const REVEAL_STATUSES: OrderStatus[] = [
-  'Cash Withdrawn',
-  'Pending Handoff',
-  'Completed'
-];
+import type { OrderStatus } from '@/types/types';
 
 /**
- * Statuses where live route/map should be shown
- * Same as reveal statuses - only show live location after cash pickup
+ * Can we show ANY runner information?
+ * 
+ * Returns true once a runner has accepted the job.
+ * Before this, customers see no runner details at all.
  */
-const LIVE_ROUTE_STATUSES: OrderStatus[] = [
-  'Cash Withdrawn',
-  'Pending Handoff',
-  'Completed'
-];
-
-/**
- * Check if runner identity (photo, full name) can be revealed
- * @param status Current order status
- * @returns true if runner info should be shown, false if should be blurred/hidden
- */
-export function canRevealRunner(status: OrderStatus): boolean {
-  return REVEAL_STATUSES.includes(status);
+export function canRevealRunnerIdentity(status: OrderStatus): boolean {
+  return [
+    'Runner Accepted',
+    'Runner at ATM',
+    'Cash Withdrawn',
+    'Pending Handoff',
+    'Completed'
+  ].includes(status);
 }
 
 /**
- * Check if live route/map should be shown
- * @param status Current order status
- * @returns true if live map should be shown, false if should show placeholder
+ * Should we blur the runner's avatar?
+ * 
+ * Returns true until cash is actually picked up.
+ * This protects runner identity during the ATM phase.
+ * 
+ * Timeline:
+ * - Accepted → Blurred (show first name only)
+ * - At ATM → Still blurred
+ * - Cash Withdrawn → Unblurred (show full name + clear photo)
  */
-export function canShowLiveRoute(status: OrderStatus): boolean {
-  return LIVE_ROUTE_STATUSES.includes(status);
+export function shouldBlurRunnerAvatar(status: OrderStatus): boolean {
+  return [
+    'Runner Accepted',
+    'Runner at ATM'
+  ].includes(status);
 }
+
+/**
+ * Can we show live location tracking?
+ * 
+ * Returns true only after runner has confirmed cash pickup.
+ * This is the "trust switch" moment.
+ * 
+ * Before this: No map, no location data.
+ * After this: Full live tracking from runner → customer.
+ */
+export function canShowLiveLocation(status: OrderStatus): boolean {
+  return [
+    'Cash Withdrawn',
+    'Pending Handoff'
+  ].includes(status);
+}
+
+/**
+ * Get runner display name based on status
+ * 
+ * Returns appropriate name format:
+ * - Before cash pickup: First name only
+ * - After cash pickup: Full name
+ */
+export function getRunnerDisplayName(
+  firstName: string | undefined,
+  lastName: string | undefined,
+  status: OrderStatus
+): string {
+  if (!firstName) return 'Runner';
+  
+  // Show full name after cash is picked up
+  if (canShowLiveLocation(status) && lastName) {
+    return `${firstName} ${lastName}`;
+  }
+  
+  // Show first name only during preparation phase
+  return firstName;
+}
+
+/**
+ * Safety microcopy for customer tracking screen
+ * 
+ * Explains why information is revealed progressively.
+ */
+export const SAFETY_MICROCOPY = {
+  beforeCashPickup: "For everyone's safety, runner details and live tracking appear only once your cash is secured.",
+  duringDelivery: "Your runner's location is being tracked for your safety and theirs.",
+  afterDelivery: "Delivery complete. Location tracking has ended."
+};
+
+// Legacy compatibility exports
+export const canRevealRunner = canShowLiveLocation;
+export const canShowLiveRoute = canShowLiveLocation;
 
 /**
  * Get reveal status message for UI
@@ -59,11 +111,15 @@ export function canShowLiveRoute(status: OrderStatus): boolean {
  * @returns User-friendly message explaining when info will be revealed
  */
 export function getRevealMessage(status: OrderStatus): string {
-  if (canRevealRunner(status)) {
-    return 'Runner information is now visible';
+  if (canShowLiveLocation(status)) {
+    return SAFETY_MICROCOPY.duringDelivery;
   }
   
-  return 'Runner photo and live location will be visible after cash pickup';
+  if (canRevealRunnerIdentity(status)) {
+    return SAFETY_MICROCOPY.beforeCashPickup;
+  }
+  
+  return 'Runner information will appear once assigned.';
 }
 
 /**

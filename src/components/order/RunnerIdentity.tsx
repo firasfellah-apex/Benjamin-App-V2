@@ -1,20 +1,26 @@
 /**
- * Runner Identity Component with Safe Reveal
+ * Runner Identity Component with Progressive Reveal
  * 
  * Shows runner information with privacy protection:
- * - Before cash pickup: Blurred avatar + initial only
- * - After cash pickup: Full avatar + full name with smooth transition
+ * - Before accepted: No runner info
+ * - Accepted → At ATM: First name + blurred avatar
+ * - Cash Withdrawn+: Full name + clear avatar
  */
 
 import { Avatar } from '@/components/common/Avatar';
-import { canRevealRunner } from '@/lib/reveal';
+import { 
+  canRevealRunnerIdentity, 
+  shouldBlurRunnerAvatar,
+  getRunnerDisplayName 
+} from '@/lib/reveal';
 import { OrderStatus } from '@/types/types';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
 import { strings } from '@/lib/strings';
 
 interface RunnerIdentityProps {
-  runnerName?: string;
+  runnerFirstName?: string;
+  runnerLastName?: string;
   runnerAvatarUrl?: string | null;
   orderStatus: OrderStatus;
   showLabel?: boolean;
@@ -23,15 +29,18 @@ interface RunnerIdentityProps {
 }
 
 export function RunnerIdentity({
-  runnerName,
+  runnerFirstName,
+  runnerLastName,
   runnerAvatarUrl,
   orderStatus,
   showLabel = true,
   size = 'md',
   className
 }: RunnerIdentityProps) {
-  const canReveal = canRevealRunner(orderStatus);
-  const initial = runnerName?.charAt(0).toUpperCase() || '?';
+  const canReveal = canRevealRunnerIdentity(orderStatus);
+  const shouldBlur = shouldBlurRunnerAvatar(orderStatus);
+  const displayName = getRunnerDisplayName(runnerFirstName, runnerLastName, orderStatus);
+  const initial = runnerFirstName?.charAt(0).toUpperCase() || '?';
 
   const sizeClasses = {
     sm: 'gap-2',
@@ -51,18 +60,23 @@ export function RunnerIdentity({
     lg: 'text-lg'
   };
 
+  // Don't show anything if runner hasn't been assigned yet
+  if (!canReveal) {
+    return null;
+  }
+
   return (
     <div className={cn('flex items-center', sizeClasses[size], className)}>
       {/* Avatar with blur effect */}
       <div className="relative">
         <Avatar
           src={runnerAvatarUrl}
-          fallback={runnerName}
+          fallback={displayName}
           size={avatarSizes[size]}
-          blurred={!canReveal}
+          blurred={shouldBlur}
         />
         
-        {!canReveal && (
+        {shouldBlur && (
           <div className="absolute inset-0 flex items-center justify-center">
             <User className="h-1/2 w-1/2 text-muted-foreground" />
           </div>
@@ -73,17 +87,17 @@ export function RunnerIdentity({
       <div className="flex flex-col">
         {showLabel && (
           <span className="text-xs text-muted-foreground">
-            {canReveal ? strings.customer.runner : strings.customer.runnerHidden}
+            {shouldBlur ? strings.customer.runnerHidden : strings.customer.runner}
           </span>
         )}
         <span
           className={cn(
             'font-medium transition-all duration-500',
             textSizes[size],
-            !canReveal && 'blur-sm select-none'
+            shouldBlur && 'blur-sm select-none'
           )}
         >
-          {canReveal ? runnerName || strings.customer.unknown : initial}
+          {shouldBlur ? initial : displayName}
         </span>
       </div>
     </div>

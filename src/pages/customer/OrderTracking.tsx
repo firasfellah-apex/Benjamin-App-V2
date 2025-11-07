@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, DollarSign } from "lucide-react";
+import { ArrowLeft, MapPin, DollarSign, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { getOrderById, subscribeToOrder, cancelOrder } from "@/db/api";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
@@ -14,7 +15,8 @@ import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
 import { SafetyBanner } from "@/components/common/SafetyBanner";
 import { Chip } from "@/components/common/Chip";
 import { triggerConfetti } from "@/lib/confetti";
-import { canRevealRunner } from "@/lib/reveal";
+import { canShowLiveLocation, SAFETY_MICROCOPY } from "@/lib/reveal";
+import { getCustomerFacingStatus } from "@/lib/customerStatus";
 import { strings } from "@/lib/strings";
 
 export default function OrderTracking() {
@@ -99,7 +101,8 @@ export default function OrderTracking() {
   }
 
   const canCancel = order.status === "Pending" || order.status === "Runner Accepted";
-  const showRunnerInfo = canRevealRunner(order.status);
+  const showLiveMap = canShowLiveLocation(order.status);
+  const customerStatus = getCustomerFacingStatus(order.status);
 
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
@@ -113,23 +116,30 @@ export default function OrderTracking() {
       </Button>
 
       <div className="space-y-6">
-        {/* Safety Banner - shown before runner reveal */}
-        {!showRunnerInfo && order.runner_id && (
-          <SafetyBanner
-            message={strings.helpers.safetyBanner}
-            storageKey="benjamin-safety-banner-dismissed"
-          />
+        {/* Safety Banner - shown before live location */}
+        {!showLiveMap && order.runner_id && order.status !== 'Completed' && order.status !== 'Cancelled' && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              {SAFETY_MICROCOPY.beforeCashPickup}
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Order Header */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1">
                 <CardTitle>Order #{order.id.slice(0, 8)}</CardTitle>
                 <CardDescription>
                   Created {new Date(order.created_at).toLocaleString()}
                 </CardDescription>
+                {/* Customer-facing status */}
+                <div className="mt-3">
+                  <div className="text-lg font-semibold">{customerStatus.label}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{customerStatus.description}</div>
+                </div>
               </div>
               <Chip status={order.status} />
             </div>
@@ -170,7 +180,8 @@ export default function OrderTracking() {
               <>
                 <Separator />
                 <RunnerIdentity
-                  runnerName={`${order.runner.first_name} ${order.runner.last_name}`}
+                  runnerFirstName={order.runner.first_name}
+                  runnerLastName={order.runner.last_name}
                   runnerAvatarUrl={order.runner.avatar_url}
                   orderStatus={order.status}
                   size="md"
