@@ -209,6 +209,7 @@ export default function OrderTracking() {
                 'Pending Handoff': order.handoff_completed_at || undefined,
                 'Completed': order.status === 'Completed' ? order.updated_at : undefined
               }}
+              variant="customer"
             />
           </CardContent>
         </Card>

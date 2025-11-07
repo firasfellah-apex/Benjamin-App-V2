@@ -55,11 +55,17 @@ export function getCustomerFacingStatus(internalStatus: OrderStatus): CustomerFa
       };
     
     case 'Cash Withdrawn':
-    case 'Pending Handoff':
       return {
         label: 'On the way',
         step: 'ON_THE_WAY',
         description: 'Your runner has your cash and is on the way.'
+      };
+    
+    case 'Pending Handoff':
+      return {
+        label: 'Arrived',
+        step: 'ARRIVED',
+        description: 'Your runner has arrived. Please meet to receive your cash.'
       };
     
     case 'Completed':
@@ -70,17 +76,11 @@ export function getCustomerFacingStatus(internalStatus: OrderStatus): CustomerFa
       };
     
     case 'Cancelled':
-      return {
-        label: 'Cancelled',
-        step: 'CANCELED',
-        description: 'Request cancelled. No charge applied.'
-      };
-    
     default:
       return {
-        label: 'Processing',
-        step: 'REQUESTED',
-        description: 'Processing your request...'
+        label: 'Canceled',
+        step: 'CANCELED',
+        description: 'This request has been canceled.'
       };
   }
 }
