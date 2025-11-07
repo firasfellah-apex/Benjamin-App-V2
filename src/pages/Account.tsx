@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useAuth } from "miaoda-auth-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { updateCurrentProfile } from "@/db/api";
+import { AvatarUploader } from "@/components/common/AvatarUploader";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -188,6 +189,23 @@ export default function Account() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Picture</CardTitle>
+            <CardDescription>
+              Upload or change your profile picture
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AvatarUploader
+              currentAvatarUrl={profile.avatar_url}
+              userName={`${profile.first_name} ${profile.last_name}`}
+              onUploadComplete={() => refreshProfile()}
+              onRemoveComplete={() => refreshProfile()}
+            />
           </CardContent>
         </Card>
 
