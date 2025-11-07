@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { calculateFees, createOrder } from "@/db/api";
 import { useProfile } from "@/contexts/ProfileContext";
+import { strings } from "@/lib/strings";
 
 export default function CashRequest() {
   const navigate = useNavigate();
@@ -28,12 +29,12 @@ export default function CashRequest() {
 
   const handleSubmit = async () => {
     if (!customerAddress.trim()) {
-      toast.error("Please enter your delivery address");
+      toast.error(strings.customer.addressRequired);
       return;
     }
 
     if (profile && profile.daily_usage + fees.totalPayment > profile.daily_limit) {
-      toast.error(`Daily limit exceeded. Available: $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
+      toast.error(`${strings.customer.dailyLimitExceeded} $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
       return;
     }
 
@@ -41,12 +42,12 @@ export default function CashRequest() {
     try {
       const order = await createOrder(amount, customerAddress, customerNotes);
       if (order) {
-        toast.success("Order created successfully!");
+        toast.success(strings.toasts.orderPlaced);
         navigate(`/customer/orders/${order.id}`);
       }
     } catch (error) {
       console.error("Error creating order:", error);
-      toast.error("Failed to create order. Please try again.");
+      toast.error(strings.errors.generic);
     } finally {
       setLoading(false);
     }
@@ -55,17 +56,17 @@ export default function CashRequest() {
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Request Cash Delivery</h1>
+        <h1 className="text-3xl font-bold mb-2">{strings.customer.newOrderTitle}</h1>
         <p className="text-muted-foreground">
-          Get cash delivered securely to your location
+          {strings.customer.newOrderSubtitle}
         </p>
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Cash Amount</CardTitle>
+            <CardTitle>{strings.customer.cashAmountTitle}</CardTitle>
             <CardDescription>
-              Select amount between $100 - $1,000 (in $20 increments)
+              {strings.customer.cashAmountDesc}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -95,27 +96,27 @@ export default function CashRequest() {
               </div>
 
               <div>
-                <Label htmlFor="address">Delivery Address</Label>
+                <Label htmlFor="address">{strings.customer.deliveryAddressLabel}</Label>
                 <Input
                   id="address"
-                  placeholder="123 Main St, City, State"
+                  placeholder={strings.customer.deliveryAddressPlaceholder}
                   value={customerAddress}
                   onChange={(e) => setCustomerAddress(e.target.value)}
                 />
               </div>
 
               <div>
-                <Label htmlFor="notes">Delivery Notes (Optional)</Label>
+                <Label htmlFor="notes">{strings.customer.deliveryNotesLabel}</Label>
                 <Textarea
                   id="notes"
-                  placeholder="e.g., Ring doorbell, meet at lobby, call when arriving..."
+                  placeholder={strings.customer.deliveryNotesPlaceholder}
                   value={customerNotes}
                   onChange={(e) => setCustomerNotes(e.target.value)}
                   rows={3}
                   className="resize-none"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Provide any special instructions for the runner
+                  {strings.customer.deliveryNotesHelp}
                 </p>
               </div>
             </div>
@@ -124,40 +125,40 @@ export default function CashRequest() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Fee Breakdown</CardTitle>
+            <CardTitle>{strings.customer.feeBreakdownTitle}</CardTitle>
             <CardDescription>
-              Transparent pricing for your cash delivery
+              {strings.customer.feeBreakdownDesc}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-muted-foreground">Requested Amount</span>
+                <span className="text-muted-foreground">{strings.customer.cashAmount}</span>
                 <span className="font-semibold">${fees.requestedAmount.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-muted-foreground">Platform Fee</span>
+                <span className="text-sm text-muted-foreground">{strings.customer.platformFee}</span>
                 <span className="text-sm">${fees.profit.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-muted-foreground">Compliance Fee</span>
+                <span className="text-sm text-muted-foreground">{strings.customer.complianceFee}</span>
                 <span className="text-sm">${fees.complianceFee.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm text-muted-foreground">Delivery Fee</span>
+                <span className="text-sm text-muted-foreground">{strings.customer.deliveryFee}</span>
                 <span className="text-sm">${fees.deliveryFee.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between items-center py-2">
-                <span className="text-muted-foreground">Total Service Fee</span>
+                <span className="text-muted-foreground">{strings.customer.totalServiceFee}</span>
                 <span className="font-semibold">${fees.totalServiceFee.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between items-center py-3 text-primary-foreground rounded-lg px-4 mt-4 bg-[#fafafafa] bg-none">
-                <span className="font-bold text-[#000000ff]">Total Payment</span>
+                <span className="font-bold text-[#000000ff]">{strings.customer.totalPayment}</span>
                 <span className="text-2xl font-bold text-[#000000ff]">${fees.totalPayment.toFixed(2)}</span>
               </div>
             </div>
@@ -165,9 +166,9 @@ export default function CashRequest() {
             <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
               <Info className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
               <p className="text-sm text-muted-foreground">
-                Your daily limit: ${profile?.daily_limit.toFixed(2) || '0.00'}
+                {strings.customer.dailyLimitInfo}: ${profile?.daily_limit.toFixed(2) || '0.00'}
                 <br />
-                Used today: ${profile?.daily_usage.toFixed(2) || '0.00'}
+                {strings.customer.usedToday}: ${profile?.daily_usage.toFixed(2) || '0.00'}
               </p>
             </div>
 
@@ -178,7 +179,7 @@ export default function CashRequest() {
               size="lg"
             >
               <DollarSign className="mr-2 h-5 w-5" />
-              {loading ? "Creating Order..." : "Request Cash Delivery"}
+              {loading ? strings.buttons.loading : strings.customer.submitButton}
             </Button>
           </CardContent>
         </Card>
