@@ -15,6 +15,7 @@ import AvailableOrders from './pages/runner/AvailableOrders';
 import MyDeliveries from './pages/runner/MyDeliveries';
 import RunnerOrderDetail from './pages/runner/RunnerOrderDetail';
 
+import { RequireAdminAuth } from './components/auth/RequireAdminAuth';
 import Dashboard from './pages/admin/Dashboard';
 import UserManagement from './pages/admin/UserManagement';
 import InvitationManagement from './pages/admin/InvitationManagement';
@@ -99,37 +100,37 @@ const routes: RouteConfig[] = [
   {
     name: 'Admin Dashboard',
     path: '/admin/dashboard',
-    element: <Dashboard />,
+    element: <RequireAdminAuth><Dashboard /></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'User Management',
     path: '/admin/users',
-    element: <UserManagement />,
+    element: <RequireAdminAuth><UserManagement /></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Invitation Management',
     path: '/admin/invitations',
-    element: <InvitationManagement />,
+    element: <RequireAdminAuth><InvitationManagement /></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Order Monitoring',
     path: '/admin/orders',
-    element: <OrderMonitoring />,
+    element: <RequireAdminAuth><OrderMonitoring /></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Admin Order Detail',
     path: '/admin/orders/:orderId',
-    element: <AdminOrderDetail />,
+    element: <RequireAdminAuth><AdminOrderDetail /></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Runner Training',
     path: '/admin/training',
-    element: <RunnerTraining />,
+    element: <RequireAdminAuth><RunnerTraining /></RequireAdminAuth>,
     visible: false
   },
   {
