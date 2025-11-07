@@ -1,457 +1,232 @@
-# Benjamin Cash Delivery Service Requirements Document (Updated v2)\n
+# Benjamin Cash Delivery Service Requirements Document (Updated v3 - UI Enhancement)
+
 ## 1. Application Overview
-\n### 1.1 Application Name
-Benjamin Cash Delivery Service
+
+### 1.1 Application Name
+Benjamin Cash Delivery Service (Resident Cash App)
 
 ### 1.2 Application Description
-Benjamin is a dual-interface cash delivery service platform that provides users with secure, real-time cash delivery services. The system includes a customer app, runner app, and admin dashboard, utilizing real-time communication technology to ensure instant synchronization of order status and secure cash handoff processes.
-
-### 1.3 Core Value
-- Provide convenient cash delivery services
-- Ensure transaction security and regulatory compliance
-- Enable real-time order tracking and status updates
-- Establish complete operational audit chain
+Benjamin is a dual-interface cash delivery service platform that provides users with secure, real-time cash delivery services. The system includes a customer app, runner app, and admin dashboard, utilizing real-time communication technology to ensure instant synchronization of order status and secure cash handoff processes with enhanced UI/UX featuring safety-first design principles.
+\n### 1.3 Core Value\n- Provide convenient cash delivery services with real-time clarity
+- Ensure transaction security through progressive information reveal
+- Enable real-time order tracking with safety-gated visibility
+- Establish complete operational audit chain with visual timeline
 - Maintain controlled access through invitation-based role management
-- Enable administrative order management and intervention capabilities
+- Enable administrative order management with enhanced drawer interface
 
-## 2. Critical Issue Resolution for Order #aa00fbcd
+## 2. Enhanced UI/UX Architecture
 
-### 2.1 Administrative Access Issue
-**Problem**: Administrative access to view order #aa00fbcd is failing
+### 2.1 Safety-First Design Principles
+- **Progressive Information Reveal**: Runner identity and location only visible after cash pickup
+- **Status-Gated Visibility**: Map and personal details revealed based on order progression
+- **Real-time Clarity**: Live updates with smooth animations and clear status indicators
+- **Security Notifications**: Contextual safety banners and dismissible notices
 
-**Root Cause Analysis**:
-- Database query timeout due to missing index on order ID field
-- Socket.io room authentication failing for admin users
-- Order status corruption preventing proper data retrieval
-\n**Solution**:
-- Add compound index on orders collection: `{orderId: 1, status: 1, createdAt: -1}`
-- Implement admin authentication bypass for critical order access
-- Add order data integrity validation and auto-repair mechanism
-- Create emergency admin access endpoint: `POST /api/admin/emergency-access/{orderId}`
+### 2.2 Core UI Enhancement Goals
+- Real-time clarity with safety-first experience
+- Show runner map & photo only after cash pickup (status >= CashPicked)
+- Add avatars for all user roles with blur-to-reveal transitions
+- Add motion, polish, and safe-reveal logic without breaking current naming
+- Implement comprehensive status timeline with visual progression
 
-### 2.2 Diagnostic Report Implementation
-- **Order Health Check API**: `GET /api/orders/{orderId}/health` - Returns order data integrity status
-- **System Status Dashboard**: Real-time monitoring of order processing pipeline
-- **Error Logging Enhancement**: Structured logging with order ID correlation
-- **Admin Alert System**: Immediate notifications for order access failures
+## 3. Map System with Safe Reveal Logic
 
-## 3. End-to-End User Flow Redesign
+### 3.1 Customer Map (Status Gated)
+- **Pre-Reveal State**: Hidden until status reaches CashPicked|EnRoute|Delivered
+- **Placeholder Design**: Blurred placeholder card with lock icon before reveal
+- **Post-Reveal Features**: 
+  - Live runner location with smooth fade-in animation (Framer Motion)
+  - Real-time ETA calculations and updates
+  - Safety notice display with 'Share OTP' button
+  - Customer and runner pin markers with route visualization
 
-### 3.1 Complete Current Flow Mapping
-\n#### Customer Flow:\n1. **Registration/Login** → Google OAuth authentication
-2. **Profile Completion** → Name, phone, address collection (mandatory)
-3. **Order Creation** → Amount selection, delivery address, special instructions
-4. **Payment Processing** → Fee breakdown display and payment confirmation
-5. **Order Tracking** → Real-time status updates with runner information
-6. **Delivery Completion** → OTP verification and order closure
+### 3.2 Runner Map Interface
+- **Route Display**: Always shows ATM → Customer route once status reaches CashPicked
+- **Navigation Integration**: 'Navigate' button opens Google Maps/Apple Maps seamlessly
+- **Location History**: Breadcrumb dots showing last 5 runner positions
+- **Address Tools**: 'Copy address' functionality for easy access
+\n### 3.3 Admin Map Drawer
+- **Activation**: Clicking any order opens right-side drawer interface
+- **Content**: Timeline + live map + user avatars + audit event list
+- **Animation**: Smooth slide-in transition with focus management
+\n## 4. Avatar System Implementation
 
-#### Runner Flow:
-1. **Invitation Registration** → Admin-invited account setup
-2. **Job Dashboard** → Real-time job list with auto-refresh
-3. **Job Acceptance** → One-click accept with customer details display
-4. **ATM Navigation** → GPS guidance and arrival confirmation
-5. **Cash Withdrawal** → Transaction completion and OTP generation
-6. **Customer Delivery** → Address navigation and OTP verification
-7. **Earnings Update** → Automatic payment processing
+### 4.1 Avatar Infrastructure
+- **Database Field**: Add `avatar_url TEXT` to `profiles` table
+- **Storage**: Supabase bucket `avatars/{user.id}/profile.jpg`
+- **Sizes**: Responsive sizing (40/64/96/128/256px) with `object-fit: cover`
+- **Fallback**: Circular crop with initials fallback for missing avatars
 
-#### Admin Flow:
-1. **Dashboard Overview** → Real-time order monitoring
-2. **Order Investigation** → Detailed order view with full audit trail
-3. **User Management** → Customer/runner account administration
-4. **Issue Resolution** → Emergency access and manual intervention tools
-5. **Order Management** → Cancel pending orders with proper authorization
-\n### 3.2 Critical Flow Defects Resolution
+### 4.2 Avatar Security & Reveal Logic
+- **Runner Avatar Blur**: Blurred (blur(12px)) until status reaches CashPicked\n- **Reveal Animation**: Smooth transition from blur(12px) → blur(0) + name reveal
+- **Customer/Admin Avatars**: Always visible without restrictions
+- **Upload Restrictions**: JPG/PNG format, ≤5MB, center-crop square1024px
 
-#### Job Availability & Acceptance Issues:
-**Problem**: Runner must manually refresh to see available jobs
-\n**Root Cause**: Socket.io event not properly triggering UI updates
+### 4.3 Avatar Integration Points
+- Profile management page with upload/change/remove functionality
+- All user interaction interfaces (customer, runner, admin views)
+- Order cards and detail views with appropriate blur states
+- Communication interfaces and user identification areas
 
-**Solution**:
-- Implement WebSocket heartbeat mechanism with 5-second intervals
-- Add automatic job list refresh every 10 seconds as fallback
-- Create job notification sound/vibration for new opportunities
-- Add 'Pull to Refresh' gesture for manual updates
+## 5. Status Timeline & Progress Visualization
+\n### 5.1 OrderTimeline Component
+- **Status Flow**: Pending → Accepted → CashPicked → EnRoute → Delivered → Completed
+- **Visual Design**: Horizontal chip-based timeline with clear progression
+- **Active State**: Current step pulses with Framer Motion animation
+- **Completed Steps**: Show checkmark (✓) with timestamps
+- **Responsive Layout**: Adapts to mobile and desktop viewports
 
-#### Post-Acceptance Interface Glitch:
-**Problem**: 'Confirm Arrival at ATM' button missing after job acceptance
+### 5.2 Timeline Integration
+- **Customer View**: Prominent timeline showing delivery progress
+- **Runner View**: Task-focused timeline with next action emphasis
+- **Admin View**: Detailed timeline with intervention capabilities
 
-**Root Cause**: State management error in React Native navigation
+## 6. Enhanced User Interface Components
 
-**Solution**:
-- Implement Redux state persistence for order status
-- Add button state validation on component mount
-- Create fallback UI recovery mechanism
-- Add debug mode for interface state inspection
+### 6.1 Card System & Lists
+- **Runner Job Cards**: Available job cards with payout + distance display
+- **Customer Order Cards**: Condensed header with building info and ETA
+- **Admin Order Cards**: Table + drawer view with comprehensive audit information
+- **Loading States**: Skeleton screens for all card types during data fetch
 
-#### Customer Onboarding Logic Enhancement:
-**Problem**: Redundant name collection during order request
+### 6.2 Empty States & Feedback
+- **Empty Job Lists**: Friendly messages with refresh timestamps
+- **No Orders**: Contextual empty states with action suggestions
+- **Error States**: Clear error messages with retry mechanisms
+\n### 6.3 Safety Banner System
+- **Content**: 'Photo & live location visible after cash collection'
+- **Behavior**: Dismissible via localStorage persistence
+- **Placement**: Contextual placement on relevant screens
+- **Styling**: Non-intrusive but clearly visible safety notice
 
-**Solution**:
-- Move name collection to mandatory profile completion after registration
-- Require complete profile before first order placement
-- Add profile completeness validation middleware
-- Display profile completion progress indicator
+## 7. Toast Notifications & Celebrations
 
-## 4. Enhanced Functional Architecture
+### 7.1 Global Toast System
+- **Implementation**: Global `useToast()` hook with success/error states
+- **Triggers**: Status changes, job acceptance, cancellations, OTP verification
+- **Positioning**: Non-blocking toast positioning with auto-dismiss
+\n### 7.2 Celebration Animations
+- **Order Completion**: Light confetti animation at 'Completed' status
+- **Job Acceptance**: Subtle success animation for runners
+- **Milestone Achievements**: Micro-celebrations for key status transitions
 
-### 4.1 Customer App Features (Updated)
-- **Enhanced Profile Management**: Mandatory name, phone, default delivery address
-- **Improved Order Creation**: \n  - Delivery address selection (saved addresses + new address)
-  - Special instructions field (max 200 characters)
-  - Delivery time preferences\n- **Real-time Tracking**: Live runner location and ETA updates
-- **Communication Channel**: In-app messaging with assigned runner
-- **Order History**: Detailed history with receipt downloads
+## 8. Technical Implementation Architecture
 
-### 4.2 Runner App Features (Updated)
-- **Auto-Refreshing Job Board**: Real-time job updates without manual refresh
-- **Sequential Task Interface**:
-  - 'Accept Job' → 'Navigate to ATM' → 'Confirm ATM Arrival' → 'Cash Withdrawn' → 'Navigate to Customer' → 'Delivery Complete'
-- **Customer Information Display**: 
-  - Full delivery address with GPS coordinates
-  - Customer contact information
-  - Special delivery instructions
-  - Customer photo (if provided)
-- **Navigation Integration**: Built-in GPS navigation for ATM and customer locations
-- **Status Broadcasting**: One-tap status updates with automatic notifications
+### 8.1 Shared Helper Libraries
+- **`/lib/reveal.ts`**: \n  - `canRevealRunner(status)` - Determines runner info visibility
+  - `canShowLiveRoute(status)` - Controls map route display
+- **`/components/Chip.tsx`**: Unified status badges and indicators
+- **`/components/Avatar.tsx`**: Avatar component with initials fallback + blur prop
+- **`/components/SafetyBanner.tsx`**: Dismissible safety notices\n
+### 8.2 Map Provider System
+- **MapProvider Context**: Configurable map implementation
+- **Default Mode**: Static map display (no external dependencies)
+- **Enhanced Mode**: Google Maps JS integration via `VITE_ENABLE_GOOGLE_MAPS=1`
+- **Usage**: CustomerOrderMap + RunnerOrderMap components
 
-### 4.3 Admin Dashboard Features (Updated)
-- **Emergency Order Access**: Bypass normal authentication for critical order investigation
-- **Real-time System Health**: Order processing pipeline monitoring
-- **Advanced Order Investigation**: 
-  - Complete audit trail visualization
-  - Socket.io event history
-  - User interaction timeline
-  - System error correlation
-- **Automated Issue Detection**: AI-powered anomaly detection for order flows
-- **Manual Intervention Tools**: Force status updates, reassign orders, emergency contact
-- **Order Cancellation Management**: Cancel pending orders with proper authorization and audit trail
-
-## 5. NEW: Admin Order Cancellation Feature
-
-### 5.1 Core User Story & Acceptance Criteria\n
-**User Story**: As an administrator, I want to be able to cancel an order that is in a 'pending' status so that I can manage orders that require intervention (e.g., fraudulent attempts, customer requests, payment issues).
-
-**Acceptance Criteria**:
-- The 'Cancel Order' action MUST only be available to user accounts with an 'admin' role
-- The action MUST only be available for orders with a status of 'pending'\n- Upon cancellation, the order status MUST be updated to 'cancelled'\n- The system MUST log the cancellation event, including which admin performed the action and a timestamp
-- The system MUST send an automated email notification to the customer informing them of the cancellation
-- The admin MUST be prompted to confirm the action before it is finalized to prevent accidental cancellations
-- A mandatory reason for cancellation must be provided\n
-### 5.2 User Interface & User Experience Specifications
-
-#### Location & Visibility:\n- **Order List View**: 'Cancel Order' button appears in the action column for pending orders only
-- **Order Detail View**: 'Cancel Order' button positioned in the order actions section
-- **Button Style**: Secondary outline button with warning color (#FF3B30) when hovered
-- **State Management**: Button disabled/hidden for non-pending orders
-
-#### Confirmation Workflow:
-1. **Initial Click**: Triggers confirmation modal dialog
-2. **Modal Content**: \n   - Title: 'Cancel Order Confirmation'
-   - Message: 'Are you sure you want to cancel this pending order? This action cannot be undone.'
-   - Order details summary (Order ID, Customer, Amount)
-3. **Mandatory Reason Selection**:
-   - Dropdown with predefined options: 'Customer Request', 'Suspected Fraud', 'Item Unavailable', 'Duplicate Order', 'Payment Issue', 'Other'
-   - If 'Other' selected: Custom text field appears (max 200 characters)
-4. **Action Buttons**:
-   - 'Confirm Cancellation' (primary warning button)
-   - 'Go Back' (secondary button)
-
-### 5.3 Backend & Technical Implementation
-
-#### API Endpoint:
-```
-POST /admin/api/orders/{order_id}/cancel\n```
-\n#### Request Body:
-```javascript
-{
-  \"reason\": \"Customer Request\",
-  \"customReason\": \"Customer changed delivery address outside service area\", // Optional, only if reason is 'Other'
-  \"adminId\": \"admin_user_id\"
-}
+### 8.3 Database Schema Updates
+\n#### Enhanced Profiles Table
+```sql
+ALTER TABLE profiles ADD COLUMN avatar_url TEXT;
 ```
 
-#### Authentication & Authorization:
-- JWT token validation for admin role
-- Role-based access control verification
-- Admin user ID extraction from token\n
-#### Pre-condition Validation:
-- Order existence verification
-- Order status validation (must be 'pending')
-- Admin permission verification
+#### Avatar Storage Bucket
+- **Bucket Name**: `avatars`
+- **RLS Policy**: Users can only manage their own avatar folder
+- **File Structure**: `avatars/{user_id}/profile.jpg`
 
-#### Post-Cancellation Actions:
-1. Update order status to 'cancelled'
-2. Record cancellation in audit log
-3. Release any reserved inventory
-4. Initiate payment reversal/void if applicable
-5. Trigger customer notification email
-6. Update real-time dashboard displays
+## 9. Sequential Implementation Tasks
 
-### 5.4 Database Schema Updates
+### 9.1 Database & Storage Setup
+1. Add `avatar_url` column to profiles table
+2. Create `avatars` bucket with proper RLS policies
+3. Implement avatar upload/management API endpoints
 
-#### Enhanced Order Collection:
-```javascript
-{
-  // ... existing fields ...
-  
-  cancellation: {
-    cancelledBy: 'admin_user_id', // Only present if cancelled\n    cancelledAt: '2025-11-06T22:22:51Z',
-    reason: 'Customer Request',
-    customReason: 'Customer changed delivery address outside service area',
-    refundStatus: 'processed', // 'pending', 'processed', 'failed'
-    refundTransactionId: 'txn_1234567890'
-  },
-  
-  // ... rest of existing fields ...
-}\n```
-\n#### Enhanced Audit Log:
-```javascript
-{\n  _id: 'mongo_object_id',
-  orderId: 'aa00fbcd',
-  eventType: 'order_cancelled',
-  actor: {
-    userId: 'admin_user_id',\n    role: 'admin',
-    ipAddress: '192.168.1.1'\n  },
-  details: {
-    previousStatus: 'pending',
-    newStatus: 'cancelled',
-    reason: 'Customer Request',
-    customReason: 'Customer changed delivery address outside service area',
-    refundInitiated: true
-  },
-  timestamp: '2025-11-06T22:22:51Z'
-}\n```
+### 9.2 Core Components Development
+4. Create `AvatarUploader.tsx` with `useAvatar.ts` hook
+5. Integrate avatar functionality into Profile page
+6. Implement `RunnerIdentity.tsx` with safe-reveal logic
+\n### 9.3 Map System Implementation
+7. Build `CustomerOrderMap.tsx` with status-gated visibility
+8. Develop `RunnerOrderMap.tsx` with navigation integration
+9. Create `MapProvider` context with configurable backends
 
-### 5.5 Integration Requirements
+### 9.4 Timeline & Feedback Systems
+10. Implement `OrderTimeline.tsx` with Framer Motion animations
+11. Build global Toaster system with `useToast()` hook
+12. Create skeleton loading states and empty state components
 
-#### Payment Gateway Integration:
-- Automatic void/refund initiation for cancelled orders
-- Transaction status tracking and updates
-- Failed refund handling and retry mechanism
+### 9.5 Admin & Accessibility Enhancements
+13. Develop admin drawer interface with timeline + map integration
+14. Implement `SafetyBanner.tsx` with localStorage persistence
+15. Add comprehensive accessibility features (aria-live, focus management)
 
-#### Notification Service Integration:
-- Email template for order cancellation notifications
-- SMS backup notification if email fails
-- Internal admin notification for cancellation confirmations
+## 10. Visual Design System
 
-#### Real-time Updates:
-- Socket.io event broadcasting for order status changes
-- Dashboard refresh for affected order lists
-- Customer app notification if user is online
+### 10.1 Enhanced Color Scheme
+- **Primary Black**: #000000 (main interface elements)
+- **Pure White**: #FFFFFF (backgrounds and contrast)
+- **Interactive Blue**: #007AFF (buttons and links)
+- **Success Green**: #34C759 (confirmations and positive states)
+- **Warning Red**: #FF3B30 (errors, cancellations, and alerts)
+- **Blur Overlay**: rgba(0,0,0,0.1) for privacy protection
 
-### 5.6 Post-Cancellation User Experience
+### 10.2 Typography & Spacing\n- **Font Family**: Inter with clear hierarchy
+- **Sizes**: Display (32px), Heading (24px), Body (16px), Label (14px)
+- **Grid System**: 8pt grid with 24px horizontal margins
+- **Border Radius**: 12px for card components, 8px for smaller elements
 
-#### Success Feedback:
-- Success toast notification: 'Order #12345 has been successfully cancelled'
-- Automatic redirect to updated order details page
-- Order details page displays cancellation information clearly
-- Order removed from pending orders list
+### 10.3 Interactive Elements
+- **Haptic Feedback**: Button presses and status transitions
+- **Loading States**: Skeleton screens with shimmer effects
+- **Micro-animations**: Smooth transitions for status changes and reveals
+- **Focus Management**: Clear focus rings and keyboard navigation
 
-#### Error Handling:
-- Clear error messages for invalid cancellation attempts
-- Rollback mechanism for failed cancellations
-- Admin notification for system errors during cancellation
-\n## 6. Enhanced Data Models
+### 10.4 Accessibility Standards
+- **High Contrast**: WCAG AA compliant color ratios
+- **Voice-over Support**: Comprehensive screen reader compatibility
+- **Touch Targets**: Minimum 44px touch areas for mobile
+- **Aria Labels**: `aria-live='polite'` for status updates
+- **Focus Trapping**: Proper focus management in modals and drawers
 
-### 6.1 Updated Order Collection\n```javascript
-{
-  _id: 'mongo_object_id',
-  orderId: 'aa00fbcd', // Indexed field
-  \n  customer: {
-    userId: 'customer_user_id',
-    name: 'John Doe', // Collected at profile creation
-    phone: '+15551234567',\n    deliveryAddress: {
-      street: '123 Main St',
-      city: 'San Francisco',
-      state: 'CA',
-      zipCode: '94102',
-      coordinates: { lat: 37.7749, lng: -122.4194 },
-      specialInstructions: 'Ring doorbell twice, apartment 3B'
-    }
-  },\n  
-  runner: {
-    userId: 'runner_user_id',
-    assignedAt: '2025-11-06T10:00:00Z',\n    location: { lat: 37.7849, lng: -122.4094}\n  },
-  
-  orderDetails: {
-    requestedAmount: 500.00,
-    serviceFeesBreakdown: {\n      profit: 10.00,
-      complianceFee: 6.95,
-      deliveryFee: 8.16,
-      total: 25.11
-    },
-    totalCharge: 525.11\n  },
-  
-  status: 'pending', // Enhanced status tracking including 'cancelled'
-  statusHistory: [
-    { status: 'created', timestamp: '2025-11-06T09:00:00Z', actor: 'customer' },
-    { status: 'pending', timestamp: '2025-11-06T09:01:00Z', actor: 'system' }
-  ],\n  
-  verification: {
-    otpCode: 'hashed_otp',
-    otpExpiresAt: '2025-11-06T10:10:00Z',\n    otpAttempts: 0
-  },\n  
-  cancellation: {
-    cancelledBy: 'admin_user_id',
-    cancelledAt: '2025-11-06T22:22:51Z',
-    reason: 'Customer Request',
-    customReason: 'Customer changed delivery address outside service area',
-    refundStatus: 'processed',
-    refundTransactionId: 'txn_1234567890'
-  },
-  
-  systemHealth: {
-    lastHealthCheck: '2025-11-06T09:30:00Z',\n    dataIntegrity: 'valid',
-    socketConnections: ['customer_socket_id', 'runner_socket_id']
-  }\n}
-```\n
-### 6.2 System Audit Log Collection (Enhanced)
-```javascript
-{
-  _id: 'mongo_object_id',
-  orderId: 'aa00fbcd',\n  eventType: 'order_cancelled', // Added new event type
-  actor: {
-    userId: 'admin_user_id',
-    role: 'admin',
-    ipAddress: '192.168.1.1'\n  },
-  details: {\n    previousStatus: 'pending',\n    newStatus: 'cancelled',\n    reason: 'Customer Request',\n    customReason: 'Customer changed delivery address outside service area',
-    refundInitiated: true,
-    metadata: { customerNotified: true, refundAmount: 525.11 }\n  },
-  timestamp: '2025-11-06T22:22:51Z'
-}\n```
+## 11. Security & Privacy Enhancements
+\n### 11.1 Progressive Information Disclosure
+- **Runner Identity Protection**: Blur and hide personal details until cash pickup
+- **Location Privacy**: No live tracking until service phase begins
+- **Customer Protection**: OTP-based verification for secure handoffs
+\n### 11.2 Safety Notifications
+- **Context-Aware Banners**: Safety reminders at appropriate workflow stages
+- **Dismissible Notices**: User-controlled safety information display
+- **Emergency Protocols**: Clear escalation paths for security concerns
 
-## 7. Real-time Communication Enhancement
+## 12. Performance Optimization
 
-### 7.1 Improved Socket.io Architecture
+### 12.1 Real-time Updates
+- **Efficient Socket Management**: Optimized WebSocket connections\n- **Selective Broadcasting**: Targeted event distribution
 - **Connection Resilience**: Automatic reconnection with exponential backoff
-- **Event Acknowledgment**: Ensure all critical events are received and processed
-- **Heartbeat Monitoring**: 5-second ping/pong to detect connection issues
-- **Event Queuing**: Store events during disconnection for replay on reconnect
 
-### 7.2 Enhanced Event Flow
-- **job_available**: Broadcast to all active runners with location filtering
-- **job_accepted**: Notify customer and admins with runner details
-- **status_update**: Real-time status changes with location data
-- **order_cancelled**: Notify all relevant parties of order cancellation
-- **emergency_alert**: Critical system issues requiring immediate attention
-- **ui_recovery**: Trigger interface state recovery for glitched components
+### 12.2 Asset Management
+- **Avatar Optimization**: Automatic image compression and resizing
+- **Lazy Loading**: Progressive loading of non-critical interface elements
+- **Caching Strategy**: Intelligent caching for frequently accessed data
 
-## 8. Validation & Testing Protocol
+## 13. Testing & Validation
 
-### 8.1 Comprehensive Testing Strategy
+### 13.1 UI/UX Testing
+- **Reveal Logic Testing**: Verify proper information gating at each status
+- **Animation Performance**: Smooth transitions across devices
+- **Accessibility Compliance**: Screen reader and keyboard navigation testing
 
-#### Unit Testing (Jest)
-- Order data integrity validation
-- Socket.io event handling\n- OTP generation and verification
-- Fee calculation accuracy
-- User authentication flows
-- Order cancellation logic and validation
+### 13.2 Security Testing
+- **Information Leakage**: Ensure no premature data exposure
+- **Avatar Upload Security**: File type and size validation
+- **Privacy Controls**: Verify blur and reveal mechanisms
 
-#### Integration Testing (Cypress)
-- Complete customer order flow
-- Runner job acceptance and completion
-- Admin emergency access procedures
-- Admin order cancellation workflow\n- Real-time communication between all actors
-- Database transaction consistency
-
-#### Load Testing (Artillery)
-- Concurrent order processing
-- Socket.io connection limits
-- Database query performance under load
-- Real-time event broadcasting scalability
-\n### 8.2 Flow Validation Checklist\n
-#### Customer Flow Validation:
-- [ ] Profile completion enforced before first order
-- [ ] Delivery address validation and GPS coordinate generation
-- [ ] Real-time order status updates without refresh
-- [ ] OTP display and verification process
-- [ ] Order history accessibility and accuracy
-- [ ] Cancellation notification receipt and display
-
-#### Runner Flow Validation:\n- [ ] Automatic job list updates every 5 seconds
-- [ ] Sequential button availability (Accept → ATM → Withdraw → Deliver)
-- [ ] Customer information display completeness
-- [ ] GPS navigation integration functionality
-- [ ] Earnings calculation and display accuracy
-- [ ] Cancelled job removal from available jobs list
-
-#### Admin Flow Validation:
-- [ ] Emergency order access for problematic orders
-- [ ] Real-time system health monitoring
-- [ ] Complete audit trail visibility
-- [ ] Manual intervention tool effectiveness
-- [ ] User management and role assignment
-- [ ] Order cancellation authorization and execution
-- [ ] Cancellation reason validation and logging
-- [ ] Post-cancellation status updates and notifications
-
-### 8.3 Data Consistency Validation
-- **Order State Integrity**: Validate order status progression logic including cancellation
-- **User Role Consistency**: Ensure proper role-based access control for cancellation
-- **Socket Connection Health**: Monitor and validate real-time connections
-- **Payment Data Accuracy**: Verify fee calculations, payment processing, and refunds
-- **Audit Trail Completeness**: Ensure all actions including cancellations are properly logged
-
-## 9. Emergency Response Procedures
-
-### 9.1 Order Investigation Protocol
-1. **Immediate Access**: Use emergency admin endpoint for problematic orders
-2. **Data Integrity Check**: Run automated health check on order data
-3. **Socket Connection Audit**: Verify all parties are properly connected
-4. **Manual Status Override**: Admin ability to force status progression
-5. **Emergency Cancellation**: Immediate order cancellation for critical issues
-6. **Customer Communication**: Automated notifications for service disruptions
-\n### 9.2 System Recovery Mechanisms
-- **Automatic UI Recovery**: Detect and fix missing interface elements
-- **Database Repair Tools**: Automated data integrity restoration
-- **Socket Reconnection**: Seamless reconnection without user intervention
-- **Fallback Communication**: SMS notifications when app notifications fail
-- **Cancellation Rollback**: Ability to reverse accidental cancellations within 5 minutes
-\n## 10. Performance Optimization
-
-### 10.1 Database Optimization
-- **Compound Indexes**: Optimize query performance for order lookups including status filtering
-- **Connection Pooling**: Efficient database connection management
-- **Query Optimization**: Reduce database load with efficient queries
-- **Data Archiving**: Move completed and cancelled orders to archive collection
-
-### 10.2 Real-time Performance
-- **Event Batching**: Group non-critical events to reduce socket overhead
-- **Selective Broadcasting**: Send events only to relevant users
-- **Connection Monitoring**: Proactive detection of connection issues
-- **Caching Strategy**: Redis caching for frequently accessed data including admin permissions
-
-## 11. User Interface Design (Updated)
-
-### 11.1 Design Style
-- **Color Scheme**: Black primary (#000000), white secondary (#FFFFFF), blue interactive (#007AFF), green success (#34C759), red error/warning (#FF3B30)
-- **Typography**: Inter font family with clear hierarchy - Display (32px), Heading (24px), Body (16px), Label (14px)
-- **Layout System**: 8pt grid with 24px horizontal margins, card-based components with 12px border radius
-- **Interactive Elements**: Haptic feedback for button presses, loading states with skeleton screens, toast notifications for status updates
-- **Accessibility**: High contrast ratios, voice-over support, large touch targets (44px minimum)
-
-### 11.2 Enhanced Interface Components
-\n#### Customer Order Interface:
-- **Address Selection**: Dropdown with saved addresses plus 'Add New' option
-- **Special Instructions**: Expandable text area with character counter
-- **Fee Breakdown**: Collapsible section with detailed cost explanation
-- **Tracking Map**: Full-screen map with runner location and ETA
-- **Cancellation Notice**: Clear display of cancelled status with reason when applicable
-
-#### Runner Task Interface:
-- **Job Cards**: Swipe-to-accept cards with customer details preview
-- **Progress Stepper**: Visual progress indicator with current step highlighted
-- **Customer Info Panel**: Persistent bottom sheet with address and instructions
-- **Navigation Integration**: Seamless handoff to Google Maps/Apple Maps
-- **Cancelled Job Handling**: Automatic removal from job list with notification
-
-#### Admin Emergency Dashboard:
-- **Order Search**: Quick search with filters for problematic orders including cancelled status
-- **System Health Indicators**: Traffic light system for service status
-- **Intervention Tools**: One-click actions for common fixes including order cancellation
-- **Audit Timeline**: Chronological view of order events with filtering including cancellation events
-- **Cancellation Management**: Dedicated section for managing order cancellations with reason tracking
-
-## 12. Reference Files
-1. Technical Specification: Benjamin (Cash Delivery Service): Comprehensive Technical Pack & Implementation Guide (v3)
-2. Issue Analysis Screenshot: Screenshot 2025-11-06 at 2.31.30 PM.png - Shows invitation link display issue requiring manual copy
+## 14. Reference Files
+1. Screenshot 2025-11-06 at 2.31.30 PM.png - Invitation link display issue
+2. Screenshot 2025-11-06 at 5.50.27 PM.png - Order interface example
+3. Screenshot 2025-11-06 at 6.26.36 PM.png - Runner order view
+4. Screenshot 2025-11-06 at 6.38.42 PM.png - Error handling display
+5. Screenshot 2025-11-06 at 6.39.26 PM.png - Console error logs
+6. Screenshot 2025-11-06 at 6.39.32 PM.png - Deprecated feature warnings
+7. menu 1.png - Navigation menu design reference
