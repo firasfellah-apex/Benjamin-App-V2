@@ -10,6 +10,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { OrderListSkeleton } from "@/components/order/OrderListSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { AdminOrderDrawer } from "@/components/admin/AdminOrderDrawer";
+import { strings } from "@/lib/strings";
 
 export default function OrderMonitoring() {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
@@ -53,44 +54,44 @@ export default function OrderMonitoring() {
   return (
     <div className="container max-w-7xl mx-auto py-8 px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Order Monitoring</h1>
+        <h1 className="text-3xl font-bold mb-2">{strings.admin.monitorTitle}</h1>
         <p className="text-muted-foreground">
-          Real-time monitoring of all cash delivery orders
+          {strings.admin.monitorSubtitle}
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-5 mb-8">
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Total Orders</CardDescription>
+            <CardDescription>{strings.admin.totalOrders}</CardDescription>
             <CardTitle className="text-3xl">{stats.total}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Pending</CardDescription>
+            <CardDescription>{strings.admin.pending}</CardDescription>
             <CardTitle className="text-3xl">{stats.pending}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>In Progress</CardDescription>
+            <CardDescription>{strings.admin.inProgress}</CardDescription>
             <CardTitle className="text-3xl">{stats.active}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Completed</CardDescription>
+            <CardDescription>{strings.admin.completed}</CardDescription>
             <CardTitle className="text-3xl">{stats.completed}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Cancelled</CardDescription>
+            <CardDescription>{strings.admin.cancelled}</CardDescription>
             <CardTitle className="text-3xl">{stats.cancelled}</CardTitle>
           </CardHeader>
         </Card>
@@ -100,26 +101,26 @@ export default function OrderMonitoring() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>All Orders</CardTitle>
+              <CardTitle>{strings.admin.allOrders}</CardTitle>
               <CardDescription>
-                Monitor and track all delivery orders
+                {strings.admin.allOrdersDesc}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
+                  <SelectValue placeholder={strings.admin.filterByStatus} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Runner Accepted">Runner Accepted</SelectItem>
-                  <SelectItem value="Runner at ATM">Runner at ATM</SelectItem>
-                  <SelectItem value="Cash Withdrawn">Cash Withdrawn</SelectItem>
-                  <SelectItem value="Pending Handoff">Pending Handoff</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
+                  <SelectItem value="all">{strings.admin.allStatuses}</SelectItem>
+                  <SelectItem value="Pending">{strings.status.pending}</SelectItem>
+                  <SelectItem value="Runner Accepted">{strings.status.accepted}</SelectItem>
+                  <SelectItem value="Runner at ATM">{strings.status.runnerAtATM}</SelectItem>
+                  <SelectItem value="Cash Withdrawn">{strings.status.cashPicked}</SelectItem>
+                  <SelectItem value="Pending Handoff">{strings.status.pendingHandoff}</SelectItem>
+                  <SelectItem value="Completed">{strings.status.completed}</SelectItem>
+                  <SelectItem value="Cancelled">{strings.status.canceled}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -131,22 +132,22 @@ export default function OrderMonitoring() {
           ) : filteredOrders.length === 0 ? (
             <EmptyState
               icon={Package}
-              title="No orders found"
-              description={statusFilter === "all" ? "Orders will appear here once customers make requests" : `No orders with status: ${statusFilter}`}
+              title={strings.admin.empty}
+              description={statusFilter === "all" ? strings.admin.emptyDesc : `No orders with status: ${statusFilter}`}
             />
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Runner</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>{strings.admin.orderId}</TableHead>
+                    <TableHead>{strings.runner.customer}</TableHead>
+                    <TableHead>{strings.customer.runner}</TableHead>
+                    <TableHead>{strings.admin.amount}</TableHead>
+                    <TableHead>{strings.admin.total}</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{strings.admin.created}</TableHead>
+                    <TableHead className="text-right">{strings.admin.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -192,7 +193,7 @@ export default function OrderMonitoring() {
                             </div>
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Unassigned</span>
+                          <span className="text-sm text-muted-foreground">{strings.admin.unassigned}</span>
                         )}
                       </TableCell>
                       <TableCell className="font-semibold">
@@ -208,7 +209,7 @@ export default function OrderMonitoring() {
                         {new Date(order.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="text-xs text-muted-foreground">Click to view</span>
+                        <span className="text-xs text-muted-foreground">{strings.admin.clickToView}</span>
                       </TableCell>
                     </TableRow>
                   ))}
