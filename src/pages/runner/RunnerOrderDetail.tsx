@@ -12,6 +12,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { OrderTimeline } from "@/components/order/OrderTimeline";
 import { RunnerOrderMap } from "@/components/order/RunnerOrderMap";
 import { triggerConfetti } from "@/lib/confetti";
+import { strings } from "@/lib/strings";
 
 export default function RunnerOrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -51,12 +52,12 @@ export default function RunnerOrderDetail() {
     try {
       const success = await updateOrderStatus(orderId, newStatus as any);
       if (success) {
-        toast.success(`Status updated to ${newStatus}`);
+        toast.success(strings.toasts.statusUpdated);
         // Immediately reload order data for instant UI update
         await loadOrder();
       }
     } catch (error) {
-      toast.error("Failed to update status");
+      toast.error(strings.errors.generic);
     } finally {
       setUpdating(false);
     }
@@ -69,12 +70,12 @@ export default function RunnerOrderDetail() {
     try {
       const otp = await generateOTP(orderId);
       if (otp) {
-        toast.success("OTP generated and sent to customer");
+        toast.success(strings.toasts.otpGenerated);
         // Immediately reload order data for instant UI update
         await loadOrder();
       }
     } catch (error) {
-      toast.error("Failed to generate OTP");
+      toast.error(strings.errors.generic);
     } finally {
       setUpdating(false);
     }
@@ -82,7 +83,7 @@ export default function RunnerOrderDetail() {
 
   const handleVerifyOTP = async () => {
     if (!orderId || otpValue.length !== 6) {
-      toast.error("Please enter a valid 6-digit code");
+      toast.error(strings.errors.invalidOTP);
       return;
     }
 
@@ -91,14 +92,14 @@ export default function RunnerOrderDetail() {
       const success = await verifyOTP(orderId, otpValue);
       if (success) {
         triggerConfetti(3000);
-        toast.success("Delivery completed successfully! 🎉");
+        toast.success(strings.toasts.runnerCompleted);
         setTimeout(() => navigate("/runner/orders"), 2000);
       } else {
-        toast.error("Invalid or expired OTP code");
+        toast.error(strings.errors.invalidOTP);
         setOtpValue("");
       }
     } catch (error) {
-      toast.error("Failed to verify OTP");
+      toast.error(strings.errors.generic);
     } finally {
       setUpdating(false);
     }
@@ -108,7 +109,7 @@ export default function RunnerOrderDetail() {
     return (
       <div className="container max-w-4xl mx-auto py-8 px-4">
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading order details...</div>
+          <div className="text-muted-foreground">{strings.emptyStates.loading}</div>
         </div>
       </div>
     );
@@ -118,9 +119,9 @@ export default function RunnerOrderDetail() {
     return (
       <div className="container max-w-4xl mx-auto py-8 px-4">
         <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <div className="text-muted-foreground">Order not found</div>
+          <div className="text-muted-foreground">{strings.errors.orderNotFound}</div>
           <Button onClick={() => navigate("/runner/orders")}>
-            View My Orders
+            {strings.runner.backToOrders}
           </Button>
         </div>
       </div>
@@ -135,7 +136,7 @@ export default function RunnerOrderDetail() {
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Orders
+        {strings.runner.backToOrders}
       </Button>
 
       <div className="space-y-6">
@@ -156,7 +157,7 @@ export default function RunnerOrderDetail() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <DollarSign className="h-4 w-4" />
-                  <span>Cash to Withdraw</span>
+                  <span>{strings.runner.cashToWithdraw}</span>
                 </div>
                 <div className="text-3xl font-bold">${order.requested_amount.toFixed(2)}</div>
               </div>
@@ -164,7 +165,7 @@ export default function RunnerOrderDetail() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <DollarSign className="h-4 w-4" />
-                  <span>Your Earnings</span>
+                  <span>{strings.runner.yourEarnings}</span>
                 </div>
                 <div className="text-3xl font-bold text-success">${order.delivery_fee.toFixed(2)}</div>
               </div>
@@ -173,7 +174,7 @@ export default function RunnerOrderDetail() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <MapPin className="h-4 w-4" />
-                Delivery Address
+                {strings.customer.deliveryAddress}
               </div>
               <div className="text-sm text-muted-foreground pl-6">
                 {order.customer_address}
@@ -189,7 +190,7 @@ export default function RunnerOrderDetail() {
                   />
                   <div>
                     <div className="text-sm font-medium">
-                      Customer: {order.customer_name}
+                      {strings.runner.customer}: {order.customer_name}
                     </div>
                   </div>
                 </div>
@@ -197,7 +198,7 @@ export default function RunnerOrderDetail() {
               
               {order.customer_notes && (
                 <div className="pl-6 mt-3">
-                  <div className="text-sm font-medium mb-1">Delivery Notes:</div>
+                  <div className="text-sm font-medium mb-1">{strings.runner.deliveryNotes}:</div>
                   <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
                     {order.customer_notes}
                   </div>
@@ -210,8 +211,8 @@ export default function RunnerOrderDetail() {
         {/* Order Timeline */}
         <Card>
           <CardHeader>
-            <CardTitle>Delivery Progress</CardTitle>
-            <CardDescription>Track your delivery progress</CardDescription>
+            <CardTitle>{strings.runner.deliveryProgress}</CardTitle>
+            <CardDescription>{strings.runner.deliveryProgressDesc}</CardDescription>
           </CardHeader>
           <CardContent>
             <OrderTimeline
@@ -247,23 +248,23 @@ export default function RunnerOrderDetail() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Delivery Steps</CardTitle>
-            <CardDescription>Follow these steps to complete the delivery</CardDescription>
+            <CardTitle>{strings.runner.deliverySteps}</CardTitle>
+            <CardDescription>{strings.runner.deliveryStepsDesc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {order.status === "Runner Accepted" && (
               <div className="space-y-4">
                 <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">Step 1: Go to ATM</p>
+                  <p className="text-sm font-medium mb-2">{strings.runner.step1Title}</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Head to the nearest ATM to withdraw ${order.requested_amount.toFixed(2)}
+                    {strings.runner.step1Desc} ${order.requested_amount.toFixed(2)}
                   </p>
                   <Button
                     onClick={() => handleUpdateStatus("Runner at ATM")}
                     disabled={updating}
                     className="w-full"
                   >
-                    I've Arrived at ATM
+                    {strings.runner.step1Button}
                   </Button>
                 </div>
               </div>
@@ -272,16 +273,16 @@ export default function RunnerOrderDetail() {
             {order.status === "Runner at ATM" && (
               <div className="space-y-4">
                 <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">Step 2: Withdraw Cash</p>
+                  <p className="text-sm font-medium mb-2">{strings.runner.step2Title}</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Withdraw ${order.requested_amount.toFixed(2)} from the ATM
+                    {strings.runner.step2Desc} ${order.requested_amount.toFixed(2)}
                   </p>
                   <Button
                     onClick={() => handleGenerateOTP()}
                     disabled={updating}
                     className="w-full"
                   >
-                    Cash Withdrawn - Generate OTP
+                    {strings.runner.step2Button}
                   </Button>
                 </div>
               </div>
@@ -290,9 +291,9 @@ export default function RunnerOrderDetail() {
             {order.status === "Pending Handoff" && (
               <div className="space-y-4">
                 <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">Step 3: Complete Delivery</p>
+                  <p className="text-sm font-medium mb-2">{strings.runner.step3Title}</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Meet the customer and ask for their 6-digit verification code
+                    {strings.runner.step3Desc}
                   </p>
                   <div className="flex justify-center mb-4">
                     <InputOTP
@@ -316,7 +317,7 @@ export default function RunnerOrderDetail() {
                     className="w-full"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Verify & Complete Delivery
+                    {strings.runner.step3Button}
                   </Button>
                 </div>
               </div>
@@ -326,10 +327,10 @@ export default function RunnerOrderDetail() {
               <div className="p-4 bg-success/10 border border-success rounded-lg">
                 <div className="flex items-center gap-2 text-success mb-2">
                   <CheckCircle2 className="h-5 w-5" />
-                  <p className="font-medium">Delivery Completed!</p>
+                  <p className="font-medium">{strings.runner.completedTitle}</p>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  You earned ${order.delivery_fee.toFixed(2)} from this delivery
+                  {strings.runner.completedDesc} ${order.delivery_fee.toFixed(2)}
                 </p>
               </div>
             )}
