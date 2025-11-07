@@ -289,11 +289,22 @@ export async function revokeInvitation(invitationId: string): Promise<boolean> {
 export async function createOrder(
   requestedAmount: number,
   customerAddress: string,
-  customerName: string,
   customerNotes?: string
 ): Promise<Order | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+
+  // Fetch customer profile to get their name
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // Construct customer name from profile, with fallback
+  const customerName = profile && (profile.first_name || profile.last_name)
+    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+    : 'Customer';
 
   const fees = calculateFees(requestedAmount);
 
@@ -725,18 +736,22 @@ export async function createTestOrder(): Promise<{ success: boolean; orderId?: s
       return { success: false, message: "Unauthorized: Admin access required" };
     }
 
+    // Calculate fees for $100 test order
+    const fees = calculateFees(100);
+
     // Create a test order with mock data
     const testOrderData = {
       customer_id: user.id, // Use admin as customer for test
-      requested_amount: 100.00,
-      service_fee: 13.66,
-      delivery_fee: 8.16,
-      total_amount: 113.66,
+      requested_amount: fees.requestedAmount,
+      profit: fees.profit,
+      compliance_fee: fees.complianceFee,
+      delivery_fee: fees.deliveryFee,
+      total_service_fee: fees.totalServiceFee,
+      total_payment: fees.totalPayment,
       customer_address: "ABC Bank ATM, 123 XYZ Street",
       customer_name: "Test Customer",
       customer_notes: "🎓 TRAINING ORDER: This is a test order. Use this to familiarize yourself with the acceptance and completion process. Delivery location: Central Office, 456 Main Avenue.",
-      status: "Pending" as const,
-      created_at: new Date().toISOString()
+      status: "Pending" as const
     };
 
     const { data, error } = await supabase

@@ -15,7 +15,6 @@ export default function CashRequest() {
   const navigate = useNavigate();
   const { profile } = useProfile();
   const [amount, setAmount] = useState(100);
-  const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,11 +27,6 @@ export default function CashRequest() {
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim()) {
-      toast.error("Please enter your name");
-      return;
-    }
-
     if (!customerAddress.trim()) {
       toast.error("Please enter your delivery address");
       return;
@@ -45,7 +39,7 @@ export default function CashRequest() {
 
     setLoading(true);
     try {
-      const order = await createOrder(amount, customerAddress, customerName, customerNotes);
+      const order = await createOrder(amount, customerAddress, customerNotes);
       if (order) {
         toast.success("Order created successfully!");
         navigate(`/customer/orders/${order.id}`);
@@ -66,7 +60,6 @@ export default function CashRequest() {
           Get cash delivered securely to your location
         </p>
       </div>
-
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -98,13 +91,7 @@ export default function CashRequest() {
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Your Name</Label>
-                <Input
-                  id="name"
-                  placeholder="John Doe"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
+
               </div>
 
               <div>
@@ -169,9 +156,9 @@ export default function CashRequest() {
                 <span className="font-semibold">${fees.totalServiceFee.toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between items-center py-3 bg-primary text-primary-foreground rounded-lg px-4 mt-4">
-                <span className="font-bold">Total Payment</span>
-                <span className="text-2xl font-bold">${fees.totalPayment.toFixed(2)}</span>
+              <div className="flex justify-between items-center py-3 text-primary-foreground rounded-lg px-4 mt-4 bg-[#fafafafa] bg-none">
+                <span className="font-bold text-[#000000ff]">Total Payment</span>
+                <span className="text-2xl font-bold text-[#000000ff]">${fees.totalPayment.toFixed(2)}</span>
               </div>
             </div>
 
