@@ -17,7 +17,12 @@ export function CustomerBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  const isActive = (path: string) => {
+    if (path === '/customer/home') {
+      return location.pathname === '/customer/home' || location.pathname === '/customer';
+    }
+    return location.pathname.startsWith(path);
+  };
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-black/5 safe-area-inset-bottom">
@@ -65,7 +70,7 @@ export function CustomerBottomNav() {
             <div className="bg-black text-white rounded-2xl px-4 py-3 shadow-lg hover:bg-black/90 transition-all hover:scale-105 active:scale-95">
               <div className="flex flex-col items-center gap-1">
                 <DollarSign className="h-6 w-6" strokeWidth={2.5} />
-                <span className="text-[10px] font-semibold">Request Cash</span>
+                <span className="text-[10px] font-semibold">Request</span>
               </div>
             </div>
           </button>
