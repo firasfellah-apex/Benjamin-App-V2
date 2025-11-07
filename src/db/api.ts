@@ -730,18 +730,39 @@ export async function getAuditLogs(limit = 100): Promise<any[]> {
 }
 
 // Real-time subscriptions
+// Realtime Subscriptions
 export function subscribeToOrders(callback: (payload: any) => void) {
-  return supabase
+  const channel = supabase
     .channel("orders")
-    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, callback)
-    .subscribe();
+    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
+      console.log("[Realtime] Orders change detected:", payload.eventType, payload.new || payload.old);
+      callback(payload);
+    })
+    .subscribe((status) => {
+      console.log("[Realtime] Orders subscription status:", status);
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error("[Realtime] Orders subscription failed:", status);
+      }
+    });
+
+  return channel;
 }
 
 export function subscribeToOrder(orderId: string, callback: (payload: any) => void) {
-  return supabase
+  const channel = supabase
     .channel(`order:${orderId}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, callback)
-    .subscribe();
+    .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, (payload) => {
+      console.log(`[Realtime] Order ${orderId} change detected:`, payload.eventType, payload.new || payload.old);
+      callback(payload);
+    })
+    .subscribe((status) => {
+      console.log(`[Realtime] Order ${orderId} subscription status:`, status);
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error(`[Realtime] Order ${orderId} subscription failed:`, status);
+      }
+    });
+
+  return channel;
 }
 
 // Admin: Create a test/mock order for runner training
