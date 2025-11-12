@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { DollarSign, Menu, User, LogOut, Shield, Truck, Package, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "miaoda-auth-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import {
   Sheet,
@@ -33,20 +33,59 @@ const Header = () => {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
 
+  // Check if user is admin (reuse same logic as RequireAdminAuth)
+  const isAdmin = () => {
+    if (!user?.email) return false;
+    const email = user.email.toLowerCase();
+    return email === 'firasfellah@gmail.com' || email.includes('mock');
+  };
+
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
     setIsMenuOpen(false);
   };
 
-  const confirmLogout = () => {
-    logout();
+  const confirmLogout = async () => {
+    await logout();
     setShowLogoutDialog(false);
-    navigate("/login");
+    navigate("/"); // Redirect to landing page after logout
   };
 
   const handleMenuItemClick = (path: string) => {
     navigate(path);
     setIsMenuOpen(false);
+  };
+
+  // Check if a menu item is active based on current location
+  const isActive = (path: string, exact: boolean = false) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    
+    // Special handling for customer home - match both /customer and /customer/home
+    if (path === "/customer/home") {
+      return location.pathname === "/customer" || location.pathname === "/customer/home" || location.pathname.startsWith("/customer/home/");
+    }
+    
+    // For non-exact matches, check if pathname starts with the path
+    // This handles sub-routes like /customer/orders/123
+    return location.pathname.startsWith(path);
+  };
+
+  // Get menu item classes with active state
+  const getMenuItemClasses = (path: string, exact: boolean = false, isDestructive: boolean = false) => {
+    const baseClasses = "w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors text-left relative";
+    const active = isActive(path, exact);
+    
+    if (isDestructive) {
+      return `${baseClasses} ${active ? 'bg-destructive/10 text-destructive border-l-2 border-destructive' : 'text-destructive hover:bg-destructive/10 hover:text-destructive'}`;
+    }
+    
+    if (active) {
+      return `${baseClasses} bg-accent text-accent-foreground font-semibold border-l-2 border-primary`;
+    }
+    
+    return `${baseClasses} hover:bg-accent hover:text-accent-foreground`;
   };
 
   return (
@@ -76,17 +115,26 @@ const Header = () => {
                 <SheetHeader>
                   <SheetTitle>Menu</SheetTitle>
                   <SheetDescription>
-                    {user && profile ? (
+                    {user ? (
                       <div className="text-left">
-                        <p className="font-semibold text-foreground">{profile.first_name} {profile.last_name}</p>
-                        <p className="text-sm">{user.email}</p>
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          {profile.role.map((role) => (
-                            <Badge key={role} variant="secondary" className="text-xs">
-                              {role}
-                            </Badge>
-                          ))}
-                        </div>
+                        {profile ? (
+                          <>
+                            <p className="font-semibold text-foreground">{profile.first_name} {profile.last_name}</p>
+                            <p className="text-sm">{user.email}</p>
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {profile.role.map((role) => (
+                                <Badge key={role} variant="secondary" className="text-xs">
+                                  {role}
+                                </Badge>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-foreground">Loading profile...</p>
+                            <p className="text-sm">{user.email}</p>
+                          </>
+                        )}
                       </div>
                     ) : (
                       "Access your account"
@@ -95,12 +143,12 @@ const Header = () => {
                 </SheetHeader>
 
                 <div className="mt-6 space-y-1">
-                  {user && profile ? (
+                  {user ? (
                     <>
                       {/* Profile Link - Always First */}
                       <button
                         onClick={() => handleMenuItemClick("/account")}
-                        className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                        className={getMenuItemClasses("/account", true)}
                       >
                         <User className="h-5 w-5" />
                         <span>My Profile</span>
@@ -109,88 +157,81 @@ const Header = () => {
                       <Separator className="my-2" />
 
                       {/* Role-Specific Navigation */}
-                      {profile.role.includes('customer') && (
+                      {profile?.role.includes('customer') && (
                         <>
                           <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             Customer
                           </div>
                           <button
-                            onClick={() => handleMenuItemClick("/customer/request")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            onClick={() => handleMenuItemClick("/customer/home")}
+                            className={getMenuItemClasses("/customer/home", false)}
                           >
-                            <DollarSign className="h-5 w-5" />
-                            <span>Request Cash</span>
-                          </button>
-                          <button
-                            onClick={() => handleMenuItemClick("/customer/orders")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
-                          >
-                            <Package className="h-5 w-5" />
-                            <span>My Orders</span>
+                            <Home className={`h-5 w-5 ${isActive("/customer/home", false) ? 'text-accent-foreground' : ''}`} />
+                            <span>Home</span>
                           </button>
                         </>
                       )}
 
-                      {profile.role.includes('runner') && (
+                      {profile?.role.includes('runner') && (
                         <>
                           <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             Runner
                           </div>
                           <button
                             onClick={() => handleMenuItemClick("/runner/available")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/runner/available", false)}
                           >
-                            <Package className="h-5 w-5" />
+                            <Package className={`h-5 w-5 ${isActive("/runner/available", false) ? 'text-accent-foreground' : ''}`} />
                             <span>Available Orders</span>
                           </button>
                           <button
                             onClick={() => handleMenuItemClick("/runner/orders")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/runner/orders", false)}
                           >
-                            <Truck className="h-5 w-5" />
+                            <Truck className={`h-5 w-5 ${isActive("/runner/orders", false) ? 'text-accent-foreground' : ''}`} />
                             <span>My Deliveries</span>
                           </button>
                         </>
                       )}
 
-                      {profile.role.includes('admin') && (
+                      {(profile?.role.includes('admin') || isAdmin()) && (
                         <>
                           <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             Admin
                           </div>
                           <button
                             onClick={() => handleMenuItemClick("/admin/dashboard")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/admin/dashboard", false)}
                           >
-                            <Shield className="h-5 w-5" />
+                            <Shield className={`h-5 w-5 ${isActive("/admin/dashboard", false) ? 'text-accent-foreground' : ''}`} />
                             <span>Dashboard</span>
                           </button>
                           <button
                             onClick={() => handleMenuItemClick("/admin/users")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/admin/users", false)}
                           >
-                            <User className="h-5 w-5" />
+                            <User className={`h-5 w-5 ${isActive("/admin/users", false) ? 'text-accent-foreground' : ''}`} />
                             <span>Users</span>
                           </button>
                           <button
                             onClick={() => handleMenuItemClick("/admin/invitations")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/admin/invitations", false)}
                           >
-                            <Package className="h-5 w-5" />
+                            <Package className={`h-5 w-5 ${isActive("/admin/invitations", false) ? 'text-accent-foreground' : ''}`} />
                             <span>Invitations</span>
                           </button>
                           <button
                             onClick={() => handleMenuItemClick("/admin/orders")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/admin/orders", false)}
                           >
-                            <Package className="h-5 w-5" />
+                            <Package className={`h-5 w-5 ${isActive("/admin/orders", false) ? 'text-accent-foreground' : ''}`} />
                             <span>Orders</span>
                           </button>
                           <button
                             onClick={() => handleMenuItemClick("/admin/training")}
-                            className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                            className={getMenuItemClasses("/admin/training", false)}
                           >
-                            <Shield className="h-5 w-5" />
+                            <Shield className={`h-5 w-5 ${isActive("/admin/training", false) ? 'text-accent-foreground' : ''}`} />
                             <span>Training</span>
                           </button>
                         </>
@@ -201,7 +242,7 @@ const Header = () => {
                       {/* Logout Button - Always Last */}
                       <button
                         onClick={handleLogoutClick}
-                        className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-destructive hover:text-destructive-foreground transition-colors text-left text-destructive"
+                        className={getMenuItemClasses("", false, true)}
                       >
                         <LogOut className="h-5 w-5" />
                         <span>Log Out</span>
@@ -212,16 +253,16 @@ const Header = () => {
                       {/* Guest User Options */}
                       <button
                         onClick={() => handleMenuItemClick("/")}
-                        className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                        className={getMenuItemClasses("/", true)}
                       >
-                        <Home className="h-5 w-5" />
+                        <Home className={`h-5 w-5 ${isActive("/", true) ? 'text-accent-foreground' : ''}`} />
                         <span>Home</span>
                       </button>
                       <button
                         onClick={() => handleMenuItemClick("/login")}
-                        className="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                        className={getMenuItemClasses("/login", true)}
                       >
-                        <User className="h-5 w-5" />
+                        <User className={`h-5 w-5 ${isActive("/login", true) ? 'text-accent-foreground' : ''}`} />
                         <span>Log In</span>
                       </button>
                     </>

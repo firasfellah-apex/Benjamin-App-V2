@@ -30,22 +30,23 @@ DECLARE
   is_admin boolean := false;
 BEGIN
   IF OLD.confirmed_at IS NULL AND NEW.confirmed_at IS NOT NULL THEN
-    -- Check if email is in admin whitelist
-    IF NEW.email = 'firasfellah@gmail.com' THEN
-      is_admin := true;
-    END IF;
-    
-    -- Allow mock accounts in non-production (check via email pattern)
-    IF NEW.email LIKE '%mock%' THEN
-      is_admin := true;
-    END IF;
-    
-    -- Count existing users
+    -- Count existing users BEFORE inserting (to check if this is the very first user)
     SELECT COUNT(*) INTO user_count FROM profiles;
     
-    -- First user is always admin
-    IF user_count = 0 THEN
+    -- Only assign admin if:
+    -- 1. Email is explicitly whitelisted (firasfellah@gmail.com)
+    -- 2. Email contains 'mock' (for dev/testing)
+    -- 3. This is the VERY FIRST user (user_count = 0)
+    IF NEW.email = 'firasfellah@gmail.com' THEN
       is_admin := true;
+    ELSIF NEW.email LIKE '%mock%' THEN
+      is_admin := true;
+    ELSIF user_count = 0 THEN
+      -- Only the first user gets admin automatically
+      is_admin := true;
+    ELSE
+      -- All other users are customers by default
+      is_admin := false;
     END IF;
     
     -- Insert profile with appropriate role

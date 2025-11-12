@@ -3,26 +3,59 @@ import { useNavigate } from "react-router-dom";
 import { DollarSign, Truck, Shield, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { getCurrentProfile } from "@/db/api";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { profile, loading } = useProfile();
+  const { user, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
 
   useEffect(() => {
-    if (!loading && profile) {
-      // Redirect authenticated users to their role-specific dashboard
-      if (profile.role.includes('admin')) {
-        navigate("/admin/dashboard", { replace: true });
-      } else if (profile.role.includes('runner')) {
-        navigate("/runner/available", { replace: true });
-      } else if (profile.role.includes('customer')) {
-        navigate("/customer/home", { replace: true });
+    // Wait for auth and profile to finish loading before checking
+    if (authLoading || profileLoading) {
+      return;
+    }
+
+    if (user) {
+      // If profile is loaded, use it for routing
+      if (profile) {
+        console.log('User authenticated with profile, redirecting based on role:', profile.role);
+        
+        if (profile.role.includes('admin')) {
+          navigate('/admin/dashboard', { replace: true });
+        } else if (profile.role.includes('runner')) {
+          navigate('/runner/home', { replace: true });
+        } else {
+          navigate('/customer/home', { replace: true });
+        }
+      } else {
+        // Profile not loaded yet, try to fetch it
+        console.log('Profile not loaded, fetching...');
+        getCurrentProfile().then(profile => {
+          if (profile) {
+            console.log('Profile fetched, redirecting based on role:', profile.role);
+            
+            if (profile.role.includes('admin')) {
+              navigate('/admin/dashboard', { replace: true });
+            } else if (profile.role.includes('runner')) {
+              navigate('/runner/home', { replace: true });
+            } else {
+              navigate('/customer/home', { replace: true });
+            }
+          } else {
+            // No profile found, default to customer home
+            console.log('No profile found, defaulting to customer home');
+            navigate('/customer/home', { replace: true });
+          }
+        });
       }
     }
-  }, [profile, loading, navigate]);
+  }, [user, profile, authLoading, profileLoading, navigate]);
 
-  if (loading) {
+  // Show loading while checking auth or profile
+  if (authLoading || profileLoading) {
     return (
       <div className="container max-w-7xl mx-auto py-8 px-4">
         <div className="flex items-center justify-center h-64">
@@ -33,7 +66,7 @@ export default function Home() {
   }
 
   // Only show landing page to unauthenticated users
-  if (profile) {
+  if (user) {
     return null; // Will redirect via useEffect
   }
 

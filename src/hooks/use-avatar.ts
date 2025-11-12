@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/db/supabase';
-import { useAuth } from 'miaoda-auth-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UseAvatarReturn {
   uploading: boolean;
@@ -24,34 +24,27 @@ export function useAvatar(): UseAvatarReturn {
   const { user } = useAuth();
 
   /**
-   * Crop and resize image to square
+   * Resize image blob to 1024x1024 (image is already cropped by user)
    */
-  const cropToSquare = async (file: File): Promise<Blob> => {
+  const resizeImage = async (blob: Blob): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
       img.onload = () => {
-        const size = Math.min(img.width, img.height);
-        const x = (img.width - size) / 2;
-        const y = (img.height - size) / 2;
-
+        // Image should already be square from crop, but ensure it's 1024x1024
         canvas.width = 1024;
         canvas.height = 1024;
 
-        ctx?.drawImage(
-          img,
-          x, y, size, size,
-          0, 0, 1024, 1024
-        );
+        ctx?.drawImage(img, 0, 0, 1024, 1024);
 
         canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(blob);
+          (resultBlob) => {
+            if (resultBlob) {
+              resolve(resultBlob);
             } else {
-              reject(new Error('Failed to crop image'));
+              reject(new Error('Failed to resize image'));
             }
           },
           'image/jpeg',
@@ -60,7 +53,7 @@ export function useAvatar(): UseAvatarReturn {
       };
 
       img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = URL.createObjectURL(file);
+      img.src = URL.createObjectURL(blob);
     });
   };
 
@@ -77,8 +70,9 @@ export function useAvatar(): UseAvatarReturn {
 
     try {
       // Validate file type
-      if (!file.type.startsWith('image/')) {
-        throw new Error('File must be an image');
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('File must be a JPEG, PNG, or WebP image');
       }
 
       // Validate file size (5MB)
@@ -86,36 +80,70 @@ export function useAvatar(): UseAvatarReturn {
         throw new Error('File size must be less than 5MB');
       }
 
-      // Crop to square
-      const croppedBlob = await cropToSquare(file);
+      // Note: We skip the bucket existence check because listBuckets() may not work
+      // due to permissions. If the bucket doesn't exist, the upload will fail with
+      // a clear error message anyway.
+
+      // Resize to 1024x1024 (image is already cropped by user)
+      console.log('[Avatar Upload] Resizing image to 1024x1024...');
+      const resizedBlob = await resizeImage(file);
+      console.log('[Avatar Upload] Image resized successfully');
 
       // Upload to storage
+      // Bucket ID is case-sensitive - use the exact ID from your Supabase storage
+      // If your bucket name is "Avatars", the ID is likely "Avatars" (capital A)
+      const bucketId = 'Avatars'; // Changed to match bucket name in Dashboard
       const filePath = `${user.id}/profile.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, croppedBlob, {
+      console.log('[Avatar Upload] Uploading to bucket:', bucketId, 'path:', filePath);
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from(bucketId)
+        .upload(filePath, resizedBlob, {
           upsert: true,
-          contentType: 'image/jpeg'
+          contentType: 'image/jpeg',
+          cacheControl: '3600'
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[Avatar Upload] Upload error:', uploadError);
+        // Provide more specific error messages
+        if (uploadError.message.includes('new row violates row-level security')) {
+          throw new Error('Permission denied. Please ensure you are logged in and have permission to upload avatars.');
+        }
+        if (uploadError.message.includes('Bucket not found')) {
+          throw new Error('Avatar storage bucket not found. Please contact support.');
+        }
+        throw uploadError;
+      }
+
+      console.log('[Avatar Upload] File uploaded successfully:', uploadData);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
+        .from(bucketId)
         .getPublicUrl(filePath);
 
+      console.log('[Avatar Upload] Public URL:', publicUrl);
+
       // Update profile
+      console.log('[Avatar Upload] Updating profile with new avatar URL...');
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
         .eq('id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[Avatar Upload] Profile update error:', updateError);
+        // Try to clean up the uploaded file if profile update fails
+        await supabase.storage.from(bucketId).remove([filePath]);
+        throw updateError;
+      }
 
+      console.log('[Avatar Upload] Profile updated successfully');
       return publicUrl;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to upload avatar';
+      console.error('[Avatar Upload] Error:', err);
       setError(message);
       throw err;
     } finally {
@@ -135,23 +163,35 @@ export function useAvatar(): UseAvatarReturn {
     setError(null);
 
     try {
-      // Delete from storage
+      // Delete from storage (ignore errors if file doesn't exist)
+      // Bucket ID is case-sensitive - use the exact ID from your Supabase storage
+      const bucketId = 'Avatars'; // Changed to match bucket name in Dashboard
       const filePath = `${user.id}/profile.jpg`;
       const { error: deleteError } = await supabase.storage
-        .from('avatars')
+        .from(bucketId)
         .remove([filePath]);
 
-      if (deleteError) throw deleteError;
+      // Log but don't fail if file doesn't exist
+      if (deleteError && !deleteError.message.includes('not found')) {
+        console.warn('[Avatar Remove] Error deleting file:', deleteError);
+        // Continue anyway - we still want to clear the profile URL
+      }
 
-      // Update profile
+      // Update profile to remove avatar_url
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: null })
         .eq('id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[Avatar Remove] Profile update error:', updateError);
+        throw updateError;
+      }
+
+      console.log('[Avatar Remove] Avatar removed successfully');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to remove avatar';
+      console.error('[Avatar Remove] Error:', err);
       setError(message);
       throw err;
     } finally {

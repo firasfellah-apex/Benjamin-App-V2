@@ -1,18 +1,29 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { createAddress, updateAddress } from "@/db/api";
+import { createAddress, updateAddress, setDefaultAddress } from "@/db/api";
 import type { CustomerAddress } from "@/types/types";
 import { cn } from "@/lib/utils";
+import { IconPicker, ALL_ICONS } from "./IconPicker";
+import { addAddressCopy } from "@/lib/copy/addAddress";
+import { Plus, Minus } from "lucide-react";
+import { AddressAutocomplete } from "./AddressAutocomplete";
+import { BenjaminMap } from "@/components/map/BenjaminMap";
+import { useLocation } from "@/contexts/LocationContext";
+
+export interface AddressFormRef {
+  submit: () => void;
+  loading: boolean;
+  setLoadingCallback: (callback: (loading: boolean) => void) => void;
+}
 
 interface AddressFormProps {
   address?: CustomerAddress | null;
   onSave: (address: CustomerAddress) => void;
-  onCancel: () => void;
+  onCancel?: () => void; // Optional - cancel handled by modal footer
 }
 
 interface FormErrors {
@@ -23,26 +34,58 @@ interface FormErrors {
   postal_code?: string;
 }
 
-export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [formData, setFormData] = useState({
-    label: address?.label || "",
-    line1: address?.line1 || "",
-    line2: address?.line2 || "",
-    city: address?.city || "",
-    state: address?.state || "",
-    postal_code: address?.postal_code || "",
-    delivery_notes: address?.delivery_notes || "",
-    is_default: address?.is_default || false
-  });
+const DELIVERY_NOTES_TEMPLATES = [
+  "Meet in lobby",
+  "Ring doorbell",
+  "Call when near",
+  "Gate code: #1234",
+];
+
+export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
+  ({ address, onSave }, ref) => {
+    const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<FormErrors>({});
+    const formRef = useRef<HTMLFormElement>(null);
+    const loadingCallbackRef = useRef<((loading: boolean) => void) | null>(null);
+    
+    // Delivery notes section - closed by default
+    const [showDeliveryNotes, setShowDeliveryNotes] = useState(false);
+    const [formData, setFormData] = useState({
+      icon: address?.icon || 'Home',
+      label: address?.label || "",
+      line1: address?.line1 || "",
+      line2: address?.line2 || "",
+      city: address?.city || "",
+      state: address?.state || "",
+      postal_code: address?.postal_code || "",
+      delivery_notes: address?.delivery_notes || "",
+      is_default: address?.is_default || false,
+      latitude: address?.latitude || null,
+      longitude: address?.longitude || null,
+    });
+
+    const { location: liveLocation } = useLocation();
+
+    const updateLoading = (newLoading: boolean) => {
+      setLoading(newLoading);
+      loadingCallbackRef.current?.(newLoading);
+    };
+
+    useImperativeHandle(ref, () => ({
+      submit: () => {
+        formRef.current?.requestSubmit();
+      },
+      loading,
+      setLoadingCallback: (callback: (loading: boolean) => void) => {
+        loadingCallbackRef.current = callback;
+        callback(loading); // Immediately call with current state
+      }
+    }));
 
   const validateForm = (): boolean => {
     const nextErrors: FormErrors = {};
 
-    if (!formData.label.trim()) {
-      nextErrors.label = "Add a name for this address.";
-    }
+    // Label is optional - no validation needed
     if (!formData.line1.trim()) {
       nextErrors.line1 = "Please enter a street address.";
     }
@@ -60,83 +103,189 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate all fields at once
-    if (!validateForm()) {
-      return;
-    }
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      // Validate all fields at once
+      if (!validateForm()) {
+        return;
+      }
 
-    setLoading(true);
+      updateLoading(true);
 
     try {
       if (address) {
         // Update existing address
-        const success = await updateAddress(address.id, formData);
+        const updateFields = {
+          icon: formData.icon || 'Home',
+          label: formData.label?.trim() || "",
+          delivery_notes: formData.delivery_notes?.trim() || null,
+          line2: formData.line2?.trim() || null,
+          line1: formData.line1,
+          city: formData.city,
+          state: formData.state,
+          postal_code: formData.postal_code,
+          latitude: formData.latitude || null,
+          longitude: formData.longitude || null,
+        };
+        
+        // Handle default address setting separately
+        if (formData.is_default && !address.is_default) {
+          const defaultSuccess = await setDefaultAddress(address.id);
+          if (!defaultSuccess) {
+            toast.error("Failed to set default address");
+            updateLoading(false);
+            return;
+          }
+        } else if (!formData.is_default && address.is_default) {
+          // Unset default if checkbox was unchecked
+          await updateAddress(address.id, { is_default: false });
+        }
+        
+        // Update address fields
+        const success = await updateAddress(address.id, updateFields);
         if (success) {
           toast.success("Address saved");
-          onSave({ ...address, ...formData });
+          const updatedAddress: CustomerAddress = { 
+            ...address, 
+            ...updateFields,
+            is_default: formData.is_default
+          };
+          onSave(updatedAddress);
         } else {
           toast.error("Failed to update address");
         }
       } else {
         // Create new address
-        const newAddress = await createAddress(formData);
-        if (newAddress) {
-          toast.success("Address saved");
-          onSave(newAddress);
+        const addressData = {
+          label: formData.label?.trim() || "",
+          icon: formData.icon || 'Home',
+          line1: formData.line1,
+          line2: formData.line2?.trim() || undefined,
+          city: formData.city,
+          state: formData.state,
+          postal_code: formData.postal_code,
+          delivery_notes: formData.delivery_notes?.trim() || null,
+          latitude: formData.latitude || undefined,
+          longitude: formData.longitude || undefined,
+          is_default: false // Always create without default first, then set if needed
+        };
+        
+        const result = await createAddress(addressData);
+        if (result) {
+          // If it should be default, set it as default
+          if (formData.is_default) {
+            const defaultSuccess = await setDefaultAddress(result.id);
+            if (defaultSuccess) {
+              toast.success("Address saved");
+              onSave({ ...result, is_default: true });
+            } else {
+              toast.success("Address saved, but failed to set as default");
+              onSave(result);
+            }
+          } else {
+            toast.success("Address saved");
+            onSave(result);
+          }
+          // Form will close via onSave callback in parent component
         } else {
+          console.error("Address save error: Failed to create address");
           toast.error("Failed to save address");
         }
       }
     } catch (error) {
       console.error("Error saving address:", error);
       toast.error("An error occurred while saving the address");
-    } finally {
-      setLoading(false);
+      updateLoading(false);
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="label">Address name</Label>
-        <Input
-          id="label"
-          placeholder="e.g., Home, Office, Mom's place"
-          value={formData.label}
-          onChange={(e) => {
-            setFormData({ ...formData, label: e.target.value });
-            if (errors.label) setErrors({ ...errors, label: undefined });
-          }}
-          className={cn(
-            errors.label && "border-[#FF5A5F] bg-[#FFF7F7]"
-          )}
-        />
-        {errors.label && (
-          <p className="text-[10px] text-[#FF5A5F] mt-1">
-            {errors.label}
+  const handleIconChange = (iconName: string) => {
+    // Only update the icon, don't override the label if it's already filled
+    // Only auto-populate if the label is empty
+    if (!formData.label || formData.label.trim() === "") {
+      const iconInfo = ALL_ICONS.find(i => i.name === iconName);
+      const iconLabel = iconInfo?.label || iconName;
+      setFormData({ ...formData, icon: iconName, label: iconLabel });
+    } else {
+      // User has filled the label, just update the icon
+      setFormData({ ...formData, icon: iconName });
+    }
+  };
+
+  const handleLabelChange = (label: string) => {
+    setFormData({ ...formData, label });
+  };
+
+  const handleNoteTemplateClick = (template: string) => {
+    const currentNotes = formData.delivery_notes || "";
+    const newNotes = currentNotes ? `${currentNotes}, ${template}` : template;
+    setFormData({ ...formData, delivery_notes: newNotes });
+  };
+
+    return (
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      {/* Icon and Label Section */}
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <Label className="text-sm font-medium text-gray-900">
+            Address Label
+          </Label>
+          <p className="text-xs text-gray-500">
+            Choose an icon and enter a label — you can edit it anytime.
           </p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Give this address a friendly name (e.g., Home, Office)
-        </p>
+        </div>
+
+        {/* Icon Picker and Label Input */}
+        <div className="flex items-center gap-3">
+          <IconPicker
+            value={formData.icon}
+            onChange={handleIconChange}
+          />
+          <Input
+            id="label"
+            name="label"
+            autoComplete="off"
+            placeholder={addAddressCopy.addressPlaceholder}
+            value={formData.label}
+            onChange={(e) => handleLabelChange(e.target.value)}
+            className="flex-1"
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="line1">Street address</Label>
-        <Input
+        <Label htmlFor="line1">{addAddressCopy.streetAddress}</Label>
+        <AddressAutocomplete
           id="line1"
-          placeholder="123 Main Street"
+          name="line1"
           value={formData.line1}
-          onChange={(e) => {
-            setFormData({ ...formData, line1: e.target.value });
+          onChange={(value) => {
+            setFormData({ ...formData, line1: value });
             if (errors.line1) setErrors({ ...errors, line1: undefined });
           }}
-          className={cn(
-            errors.line1 && "border-[#FF5A5F] bg-[#FFF7F7]"
-          )}
+          onPlaceSelect={(place) => {
+            setFormData({
+              ...formData,
+              line1: place.line1,
+              city: place.city,
+              state: place.state,
+              postal_code: place.postal_code,
+              latitude: place.latitude,
+              longitude: place.longitude,
+            });
+            // Clear errors for auto-filled fields
+            setErrors({
+              ...errors,
+              line1: undefined,
+              city: undefined,
+              state: undefined,
+              postal_code: undefined,
+            });
+          }}
+          error={errors.line1}
+          placeholder="123 Main Street"
+          className={cn(errors.line1 && "border-[#FF5A5F] bg-[#FFF7F7]")}
         />
         {errors.line1 && (
           <p className="text-[10px] text-[#FF5A5F] mt-1">
@@ -145,10 +294,33 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
         )}
       </div>
 
+      {/* Map Preview */}
+      {(formData.latitude && formData.longitude) || liveLocation ? (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-900">
+            Address Preview
+          </Label>
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <BenjaminMap
+              center={
+                formData.latitude && formData.longitude
+                  ? { lat: formData.latitude, lng: formData.longitude }
+                  : liveLocation || { lat: 25.7617, lng: -80.1918 }
+              }
+              customerPosition={liveLocation || undefined}
+              zoom={15}
+              height="200px"
+            />
+          </div>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
-        <Label htmlFor="line2">Apt, suite, etc. (optional)</Label>
+        <Label htmlFor="line2">{addAddressCopy.apt}</Label>
         <Input
           id="line2"
+          name="line2"
+          autoComplete="address-line2"
           placeholder="Apt 4B"
           value={formData.line2}
           onChange={(e) => setFormData({ ...formData, line2: e.target.value })}
@@ -157,9 +329,11 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="city">City</Label>
+          <Label htmlFor="city">{addAddressCopy.city}</Label>
           <Input
             id="city"
+            name="city"
+            autoComplete="address-level2"
             placeholder="San Francisco"
             value={formData.city}
             onChange={(e) => {
@@ -178,9 +352,11 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="state">State</Label>
+          <Label htmlFor="state">{addAddressCopy.state}</Label>
           <Input
             id="state"
+            name="state"
+            autoComplete="address-level1"
             placeholder="CA"
             value={formData.state}
             onChange={(e) => {
@@ -201,9 +377,11 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="postal_code">ZIP code</Label>
+        <Label htmlFor="postal_code">{addAddressCopy.zip}</Label>
         <Input
           id="postal_code"
+          name="postal_code"
+          autoComplete="postal-code"
           placeholder="94102"
           value={formData.postal_code}
           onChange={(e) => {
@@ -223,51 +401,89 @@ export function AddressForm({ address, onSave, onCancel }: AddressFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="delivery_notes">Delivery notes (optional)</Label>
-        <Textarea
-          id="delivery_notes"
-          placeholder="e.g., Ring doorbell, meet in lobby, call when you arrive"
-          value={formData.delivery_notes}
-          onChange={(e) => setFormData({ ...formData, delivery_notes: e.target.value })}
-          rows={3}
-          className="resize-none"
-        />
-        <p className="text-xs text-muted-foreground">
-          These notes will be used for all deliveries to this address
-        </p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between py-2">
+            <Label className="text-sm font-medium text-gray-900 cursor-pointer" onClick={() => setShowDeliveryNotes(!showDeliveryNotes)}>
+              {addAddressCopy.deliveryNotesTitle}
+            </Label>
+            <button
+              type="button"
+              onClick={() => setShowDeliveryNotes(!showDeliveryNotes)}
+              className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {formData.delivery_notes && !showDeliveryNotes && (
+                <span className="text-xs text-gray-500">
+                  {formData.delivery_notes.length > 30 
+                    ? `${formData.delivery_notes.substring(0, 30)}...` 
+                    : formData.delivery_notes}
+                </span>
+              )}
+              <div className="transition-transform duration-300 ease-in-out">
+                {showDeliveryNotes ? (
+                  <Minus className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </div>
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            {addAddressCopy.deliveryNotesHint}
+          </p>
+        </div>
+        
+        <div
+          className={cn(
+            "overflow-hidden transition-all duration-300 ease-in-out",
+            showDeliveryNotes ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+          )}
+        >
+          <div className="space-y-2 pt-2">
+            {/* Note Templates */}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 scroll-smooth">
+              {DELIVERY_NOTES_TEMPLATES.map((template) => (
+                <button
+                  key={template}
+                  type="button"
+                  onClick={() => handleNoteTemplateClick(template)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-300 bg-white text-gray-700 hover:border-[#22C55E] hover:text-[#22C55E] hover:bg-green-50 transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  {template}
+                </button>
+              ))}
+            </div>
+            
+            <Textarea
+              id="delivery_notes"
+              placeholder={addAddressCopy.deliveryNotesPlaceholder}
+              value={formData.delivery_notes}
+              onChange={(e) => setFormData({ ...formData, delivery_notes: e.target.value })}
+              rows={3}
+              className="resize-none"
+            />
+            <p className="text-xs text-gray-500">
+              {addAddressCopy.deliveryNotesFooter}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Checkbox
+      <div className="flex items-center justify-between py-2">
+        <Label htmlFor="is_default" className="text-sm font-medium text-gray-900 cursor-pointer">
+          Make this my default address
+        </Label>
+        <Switch
           id="is_default"
           checked={formData.is_default}
           onCheckedChange={(checked) => 
-            setFormData({ ...formData, is_default: checked as boolean })
+            setFormData({ ...formData, is_default: checked })
           }
+          className="data-[state=checked]:bg-[#22C55E]"
         />
-        <Label htmlFor="is_default" className="text-sm font-normal cursor-pointer">
-          Set as default address
-        </Label>
       </div>
+      </form>
+    );
+  }
+);
 
-      <div className="flex gap-3 pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={loading}
-          className="text-xs px-3 py-2 rounded-lg border border-muted-foreground/30 text-muted-foreground hover:bg-muted"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={loading}
-          className="flex-1 bg-black text-white hover:bg-black/90"
-        >
-          {loading ? "Saving..." : "Save & Use This Address"}
-        </Button>
-      </div>
-    </form>
-  );
-}
+AddressForm.displayName = "AddressForm";

@@ -476,12 +476,23 @@ npm run build
 npm run preview
 ```
 
-Environment Variables
+## Environment Setup
+
+Required environment variables (create a `.env` file in the project root):
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_ENV=development
+```
+
+**Where to find these values:**
+- Go to your Supabase project dashboard
+- Navigate to **Settings** → **API**
+- Copy the **Project URL** → `VITE_SUPABASE_URL`
+- Copy the **anon/public** key → `VITE_SUPABASE_ANON_KEY`
+
+**Note:** The app will validate these at startup and show clear errors in dev mode if they're missing.
 ```
 
 Deployment Targets

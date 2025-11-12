@@ -2,247 +2,304 @@
  * Customer Home Dashboard
  * 
  * Main landing page for authenticated customers.
- * Features:
- * - Personalized greeting
- * - Delivery statistics snapshot
- * - Active order tracking card
- * - Recent order history
- * - Referral banner
+ * Uses CustomerScreen with 3-zone layout: header, map, footer.
  */
 
-import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { useProfile } from '@/contexts/ProfileContext';
-import { ShellCard } from '@/components/ui/ShellCard';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/db/supabase';
-import type { Order } from '@/types/types';
-import { ArrowRight, TrendingUp, Package, Share2 } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
+import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
+import { CustomerTopShell } from '@/pages/customer/components/CustomerTopShell';
+import { CustomerMapViewport } from '@/components/customer/layout/CustomerMapViewport';
+import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar';
+import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
+import { useLocation } from '@/contexts/LocationContext';
+import { getCustomerOrders } from '@/db/api';
+import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { OrderWithDetails, Order } from '@/types/types';
 
 export default function CustomerHome() {
-  const { profile, loading: profileLoading } = useProfile();
+  const { user, loading: authLoading } = useAuth();
+  const { profile, isReady } = useProfile(user?.id);
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!profileLoading && profile) {
-      fetchOrders();
+  const { location } = useLocation();
+  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  
+  // Load orders function
+  const loadOrders = useCallback(async () => {
+    if (!user) {
+      setOrdersLoading(false);
+      return;
     }
-  }, [profile, profileLoading]);
-
-  const fetchOrders = async () => {
-    if (!profile) return;
-
+    
+    setOrdersLoading(true);
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('customer_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      const orderList = data || [];
-      setOrders(orderList);
-
-      // Find active order (non-final status)
-      const active = orderList.find(
-        o => !['Completed', 'Cancelled'].includes(o.status)
-      );
-      setActiveOrder(active || null);
+      const data = await getCustomerOrders();
+      setOrders(data);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error loading orders:', error);
+      setOrders([]);
     } finally {
-      setLoading(false);
+      setOrdersLoading(false);
     }
+  }, [user]);
+  
+  // Fetch orders on mount
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  // Handle realtime order updates
+  const handleOrderUpdate = useCallback((updatedOrder: Order) => {
+    console.log('[CustomerHome] Order update received:', updatedOrder.id, updatedOrder.status);
+    
+    // Update the order in the list
+    setOrders((prev) => {
+      const existingIndex = prev.findIndex((o) => o.id === updatedOrder.id);
+      
+      if (existingIndex >= 0) {
+        // Update existing order
+        return prev.map((o) => 
+          o.id === updatedOrder.id 
+            ? { ...o, ...updatedOrder } as OrderWithDetails
+            : o
+        );
+      } else {
+        // New order, reload to get full details
+        loadOrders();
+        return prev;
+      }
+    });
+  }, [loadOrders]);
+
+  // Subscribe to realtime updates for customer orders
+  useOrdersRealtime({
+    filter: { mode: 'customer', customerId: user?.id || '' },
+    onUpdate: handleOrderUpdate,
+    onInsert: handleOrderUpdate,
+    enabled: !!user?.id,
+  });
+  
+  // Determine order states
+  const { hasActiveOrder, lastCompletedOrder } = useMemo(() => {
+    const activeStatuses = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
+    const activeOrders = orders.filter(order => activeStatuses.includes(order.status));
+    // Only get completed orders (exclude cancelled)
+    const completedOrders = orders.filter(order => 
+      order.status === 'Completed'
+    );
+    
+    // Sort completed orders by completion date (most recent first)
+    const sortedCompleted = completedOrders.sort((a, b) => {
+      const dateA = a.handoff_completed_at ? new Date(a.handoff_completed_at).getTime() : new Date(a.updated_at).getTime();
+      const dateB = b.handoff_completed_at ? new Date(b.handoff_completed_at).getTime() : new Date(b.updated_at).getTime();
+      return dateB - dateA;
+    });
+    
+    return {
+      hasActiveOrder: activeOrders.length > 0,
+      lastCompletedOrder: sortedCompleted.length > 0 ? sortedCompleted[0] : null,
+    };
+  }, [orders]);
+  
+  // Handle rate runner action
+  const handleRateRunner = useCallback((orderId: string) => {
+    // Navigate to order detail page where rating can be done
+    navigate(`/customer/orders/${orderId}`);
+  }, [navigate]);
+  
+  // Handle view all action
+  const handleViewAll = useCallback(() => {
+    navigate('/customer/history');
+  }, [navigate]);
+
+  /**
+   * Format and capitalize a name, filtering out invalid IDs
+   * @param name - The name to format (first_name, full_name, or email prefix)
+   * @returns Formatted name or empty string if invalid
+   */
+  const formatName = (name?: string | null): string => {
+    if (!name) return "";
+
+    const clean = name.trim();
+    if (!/^[a-zA-Z]/.test(clean)) return "";
+
+    return clean
+      .split(" ")
+      .map(
+        (part) =>
+          part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      )
+      .join(" ");
   };
 
-  const getGreeting = () => {
+  /**
+   * Get user's display name with proper formatting
+   * Uses cached profile data to prevent flicker
+   * @returns Formatted name or empty string if not available/invalid
+   */
+  const getUserName = (): string => {
+    // Use profile data (cached from localStorage initially)
+    if (profile?.first_name) {
+      const formatted = formatName(profile.first_name);
+      if (formatted) return formatted;
+    }
+    
+    // Fallback: construct name from first_name and last_name
+    if (profile?.first_name || profile?.last_name) {
+      const parts = [profile.first_name, profile.last_name].filter(Boolean);
+      if (parts.length > 0) {
+        const fullName = parts.join(' ');
+        const formatted = formatName(fullName);
+        if (formatted) return formatted;
+      }
+    }
+
+    // Return empty string if profile not loaded yet
+    return "";
+  };
+
+  const getGreetingTime = (): string => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour >= 5 && hour < 12) return "morning";
+    if (hour >= 12 && hour < 17) return "afternoon";
+    return "evening";
   };
 
-  const completedOrders = orders.filter(o => o.status === 'Completed');
-  const totalDelivered = completedOrders.reduce((sum, o) => sum + o.requested_amount, 0);
-  const recentOrders = orders.slice(0, 3);
+  // Reserve header height to prevent layout shift
+  // Show skeleton in title slot while loading, but keep layout stable
+  const displayName = getUserName();
 
-  if (profileLoading || loading) {
+  // Determine what to show in topContent
+  // Show skeleton while orders are loading to maintain consistent header height
+  // IMPORTANT: This hook must be called before any early returns to follow Rules of Hooks
+  const topContent = useMemo(() => {
+    const hasOrders = orders.length > 0;
+    
+    // If user has >= 1 order, show skeleton while loading (but not during initial auth/profile load)
+    // If orders.length === 0, show nothing (keep current logic - don't change)
+    if (hasOrders && ordersLoading && !authLoading && isReady) {
+      return (
+        <div className="mt-3">
+          <div className="w-full rounded-2xl bg-white border border-gray-200 px-6 py-5 flex flex-col gap-2">
+            {/* Header skeleton - matches LastDeliveryCard structure */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <Skeleton className="h-[11px] w-24" />
+                <Skeleton className="h-[15px] w-48" />
+                <Skeleton className="h-[11px] w-32" />
+              </div>
+              {/* Status pill skeleton */}
+              <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+            </div>
+            {/* Divider skeleton */}
+            <div className="border-t border-slate-200 mt-3 mb-3" />
+            {/* Actions skeleton */}
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton className="h-10 w-32 rounded-full" />
+              <Skeleton className="h-4 w-36" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Show actual card if we have a completed order and no active order
+    if (!hasActiveOrder && lastCompletedOrder) {
+      return (
+        <LastDeliveryCard
+          order={lastCompletedOrder}
+          onRateRunner={handleRateRunner}
+          onViewAll={handleViewAll}
+        />
+      );
+    }
+    
+    // Otherwise, no top content (orders.length === 0 or other cases)
+    return undefined;
+  }, [orders.length, ordersLoading, authLoading, isReady, hasActiveOrder, lastCompletedOrder, handleRateRunner, handleViewAll]);
+
+  // Show skeleton loader while auth is loading or profile is not ready
+  if (authLoading || (user && !isReady)) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-neutral-400">Loading...</div>
-      </div>
+      <CustomerScreen
+        header={
+          <div className="px-8 pt-10 pb-8">
+            {/* Logo + menu skeleton */}
+            <div className="flex items-center justify-between mb-6">
+              <Skeleton className="h-7 w-32" />
+              <Skeleton className="h-9 w-9 rounded-full" />
+            </div>
+            
+            {/* Title skeleton */}
+            <div className="space-y-2 mb-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-5 w-64" />
+            </div>
+            
+            {/* Last Delivery Card Skeleton */}
+            <div className="mt-6">
+              <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-16 rounded-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-6 w-24" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Skeleton className="h-10 flex-1 rounded-full" />
+                  <Skeleton className="h-10 w-24 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+        map={<CustomerMapViewport center={location} />}
+        footer={
+          <RequestFlowBottomBar
+            mode="home"
+            onPrimary={() => navigate('/customer/request')}
+            useFixedPosition={true}
+          />
+        }
+      />
     );
   }
 
+  // If no user, redirect to landing
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Greeting */}
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-black">
-          {getGreeting()}, {profile?.first_name || 'there'}
-        </h1>
-        <p className="text-sm text-neutral-500">
-          All your cash deliveries in one place
-        </p>
-      </div>
-
-      {/* Snapshot Card */}
-      <ShellCard variant="customer">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-neutral-600" />
-            <h2 className="text-lg font-semibold text-black">Your Summary</h2>
-          </div>
-          
-          {completedOrders.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-neutral-500">Total Delivered</p>
-                <p className="text-2xl font-bold text-black">
-                  ${totalDelivered.toFixed(2)}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-neutral-500">Completed Deliveries</p>
-                <p className="text-2xl font-bold text-black">
-                  {completedOrders.length}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="py-4 text-center">
-              <Package className="h-12 w-12 text-neutral-300 mx-auto mb-2" />
-              <p className="text-sm text-neutral-500">
-                Your summary appears after your first delivery
-              </p>
-            </div>
-          )}
-        </div>
-      </ShellCard>
-
-      {/* Active Order Card */}
-      {activeOrder && (
-        <ShellCard variant="customer">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-black">Active Delivery</h2>
-              <StatusChip status={activeOrder.status} tone="customer" />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-neutral-500">Amount</span>
-                <span className="font-semibold text-black">
-                  ${activeOrder.requested_amount.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-neutral-500">Order ID</span>
-                <span className="font-mono text-xs text-neutral-600">
-                  #{activeOrder.id.slice(0, 8).toUpperCase()}
-                </span>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => navigate(`/customer/orders/${activeOrder.id}`)}
-              className="w-full bg-black text-white hover:bg-black/90 rounded-full"
-            >
-              Track Delivery
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </ShellCard>
-      )}
-
-      {/* Recent Orders */}
-      <ShellCard variant="customer">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-black">Recent Deliveries</h2>
-          
-          {recentOrders.length > 0 ? (
-            <div className="space-y-3">
-              {recentOrders.map((order) => (
-                <button
-                  key={order.id}
-                  onClick={() => navigate(`/customer/orders/${order.id}`)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 transition-colors"
-                >
-                  <div className="flex-1 text-left space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-black">
-                        ${order.requested_amount.toFixed(2)}
-                      </span>
-                      <StatusChip 
-                        status={order.status} 
-                        tone="customer"
-                        className="text-[9px] px-2 py-0.5"
-                      />
-                    </div>
-                    <p className="text-xs text-neutral-500">
-                      {new Date(order.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-neutral-400" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <Package className="h-12 w-12 text-neutral-300 mx-auto mb-2" />
-              <p className="text-sm text-neutral-500">
-                You haven't used Benjamin yet
-              </p>
-              <p className="text-xs text-neutral-400 mt-1">
-                Your completed deliveries will show here
-              </p>
-            </div>
-          )}
-
-          {recentOrders.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => navigate('/customer/orders')}
-              className="w-full rounded-full border-black/10 hover:bg-neutral-50"
-            >
-              View All Orders
-            </Button>
-          )}
-        </div>
-      </ShellCard>
-
-      {/* Referral Banner */}
-      <ShellCard variant="customer" className="bg-black text-white border-black">
-        <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <Share2 className="h-5 w-5 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 space-y-1">
-              <h3 className="font-semibold">Invite a Friend</h3>
-              <p className="text-xs text-white/70">
-                Earn a reward once they complete their first delivery
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={() => console.log('Share invite - coming soon')}
-            variant="outline"
-            className="w-full rounded-full bg-white text-black hover:bg-white/90 border-white"
-          >
-            Share Invite
-          </Button>
-        </div>
-      </ShellCard>
-    </div>
+    <CustomerScreen
+      header={
+        <CustomerTopShell
+          title={
+            !isReady ? (
+              <Skeleton className="h-8 w-64" />
+            ) : (
+              `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`
+            )
+          }
+          subtitle="Skip the ATM. Request cash in seconds."
+          topContent={topContent}
+        />
+      }
+      map={<CustomerMapViewport center={location} />}
+      footer={
+        <RequestFlowBottomBar
+          mode="home"
+          onPrimary={() => navigate('/customer/request')}
+          useFixedPosition={true}
+        />
+      }
+    />
   );
 }

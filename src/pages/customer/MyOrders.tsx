@@ -1,46 +1,130 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Eye, Package } from "lucide-react";
+import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ShellCard } from "@/components/ui/ShellCard";
-import { StatusChip } from "@/components/ui/StatusChip";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getCustomerOrders, subscribeToOrders } from "@/db/api";
-import type { OrderWithDetails } from "@/types/types";
-import { Avatar } from "@/components/common/Avatar";
+import { getCustomerOrders } from "@/db/api";
+import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
+import { useAuth } from "@/contexts/AuthContext";
+import type { OrderWithDetails, Order } from "@/types/types";
 import { OrderListSkeleton } from "@/components/order/OrderListSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { strings } from "@/lib/strings";
+import { OrderCard } from "@/components/customer/OrderCard";
+
+interface GroupedOrders {
+  [key: string]: OrderWithDetails[];
+}
 
 export default function MyOrders() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     const data = await getCustomerOrders();
-    setOrders(data);
+    // Sort by created_at descending (most recent first)
+    const sorted = data.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    setOrders(sorted);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     loadOrders();
+  }, [loadOrders]);
 
-    const subscription = subscribeToOrders(() => {
-      loadOrders();
+  // Handle realtime order updates
+  const handleOrderUpdate = useCallback((updatedOrder: Order) => {
+    console.log('[MyOrders] Order update received:', updatedOrder.id, updatedOrder.status);
+    
+    // Update the order in the list
+    setOrders((prev) => {
+      const existingIndex = prev.findIndex((o) => o.id === updatedOrder.id);
+      
+      if (existingIndex >= 0) {
+        // Update existing order and re-sort
+        const updated = prev.map((o) => 
+          o.id === updatedOrder.id 
+            ? { ...o, ...updatedOrder } as OrderWithDetails
+            : o
+        );
+        return updated.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      } else {
+        // New order, reload to get full details
+        loadOrders();
+        return prev;
+      }
     });
+  }, [loadOrders]);
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+  // Subscribe to realtime updates for customer orders
+  useOrdersRealtime({
+    filter: { mode: 'customer', customerId: user?.id || '' },
+    onUpdate: handleOrderUpdate,
+    onInsert: handleOrderUpdate,
+    enabled: !!user?.id,
+  });
+
+  // Group orders by month
+  const groupedOrders = useMemo<GroupedOrders>(() => {
+    const groups: GroupedOrders = {};
+    
+    orders.forEach((order) => {
+      const date = new Date(order.created_at);
+      const monthKey = date.toLocaleDateString('en-US', { 
+        month: 'long', 
+        year: 'numeric' 
+      });
+      
+      if (!groups[monthKey]) {
+        groups[monthKey] = [];
+      }
+      groups[monthKey].push(order);
+    });
+    
+    return groups;
+  }, [orders]);
+
+  // Get sorted month keys (most recent first)
+  const monthKeys = useMemo(() => {
+    return Object.keys(groupedOrders).sort((a, b) => {
+      const dateA = new Date(a);
+      const dateB = new Date(b);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [groupedOrders]);
+
+  const handleReorder = (order: OrderWithDetails) => {
+    // Navigate to request page with prefilled data
+    const params = new URLSearchParams();
+    
+    // Prefill amount
+    params.set('amount', order.requested_amount.toString());
+    
+    // Store address info for prefilling (if address_id exists, use it; otherwise use snapshot)
+    if (order.address_id) {
+      params.set('address_id', order.address_id);
+    } else if (order.address_snapshot) {
+      // Store address snapshot in sessionStorage for address selector to use
+      sessionStorage.setItem('reorder_address_snapshot', JSON.stringify(order.address_snapshot));
+    }
+    
+    navigate(`/customer/request?${params.toString()}`);
+  };
+
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black mb-2">{strings.customer.ordersTitle}</h1>
-          <p className="text-sm text-neutral-500">
+          <h1 className="text-3xl font-bold text-black dark:text-white mb-2">
+            {strings.customer.ordersTitle}
+          </h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
             {strings.customer.ordersSubtitle}
           </p>
         </div>
@@ -48,97 +132,42 @@ export default function MyOrders() {
           onClick={() => navigate("/customer/request")}
           className="bg-black text-white hover:bg-black/90 rounded-full"
         >
-          <Plus className="mr-2 h-4 w-4" />
-          {strings.customer.newOrderButton}
+          Request Cash
         </Button>
       </div>
 
-      <ShellCard variant="customer">
+      {loading ? (
         <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-black">{strings.customer.orderHistoryTitle}</h2>
-            <p className="text-sm text-neutral-500 mt-1">
-              {strings.customer.orderHistoryDesc}
-            </p>
-          </div>
-          
-          {loading ? (
-            <OrderListSkeleton count={3} />
-          ) : orders.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              title={strings.emptyStates.noOrders}
-              description={strings.emptyStates.noOrdersDesc}
-              actionLabel={strings.customer.createFirstOrder}
-              onAction={() => navigate("/customer/request")}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{strings.admin.orderId}</TableHead>
-                    <TableHead>{strings.customer.runner}</TableHead>
-                    <TableHead>{strings.admin.amount}</TableHead>
-                    <TableHead>{strings.admin.total}</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>{strings.admin.created}</TableHead>
-                    <TableHead className="text-right">{strings.admin.actions}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
-                        #{order.id.slice(0, 8)}
-                      </TableCell>
-                      <TableCell>
-                        {order.runner ? (
-                          <div className="flex items-center gap-2">
-                            <Avatar
-                              src={order.runner.avatar_url}
-                              fallback={`${order.runner.first_name} ${order.runner.last_name}`}
-                              size="sm"
-                            />
-                            <span className="text-sm">
-                              {order.runner.first_name} {order.runner.last_name}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-neutral-500">{strings.admin.notAssigned}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        ${order.requested_amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        ${order.total_payment.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusChip status={order.status} tone="customer" />
-                      </TableCell>
-                      <TableCell className="text-sm text-neutral-500">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/customer/orders/${order.id}`)}
-                          className="hover:bg-neutral-100"
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <OrderListSkeleton count={3} />
         </div>
-      </ShellCard>
+      ) : orders.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title={strings.emptyStates.noOrders}
+          description="Your past deliveries appear here. Each one tells its story."
+          actionLabel="Request Cash Now"
+          onAction={() => navigate("/customer/request")}
+        />
+      ) : (
+        <div className="space-y-8">
+          {monthKeys.map((monthKey) => (
+            <div key={monthKey} className="space-y-4">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 px-1">
+                {monthKey}
+              </h2>
+              <div className="space-y-3">
+                {groupedOrders[monthKey].map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onReorder={handleReorder}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

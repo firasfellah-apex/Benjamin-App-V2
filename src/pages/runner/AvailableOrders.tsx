@@ -1,49 +1,114 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { DollarSign, MapPin, Clock } from "lucide-react";
+import { DollarSign, MapPin, Clock, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ShellCard } from "@/components/ui/ShellCard";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { toast } from "sonner";
-import { getAvailableOrders, acceptOrder, subscribeToOrders } from "@/db/api";
-import type { OrderWithDetails } from "@/types/types";
+import { getAvailableOrders, acceptOrder } from "@/db/api";
+import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
+import { useProfile } from "@/contexts/ProfileContext";
+import type { OrderWithDetails, Order } from "@/types/types";
 
 export default function AvailableOrders() {
   const navigate = useNavigate();
+  const { profile } = useProfile();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
 
+  const isOnline = profile?.is_online ?? false;
+
   const loadOrders = async () => {
+    // Only load orders if runner is online
+    if (!isOnline) {
+      setLoading(false);
+      return;
+    }
+    
     const data = await getAvailableOrders();
     setOrders(data);
     setLoading(false);
   };
 
+  // Initial load
   useEffect(() => {
     loadOrders();
+  }, [isOnline]);
 
-    const subscription = subscribeToOrders(() => {
-      loadOrders();
+  // Handle realtime updates for available orders (status = Pending, runner_id IS NULL)
+  const handleOrderInsert = useCallback((order: Order) => {
+    console.log('[AvailableOrders] Realtime INSERT received:', {
+      orderId: order.id,
+      status: order.status,
+      runnerId: order.runner_id,
+      isPending: order.status === 'Pending',
+      hasNoRunner: !order.runner_id,
     });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    
+    // Only add if it's a pending order with no runner
+    if (order.status === 'Pending' && !order.runner_id) {
+      console.log('[AvailableOrders] Order is available, adding to list');
+      setOrders((prev) => {
+        // Check if order already exists
+        if (prev.some((o) => o.id === order.id)) {
+          console.log('[AvailableOrders] Order already exists, skipping insert');
+          return prev;
+        }
+        // Add to the beginning and sort by created_at
+        const updated = [order as OrderWithDetails, ...prev].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        console.log('[AvailableOrders] Order added, new count:', updated.length);
+        return updated;
+      });
+    } else {
+      console.log('[AvailableOrders] Order filtered out (not available):', {
+        status: order.status,
+        runnerId: order.runner_id,
+      });
+    }
   }, []);
+
+  const handleOrderUpdate = useCallback((order: Order) => {
+    setOrders((prev) => {
+      // If order is no longer available (accepted or status changed), remove it
+      if (order.status !== 'Pending' || order.runner_id !== null) {
+        return prev.filter((o) => o.id !== order.id);
+      }
+      // Otherwise update the existing order
+      return prev.map((o) => (o.id === order.id ? (order as OrderWithDetails) : o));
+    });
+  }, []);
+
+  const handleOrderDelete = useCallback((order: Order) => {
+    setOrders((prev) => prev.filter((o) => o.id !== order.id));
+  }, []);
+
+  // Subscribe to available orders (Pending status, runner_id IS NULL)
+  // Only subscribe if runner is online
+  useOrdersRealtime({
+    filter: { mode: 'runner', availableOnly: true },
+    onInsert: handleOrderInsert,
+    onUpdate: handleOrderUpdate,
+    onDelete: handleOrderDelete,
+    enabled: isOnline,
+  });
 
   const handleAccept = async (orderId: string) => {
     setAccepting(orderId);
     try {
-      const success = await acceptOrder(orderId);
-      if (success) {
+      const result = await acceptOrder(orderId);
+      if (result.success) {
         toast.success("Order accepted! Proceed to ATM");
         navigate(`/runner/orders/${orderId}`);
       } else {
-        toast.error("Failed to accept order. It may have been taken by another runner.");
+        const errorMessage = result.error || "Failed to accept order. It may have been taken by another runner.";
+        toast.error(errorMessage);
       }
-    } catch (error) {
-      toast.error("Failed to accept order");
+    } catch (error: any) {
+      console.error("Error accepting order:", error);
+      toast.error(error?.message || "Failed to accept order");
     } finally {
       setAccepting(null);
     }
@@ -62,6 +127,25 @@ export default function AvailableOrders() {
         <div className="text-center py-12 text-slate-400">
           Loading available orders...
         </div>
+      ) : !isOnline ? (
+        <ShellCard variant="runner">
+          <div className="py-12 text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-slate-800 p-4">
+                <Radio className="h-8 w-8 text-slate-500" />
+              </div>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-white mb-2">You're currently offline</p>
+              <p className="text-sm text-slate-400 mb-4">
+                Go online to see available deliveries and start earning
+              </p>
+              <p className="text-xs text-slate-500">
+                Use the toggle in the header to go online
+              </p>
+            </div>
+          </div>
+        </ShellCard>
       ) : orders.length === 0 ? (
         <ShellCard variant="runner">
           <div className="py-12 text-center">
@@ -85,7 +169,7 @@ export default function AvailableOrders() {
                   </div>
                   <div className="flex items-center gap-1 text-xs text-slate-400">
                     <Clock className="h-3 w-3" />
-                    {new Date(order.created_at).toLocaleTimeString([], { 
+                    {new Date(order.created_at).toLocaleTimeString('en-US', { 
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}

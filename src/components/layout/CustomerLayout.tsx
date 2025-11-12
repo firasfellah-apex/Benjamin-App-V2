@@ -1,14 +1,9 @@
 /**
  * CustomerLayout Component
  * 
- * Wrapper layout for customer pages that includes:
- * - PageContainer with customer theme
- * - Fixed bottom navigation with Request Cash CTA
- * - Proper padding to avoid content being hidden
+ * Simple wrapper for customer pages with smooth page transitions.
+ * No nested cards or frames - pages handle their own layout via CustomerScreen.
  */
-
-import { PageContainer } from './PageContainer';
-import { CustomerBottomNav } from './CustomerBottomNav';
 
 interface CustomerLayoutProps {
   children: React.ReactNode;
@@ -16,15 +11,8 @@ interface CustomerLayoutProps {
 
 export function CustomerLayout({ children }: CustomerLayoutProps) {
   return (
-    <>
-      <PageContainer variant="customer">
-        <div className="pb-24">
-          {children}
-        </div>
-      </PageContainer>
-
-      {/* Fixed bottom navigation */}
-      <CustomerBottomNav />
-    </>
+    <div className="h-full flex flex-col bg-[#F4F5F7] overflow-hidden">
+      {children}
+    </div>
   );
 }

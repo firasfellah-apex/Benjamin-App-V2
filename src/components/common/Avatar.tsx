@@ -6,8 +6,10 @@
  * - Supports blur effect for privacy (runner identity protection)
  * - Multiple sizes
  * - Smooth transitions
+ * - Handles image load errors gracefully
  */
 
+import * as React from 'react';
 import { Avatar as RadixAvatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +57,27 @@ export function Avatar({
   blurred = false,
   className
 }: AvatarProps) {
+  const [imageError, setImageError] = React.useState(false);
   const initials = getInitials(fallback || alt);
+  
+  // Validate URL before using it
+  const isValidUrl = React.useMemo(() => {
+    if (!src) return false;
+    try {
+      const url = new URL(src);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      // Invalid URL or relative path
+      return false;
+    }
+  }, [src]);
+  
+  // Reset error when src changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [src]);
+  
+  const shouldShowImage = src && isValidUrl && !imageError;
   
   return (
     <RadixAvatar
@@ -66,11 +88,15 @@ export function Avatar({
         className
       )}
     >
-      {src && (
+      {shouldShowImage && (
         <AvatarImage
           src={src}
           alt={alt}
           className="object-cover"
+          onError={() => {
+            console.warn('[Avatar] Failed to load image:', src);
+            setImageError(true);
+          }}
         />
       )}
       <AvatarFallback

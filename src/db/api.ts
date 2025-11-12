@@ -42,14 +42,21 @@ export async function updateCurrentProfile(updates: {
   first_name?: string;
   last_name?: string;
   phone?: string | null;
-  email?: string;
+  // Email is intentionally excluded - it cannot be changed via profile update
+  // Email is managed through the authentication provider (Supabase Auth)
 }): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
 
+  // Ensure email is never updated through this function
+  const { email, ...safeUpdates } = updates as any;
+  if (email !== undefined) {
+    console.warn('Email update attempted but ignored. Email cannot be changed via profile update.');
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .update(updates)
+    .update(safeUpdates)
     .eq("id", user.id);
 
   if (error) {
@@ -142,7 +149,7 @@ export async function revokeRole(userId: string, role: UserRole): Promise<boolea
   if (!profile) return false;
 
   const currentRoles = profile.role || [];
-  const newRoles = currentRoles.filter(r => r !== role);
+  const newRoles = currentRoles.filter((r: UserRole) => r !== role);
 
   if (newRoles.length === 0) {
     newRoles.push('customer');
@@ -363,6 +370,7 @@ export async function getAddressById(addressId: string): Promise<CustomerAddress
 
 export async function createAddress(address: {
   label: string;
+  icon?: string | null;
   line1: string;
   line2?: string;
   city: string;
@@ -370,6 +378,7 @@ export async function createAddress(address: {
   postal_code: string;
   latitude?: number;
   longitude?: number;
+  delivery_notes?: string | null;
   is_default?: boolean;
 }): Promise<CustomerAddress | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -380,6 +389,7 @@ export async function createAddress(address: {
     .insert({
       customer_id: user.id,
       label: address.label,
+      icon: address.icon || 'Home',
       line1: address.line1,
       line2: address.line2 || null,
       city: address.city,
@@ -387,6 +397,7 @@ export async function createAddress(address: {
       postal_code: address.postal_code,
       latitude: address.latitude || null,
       longitude: address.longitude || null,
+      delivery_notes: address.delivery_notes || null,
       is_default: address.is_default || false
     })
     .select()
@@ -404,6 +415,7 @@ export async function updateAddress(
   addressId: string,
   updates: {
     label?: string;
+    icon?: string | null;
     line1?: string;
     line2?: string | null;
     city?: string;
@@ -411,6 +423,7 @@ export async function updateAddress(
     postal_code?: string;
     latitude?: number | null;
     longitude?: number | null;
+    delivery_notes?: string | null;
     is_default?: boolean;
   }
 ): Promise<boolean> {
@@ -442,12 +455,30 @@ export async function deleteAddress(addressId: string): Promise<boolean> {
 }
 
 export async function setDefaultAddress(addressId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  // First, unset all other default addresses for this customer
+  const { error: unsetError } = await supabase
+    .from("customer_addresses")
+    .update({ is_default: false })
+    .eq("customer_id", user.id)
+    .eq("is_default", true)
+    .neq("id", addressId);
+
+  if (unsetError) {
+    console.error("Error unsetting other defaults:", unsetError);
+    // Continue anyway - try to set the new default
+  }
+
+  // Then set this address as default
   return await updateAddress(addressId, { is_default: true });
 }
 
 export function createAddressSnapshot(address: CustomerAddress): AddressSnapshot {
   return {
     label: address.label,
+    icon: address.icon,
     line1: address.line1,
     line2: address.line2,
     city: address.city,
@@ -573,6 +604,94 @@ export async function getRunnerOrders(): Promise<OrderWithDetails[]> {
   return Array.isArray(data) ? data : [];
 }
 
+/**
+ * Get runner order history including Completed, Skipped, and Timed-Out orders
+ * Completed orders come from orders table, Skipped/Timed-Out from runner_offer_events
+ */
+export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' }>> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const history: Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' }> = [];
+
+  // Get completed orders
+  const { data: completedOrders, error: ordersError } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      customer:customer_id(*),
+      runner:runner_id(*)
+    `)
+    .eq("runner_id", user.id)
+    .eq("status", "Completed")
+    .order("created_at", { ascending: false });
+
+  if (!ordersError && completedOrders) {
+    completedOrders.forEach(order => {
+      history.push({
+        ...order,
+        historyStatus: 'Completed' as const
+      });
+    });
+  }
+
+  // Get skipped and timed-out orders from runner_offer_events
+  try {
+    const { data: offerEvents, error: eventsError } = await supabase
+      .from('runner_offer_events')
+      .select('offer_id, event, created_at')
+      .eq('runner_id', user.id)
+      .in('event', ['skipped', 'timeout'])
+      .order('created_at', { ascending: false });
+
+    if (!eventsError && offerEvents) {
+      // Get unique order IDs from events
+      const orderIds = [...new Set(offerEvents.map(e => e.offer_id))];
+      
+      if (orderIds.length > 0) {
+        // Fetch order details for skipped/timed-out orders
+        const { data: skippedOrders, error: skippedError } = await supabase
+          .from("orders")
+          .select(`
+            *,
+            customer:customer_id(*),
+            runner:runner_id(*)
+          `)
+          .in("id", orderIds);
+
+        if (!skippedError && skippedOrders) {
+          skippedOrders.forEach(order => {
+            // Find the most recent event for this order
+            const orderEvents = offerEvents.filter(e => e.offer_id === order.id);
+            const mostRecentEvent = orderEvents.sort((a, b) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0];
+
+            if (mostRecentEvent) {
+              const historyStatus = mostRecentEvent.event === 'timeout' 
+                ? 'Timed-Out' as const 
+                : 'Skipped' as const;
+              
+              history.push({
+                ...order,
+                historyStatus
+              });
+            }
+          });
+        }
+      }
+    }
+  } catch (error) {
+    // Table might not exist, gracefully degrade
+    console.warn('Error fetching runner offer events:', error);
+  }
+
+  // Sort by created_at descending (most recent first)
+  return history.sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 export async function getAvailableOrders(): Promise<OrderWithDetails[]> {
   const { data, error } = await supabase
     .from("orders")
@@ -582,6 +701,7 @@ export async function getAvailableOrders(): Promise<OrderWithDetails[]> {
       runner:runner_id(*)
     `)
     .eq("status", "Pending")
+    .is("runner_id", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -629,15 +749,20 @@ export async function getOrderById(orderId: string): Promise<OrderWithDetails | 
   return data;
 }
 
-export async function acceptOrder(orderId: string): Promise<boolean> {
+export async function acceptOrder(orderId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error("Accept order failed: No authenticated user");
-      return false;
+      return { success: false, error: "Not authenticated" };
     }
 
-    // First, fetch the current order to verify it exists and is in Pending status
+    // Verify user is a runner
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('runner')) {
+      return { success: false, error: "Unauthorized: Only runners can accept orders" };
+    }
+
+    // Get the order to verify it exists
     const { data: existingOrder, error: fetchError } = await supabase
       .from("orders")
       .select("*")
@@ -646,41 +771,69 @@ export async function acceptOrder(orderId: string): Promise<boolean> {
 
     if (fetchError) {
       console.error("Error fetching order:", fetchError);
-      return false;
+      return { success: false, error: "Failed to fetch order" };
     }
 
     if (!existingOrder) {
-      console.error("Order not found:", orderId);
-      return false;
+      return { success: false, error: "Order not found" };
     }
 
+    // Check if order is already accepted or not in Pending status
     if (existingOrder.status !== "Pending") {
-      console.error("Order is not in Pending status. Current status:", existingOrder.status);
-      return false;
+      return { 
+        success: false, 
+        error: `Order is not available. Current status: ${existingOrder.status}` 
+      };
     }
 
-    // Update the order status to "Runner Accepted"
-    const { data: updatedOrder, error: updateError } = await supabase
-      .from("orders")
-      .update({
-        runner_id: user.id,
-        status: "Runner Accepted",
-        runner_accepted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", orderId)
-      .eq("status", "Pending")
-      .select()
-      .maybeSingle();
+    if (existingOrder.runner_id) {
+      return { 
+        success: false, 
+        error: "Order has already been accepted by another runner" 
+      };
+    }
 
-    if (updateError) {
-      console.error("Error updating order status:", updateError);
-      return false;
+    // Use FSM RPC to accept the order (this handles state transitions properly and prevents race conditions)
+    const { data: updatedOrder, error: fsmError } = await supabase.rpc('rpc_advance_order', {
+      p_order_id: orderId,
+      p_next_status: 'Runner Accepted',
+      p_metadata: {
+        accepted_by: user.id,
+        accepted_at: new Date().toISOString()
+      }
+    });
+
+    if (fsmError) {
+      console.error("Error accepting order via FSM:", fsmError);
+      
+      // Provide user-friendly error messages
+      const errorMessage = fsmError.message || `Failed to accept order: ${JSON.stringify(fsmError)}`;
+      
+      // Map common FSM errors to user-friendly messages
+      if (errorMessage.includes('Illegal transition')) {
+        return { 
+          success: false, 
+          error: "Order is no longer available. It may have been accepted by another runner." 
+        };
+      }
+      if (errorMessage.includes('already been accepted')) {
+        return { 
+          success: false, 
+          error: "This order has already been accepted by another runner." 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage
+      };
     }
 
     if (!updatedOrder) {
-      console.error("Order update returned no data. Order may have been accepted by another runner.");
-      return false;
+      return { 
+        success: false, 
+        error: "Order may have been accepted by another runner. Please refresh and try again." 
+      };
     }
 
     // Create audit log entry
@@ -692,7 +845,7 @@ export async function acceptOrder(orderId: string): Promise<boolean> {
       { 
         status: "Runner Accepted", 
         runner_id: user.id,
-        runner_accepted_at: updatedOrder.runner_accepted_at
+        runner_accepted_at: updatedOrder.runner_accepted_at || new Date().toISOString()
       }
     );
 
@@ -703,10 +856,13 @@ export async function acceptOrder(orderId: string): Promise<boolean> {
       timestamp: updatedOrder.runner_accepted_at
     });
 
-    return true;
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error("Unexpected error in acceptOrder:", error);
-    return false;
+    return { 
+      success: false, 
+      error: error?.message || "An unexpected error occurred" 
+    };
   }
 }
 
@@ -714,60 +870,258 @@ export async function acceptOrder(orderId: string): Promise<boolean> {
 // It now uses advanceOrderStatus for proper FSM validation
 
 export async function generateOTP(orderId: string): Promise<string | null> {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date();
-  expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+  try {
+    // Generate OTP using helper (6-digit numeric)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // MVP: Set expiry far in the future (1 year) - OTPs valid until order completion
+    // TODO: Set proper expiry (e.g., 15 minutes) for production
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year from now (effectively no expiry)
 
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      otp_code: otp,
-      otp_expires_at: expiresAt.toISOString(),
-      otp_attempts: 0,
-      status: "Pending Handoff"
-    })
-    .eq("id", orderId);
+    // Advance to "Pending Handoff" using FSM (status should be "Cash Withdrawn" at this point)
+    // This represents: OTP Generated → Enroute Customer (logical states, DB uses "Pending Handoff")
+    const updatedOrder = await advanceOrderStatus(
+      orderId,
+      "Pending Handoff",
+      undefined,
+      {
+        action: "generate_otp",
+        otp_generated: true
+      }
+    );
 
-  if (error) {
+    if (!updatedOrder) {
+      console.error("Failed to advance order status to Pending Handoff");
+      return null;
+    }
+
+    // Update OTP fields directly (FSM doesn't handle these fields)
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({
+        otp_code: otp,
+        otp_expires_at: expiresAt.toISOString(),
+        otp_attempts: 0,
+        // TODO: When DB supports otp_verified_at, initialize it as null here
+      })
+      .eq("id", orderId);
+
+    if (updateError) {
+      console.error("Error updating OTP fields:", updateError);
+      // OTP was generated and status was updated, so return it even if field update failed
+      // In dev, warn if column doesn't exist
+      if (import.meta.env.DEV && (updateError.message?.includes('otp_code') || updateError.message?.includes('column'))) {
+        console.warn('[OTP] OTP fields may not exist in database. Run migration to add otp_code, otp_expires_at columns.');
+      }
+    }
+
+    return otp;
+  } catch (error) {
     console.error("Error generating OTP:", error);
     return null;
   }
-
-  return otp;
 }
 
-export async function verifyOTP(orderId: string, otp: string): Promise<boolean> {
-  const { data: order } = await supabase
-    .from("orders")
-    .select("otp_code, otp_expires_at, otp_attempts")
-    .eq("id", orderId)
-    .maybeSingle();
+/**
+ * Mark runner as arrived at customer location
+ * 
+ * Creates an order event to track runner arrival.
+ * This allows customers to see "Arrived" status.
+ */
+export async function markRunnerArrived(orderId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
 
-  if (!order || !order.otp_code || !order.otp_expires_at) {
-    return false;
-  }
-
-  if (new Date(order.otp_expires_at) < new Date()) {
-    return false;
-  }
-
-  if (order.otp_attempts >= 3) {
-    return false;
-  }
-
-  if (order.otp_code !== otp) {
-    await supabase
+    // Get order to verify runner
+    const { data: order, error: orderError } = await supabase
       .from("orders")
-      .update({ otp_attempts: order.otp_attempts + 1 })
-      .eq("id", orderId);
-    return false;
-  }
+      .select("id, runner_id, status")
+      .eq("id", orderId)
+      .maybeSingle();
 
-  await updateOrderStatus(orderId, "Completed");
-  return true;
+    if (orderError || !order) {
+      return { success: false, error: "Order not found" };
+    }
+
+    if (order.runner_id !== user.id) {
+      return { success: false, error: "Only the assigned runner can mark arrival" };
+    }
+
+    if (order.status !== "Pending Handoff") {
+      return { success: false, error: "Can only mark arrival when status is Pending Handoff" };
+    }
+
+    // Create order event to track arrival
+    const { error: eventError } = await supabase
+      .from("order_events")
+      .insert({
+        order_id: orderId,
+        from_status: order.status,
+        to_status: order.status, // Status doesn't change, just tracking arrival
+        actor_id: user.id,
+        actor_role: "runner",
+        client_action_id: "runner_arrived",
+        metadata: { action: "runner_arrived", timestamp: new Date().toISOString() }
+      });
+
+    if (eventError) {
+      console.error("Error creating arrival event:", eventError);
+      // If order_events table doesn't exist, silently fail (graceful degradation)
+      if (import.meta.env.DEV && (eventError.code === '42P01' || eventError.message?.includes('does not exist'))) {
+        console.warn('[Runner Arrival] order_events table may not exist. Arrival tracking may not work.');
+      }
+      // Still return success since the main action (marking arrival) is conceptual
+      // The event is just for tracking/audit
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking runner as arrived:", error);
+    return { success: false, error: error?.message || "Failed to mark arrival" };
+  }
 }
 
-// Admin: Cancel a pending order
+export async function verifyOTP(orderId: string, otp: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Fetch order - use select("*") to get all available columns gracefully
+    // This handles cases where OTP columns might not exist yet
+    const { data: order, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("Error fetching order for OTP verification:", fetchError);
+      // Provide more specific error message based on error code
+      if (fetchError.code === 'PGRST116') {
+        return { success: false, error: "Order not found. Please contact support." };
+      }
+      if (fetchError.code === '42501' || fetchError.message?.includes('permission')) {
+        return { success: false, error: "Permission denied. Please contact support." };
+      }
+      if (fetchError.code === '42703' || fetchError.message?.includes('column')) {
+        // Column doesn't exist - this shouldn't happen with select("*"), but handle it
+        if (import.meta.env.DEV) {
+          console.warn('[OTP] Database schema issue. Some columns may be missing.');
+        }
+        return { success: false, error: "Database error. Please contact support." };
+      }
+      // Log full error in dev for debugging
+      if (import.meta.env.DEV) {
+        console.error('[OTP] Full fetch error:', { code: fetchError.code, message: fetchError.message, details: fetchError });
+      }
+      return { success: false, error: "Failed to verify code. Please try again." };
+    }
+
+    if (!order) {
+      return { success: false, error: "Order not found." };
+    }
+
+    // Check if OTP fields exist (graceful degradation)
+    // Handle cases where columns might not exist in the database yet
+    const otpCode = (order as any).otp_code;
+    const otpExpiresAt = (order as any).otp_expires_at;
+    const otpAttempts = (order as any).otp_attempts || 0;
+    const otpVerifiedAt = (order as any).otp_verified_at;
+
+    if (!otpCode || !otpExpiresAt) {
+      if (import.meta.env.DEV) {
+        console.warn('[OTP] OTP fields not found. Order may not have OTP generated yet.', { orderId, hasOtpCode: !!otpCode, hasOtpExpiresAt: !!otpExpiresAt });
+      }
+      return { success: false, error: "Verification code not available. Please contact support." };
+    }
+
+    // Check if already verified
+    if (otpVerifiedAt) {
+      return { success: false, error: "This code has already been used." };
+    }
+
+    // MVP: Skip expiry check - OTPs valid until order completion
+    // TODO: Re-enable expiry validation for production
+    // if (new Date(otpExpiresAt) < new Date()) {
+    //   return { success: false, error: "Code expired. Please contact support." };
+    // }
+
+    // Check attempt limit
+    if (otpAttempts >= 3) {
+      return { success: false, error: "Too many incorrect attempts. Please contact support." };
+    }
+
+    // Verify OTP code
+    if (otpCode !== otp) {
+      // Increment attempt counter (only if column exists)
+      try {
+        await supabase
+          .from("orders")
+          .update({ otp_attempts: otpAttempts + 1 })
+          .eq("id", orderId);
+      } catch (updateError: any) {
+        // Silently fail if otp_attempts column doesn't exist
+        if (import.meta.env.DEV && updateError.message?.includes('otp_attempts')) {
+          console.warn('[OTP] otp_attempts column may not exist. Skipping attempt counter update.');
+        }
+      }
+      return { success: false, error: "Incorrect code. Please try again." };
+    }
+
+    // OTP is correct - try to update verified_at timestamp (if column exists)
+    // Note: otp_verified_at column may not exist in all database schemas
+    // We'll try to update it, but won't fail if it doesn't exist
+    try {
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ otp_verified_at: new Date().toISOString() })
+        .eq("id", orderId);
+
+      if (updateError) {
+        // If column doesn't exist (42703 = undefined_column), log warning but continue
+        if (updateError.code === '42703' || updateError.message?.includes('otp_verified_at') || updateError.message?.includes('column')) {
+          if (import.meta.env.DEV) {
+            console.warn('[OTP] otp_verified_at column may not exist. Order will still be completed.');
+          }
+        } else {
+          // Log other errors in dev
+          if (import.meta.env.DEV) {
+            console.error("Error updating OTP verified timestamp:", updateError);
+          }
+        }
+      }
+    } catch (updateError: any) {
+      // Silently handle if column doesn't exist - this is optional
+      if (import.meta.env.DEV && (updateError.message?.includes('otp_verified_at') || updateError.code === '42703')) {
+        console.warn('[OTP] otp_verified_at column may not exist. Order will still be completed.');
+      }
+    }
+
+    // Use FSM to complete the order
+    // This is the critical step that marks the order as completed
+    const updatedOrder = await advanceOrderStatus(
+      orderId,
+      "Completed",
+      undefined,
+      {
+        action: "verify_otp",
+        otp_verified: true,
+        otp_code: otp // Include OTP in metadata for audit
+      }
+    );
+
+    if (!updatedOrder) {
+      return { success: false, error: "Failed to complete delivery. Please contact support." };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    return { success: false, error: "An unexpected error occurred. Please try again." };
+  }
+}
+
+// Cancel an order (supports both customer and admin cancellation via FSM)
 export async function cancelOrder(orderId: string, reason: string): Promise<{ success: boolean; message: string }> {
   try {
     // Get current user
@@ -776,13 +1130,16 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
       return { success: false, message: "Not authenticated" };
     }
 
-    // Verify user is admin
+    // Get user profile to check role
     const profile = await getCurrentProfile();
-    if (!profile || !profile.role.includes('admin')) {
-      return { success: false, message: "Unauthorized: Admin access required" };
+    if (!profile) {
+      return { success: false, message: "User profile not found" };
     }
 
-    // Get the order to verify it exists and is in Pending status
+    const isAdmin = profile.role.includes('admin');
+    const isCustomer = profile.role.includes('customer');
+
+    // Get the order to verify it exists and check ownership
     const { data: order, error: fetchError } = await supabase
       .from("orders")
       .select("*")
@@ -798,25 +1155,69 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
       return { success: false, message: "Order not found" };
     }
 
-    if (order.status !== 'Pending') {
-      return { success: false, message: `Order cannot be cancelled because it is no longer pending (current status: ${order.status})` };
+    // Check if order is already cancelled or completed
+    if (order.status === 'Cancelled') {
+      return { success: false, message: "Order is already cancelled" };
     }
 
-    // Update the order to cancelled status
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update({
-        status: 'Cancelled',
-        cancelled_at: new Date().toISOString(),
-        cancelled_by: user.id,
-        cancellation_reason: reason,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", orderId);
+    if (order.status === 'Completed') {
+      return { success: false, message: "Cannot cancel a completed order" };
+    }
 
-    if (updateError) {
-      console.error("Error cancelling order:", updateError);
-      return { success: false, message: "Failed to cancel order" };
+    // Authorization checks
+    if (isCustomer) {
+      // Customers can only cancel their own orders
+      if (order.customer_id !== user.id) {
+        return { success: false, message: "You can only cancel your own orders" };
+      }
+      // Customers can only cancel from Pending or Runner Accepted status
+      // (FSM will enforce this, but we can provide a better error message)
+      if (order.status !== 'Pending' && order.status !== 'Runner Accepted') {
+        return { success: false, message: "Cannot cancel order at this stage" };
+      }
+    } else if (!isAdmin) {
+      // Only customers and admins can cancel orders
+      return { success: false, message: "Unauthorized: Only customers and admins can cancel orders" };
+    }
+
+    // Use FSM to cancel the order (this handles state transitions properly)
+    // FSM will validate:
+    // - Customers can cancel their own orders from Pending/Runner Accepted
+    // - Admins can cancel from any status (except Completed, which we already checked)
+    const { error: fsmError } = await supabase.rpc('rpc_advance_order', {
+      p_order_id: orderId,
+      p_next_status: 'Cancelled',
+      p_metadata: {
+        reason: reason,
+        cancelled_by: user.id
+      }
+    });
+
+    if (fsmError) {
+      console.error("Error cancelling order via FSM:", fsmError);
+      console.error("FSM Error details:", JSON.stringify(fsmError, null, 2));
+      console.error("Order status:", order.status);
+      console.error("User role:", profile.role);
+      console.error("Is customer:", isCustomer);
+      console.error("Is admin:", isAdmin);
+      console.error("Order customer_id:", order.customer_id);
+      console.error("Current user id:", user.id);
+      
+      // Provide user-friendly error messages
+      const errorMessage = fsmError.message || `Failed to cancel order: ${JSON.stringify(fsmError)}`;
+      
+      // Map common FSM errors to user-friendly messages
+      if (errorMessage.includes('Illegal transition')) {
+        return { success: false, message: "Cannot cancel order at this stage" };
+      }
+      if (errorMessage.includes('can only cancel your own orders')) {
+        return { success: false, message: "You can only cancel your own orders" };
+      }
+      
+      return { 
+        success: false, 
+        message: errorMessage
+      };
     }
 
     // Create audit log entry
@@ -834,9 +1235,408 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
     );
 
     return { success: true, message: "Order cancelled successfully" };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in cancelOrder:", error);
-    return { success: false, message: "An unexpected error occurred" };
+    return { success: false, message: error.message || "An unexpected error occurred" };
+  }
+}
+
+export async function updateRunnerOnlineStatus(isOnline: boolean): Promise<{ success: boolean; error?: string; data?: any }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // Verify user is a runner
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('runner')) {
+      return { success: false, error: "Unauthorized: Runner access required" };
+    }
+
+    // Defensive check: Prevent going offline if runner has active deliveries
+    if (!isOnline) {
+      const { data: activeOrders, error: activeErr } = await supabase
+        .from('orders')
+        .select('id, status')
+        .eq('runner_id', user.id)
+        .not('status', 'in', '("Completed","Cancelled")')
+        .limit(1);
+
+      if (activeErr) {
+        console.error('[updateRunnerOnlineStatus] Error checking active jobs before offline:', activeErr);
+        // Fail safe: do NOT force offline on error - this prevents data inconsistency
+        return { 
+          success: false, 
+          error: "Unable to go offline right now. Please try again." 
+        };
+      }
+
+      if (activeOrders && activeOrders.length > 0) {
+        // Server-side enforcement: runner has active delivery
+        return { 
+          success: false, 
+          error: "You have an active delivery. Complete it before going offline." 
+        };
+      }
+    }
+
+    // Update is_online status
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ is_online: isOnline })
+      .eq("id", user.id)
+      .select("is_online")
+      .single();
+
+    if (error) {
+      // Check if it's a column missing error
+      const errorMessage = error.message || '';
+      if (errorMessage.includes("is_online") || errorMessage.includes("schema cache")) {
+        // In dev: log warning and no-op gracefully
+        if (import.meta.env.DEV) {
+          console.warn(
+            "[updateRunnerOnlineStatus] is_online column not found. " +
+            "This feature requires a database migration. " +
+            "See ADD_IS_ONLINE_COLUMN.sql or FIX_RUNNER_ONLINE_TOGGLE.md for instructions."
+          );
+          // Return success to prevent UI errors, but log the issue
+          return { success: true, error: undefined, data: { is_online: false } };
+        }
+        return { 
+          success: false, 
+          error: "Database configuration issue. The is_online column is missing. Please contact support." 
+        };
+      }
+      return { success: false, error: error.message || "Failed to update online status" };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Error in updateRunnerOnlineStatus:", error);
+    const errorMessage = error?.message || "An unexpected error occurred";
+    
+    // Handle missing column gracefully in dev
+    if (import.meta.env.DEV && (errorMessage.includes("is_online") || errorMessage.includes("schema cache"))) {
+      console.warn("[updateRunnerOnlineStatus] Column missing - no-op in dev mode");
+      return { success: true, error: undefined, data: { is_online: false } };
+    }
+    
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function getRunnerEarningsStats(): Promise<{
+  monthlyEarnings: number;
+  activeDeliveries: number;
+  completedThisMonth: number;
+}> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { monthlyEarnings: 0, activeDeliveries: 0, completedThisMonth: 0 };
+  }
+
+  // Get all runner orders
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("runner_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching runner orders for earnings:", error);
+    return { monthlyEarnings: 0, activeDeliveries: 0, completedThisMonth: 0 };
+  }
+
+  if (!orders || orders.length === 0) {
+    return { monthlyEarnings: 0, activeDeliveries: 0, completedThisMonth: 0 };
+  }
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  // Active deliveries (in-progress statuses)
+  const activeStatuses = ['Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
+  const activeDeliveries = orders.filter(o => 
+    activeStatuses.includes(o.status)
+  ).length;
+
+  // Completed orders this month
+  const completedThisMonth = orders.filter(o => {
+    if (o.status !== 'Completed') return false;
+    
+    const completedDate = o.handoff_completed_at 
+      ? new Date(o.handoff_completed_at)
+      : new Date(o.updated_at);
+    
+    return (
+      completedDate.getMonth() === currentMonth &&
+      completedDate.getFullYear() === currentYear
+    );
+  });
+
+  // Calculate monthly earnings from completed orders
+  const monthlyEarnings = completedThisMonth.reduce((total, order) => {
+    return total + (order.delivery_fee || 0);
+  }, 0);
+
+  return {
+    monthlyEarnings,
+    activeDeliveries,
+    completedThisMonth: completedThisMonth.length,
+  };
+}
+
+export async function getRunnerStatsForAdmin(runnerId: string): Promise<{
+  activeDeliveries: number;
+  completedThisMonth: number;
+  monthlyEarnings: number;
+  totalCompleted: number;
+  totalEarnings: number;
+  acceptedCount: number;
+  skippedCount: number;
+  timedOutCount: number;
+}> {
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("runner_id", runnerId)
+    .order("created_at", { ascending: false });
+
+  // Get accepted/skipped/timed-out counts from runner_offer_events
+  let acceptedCount = 0;
+  let skippedCount = 0;
+  let timedOutCount = 0;
+  
+  try {
+    const { data: events, error: eventsError } = await supabase
+      .from('runner_offer_events')
+      .select('event')
+      .eq('runner_id', runnerId);
+    
+    if (!eventsError && events) {
+      acceptedCount = events.filter(e => e.event === 'accepted').length;
+      skippedCount = events.filter(e => e.event === 'skipped').length;
+      timedOutCount = events.filter(e => e.event === 'timeout').length;
+    }
+  } catch (error) {
+    // Table might not exist, gracefully degrade
+    console.warn('Error fetching runner offer events:', error);
+  }
+
+  if (error) {
+    console.error("Error fetching runner orders for admin:", error);
+    return {
+      activeDeliveries: 0,
+      completedThisMonth: 0,
+      monthlyEarnings: 0,
+      totalCompleted: 0,
+      totalEarnings: 0,
+      acceptedCount,
+      skippedCount,
+      timedOutCount,
+    };
+  }
+
+  if (!orders || orders.length === 0) {
+    return {
+      activeDeliveries: 0,
+      completedThisMonth: 0,
+      monthlyEarnings: 0,
+      totalCompleted: 0,
+      totalEarnings: 0,
+      acceptedCount,
+      skippedCount,
+      timedOutCount,
+    };
+  }
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  // Active deliveries (in-progress statuses)
+  const activeStatuses = ['Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
+  const activeDeliveries = orders.filter(o => activeStatuses.includes(o.status)).length;
+
+  // Completed orders
+  const completedOrders = orders.filter(o => o.status === 'Completed');
+  const totalCompleted = completedOrders.length;
+
+  // Completed this month
+  const completedThisMonth = completedOrders.filter(o => {
+    const completedDate = o.handoff_completed_at 
+      ? new Date(o.handoff_completed_at)
+      : new Date(o.updated_at);
+    return (
+      completedDate.getMonth() === currentMonth &&
+      completedDate.getFullYear() === currentYear
+    );
+  });
+
+  // Calculate earnings
+  const monthlyEarnings = completedThisMonth.reduce((total, order) => {
+    return total + (order.delivery_fee || 0);
+  }, 0);
+
+  const totalEarnings = completedOrders.reduce((total, order) => {
+    return total + (order.delivery_fee || 0);
+  }, 0);
+
+  return {
+    activeDeliveries,
+    completedThisMonth: completedThisMonth.length,
+    monthlyEarnings,
+    totalCompleted,
+    totalEarnings,
+    acceptedCount,
+    skippedCount,
+    timedOutCount,
+  };
+}
+
+export async function getCustomerStatsForAdmin(customerId: string): Promise<{
+  activeOrders: number;
+  totalOrders: number;
+  completedOrders: number;
+  totalSpent: number;
+}> {
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching customer orders for admin:", error);
+    return {
+      activeOrders: 0,
+      totalOrders: 0,
+      completedOrders: 0,
+      totalSpent: 0,
+    };
+  }
+
+  if (!orders || orders.length === 0) {
+    return {
+      activeOrders: 0,
+      totalOrders: 0,
+      completedOrders: 0,
+      totalSpent: 0,
+    };
+  }
+
+  // Active orders (non-final statuses)
+  const finalStatuses = ['Completed', 'Cancelled'];
+  const activeOrders = orders.filter(o => !finalStatuses.includes(o.status)).length;
+
+  // Completed orders
+  const completedOrders = orders.filter(o => o.status === 'Completed').length;
+
+  // Total spent (from completed orders)
+  const totalSpent = orders
+    .filter(o => o.status === 'Completed')
+    .reduce((total, order) => total + (order.requested_amount || 0), 0);
+
+  return {
+    activeOrders,
+    totalOrders: orders.length,
+    completedOrders,
+    totalSpent,
+  };
+}
+
+export async function syncAuthUsersToProfiles(): Promise<{ success: boolean; message: string; synced: number }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, message: "Not authenticated", synced: 0 };
+    }
+
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('admin')) {
+      return { success: false, message: "Unauthorized: Admin access required", synced: 0 };
+    }
+
+    // Call the database function to sync auth users to profiles
+    const { data, error } = await supabase.rpc('sync_auth_users_to_profiles');
+
+    if (error) {
+      console.error("Error syncing auth users to profiles:", error);
+      return { success: false, message: error.message, synced: 0 };
+    }
+
+    return { success: true, message: "Users synced successfully", synced: data || 0 };
+  } catch (error: any) {
+    console.error("Error in syncAuthUsersToProfiles:", error);
+    return { success: false, message: error.message || "An unexpected error occurred", synced: 0 };
+  }
+}
+
+// Admin: Cancel all live orders (bulk cancellation)
+export async function cancelAllLiveOrders(): Promise<{ success: boolean; cancelled: number; failed: number; errors: string[] }> {
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, cancelled: 0, failed: 0, errors: ["Not authenticated"] };
+    }
+
+    // Verify user is admin
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('admin')) {
+      return { success: false, cancelled: 0, failed: 0, errors: ["Unauthorized: Admin access required"] };
+    }
+
+    // Get all live orders (not completed, not cancelled)
+    const { data: orders, error: fetchError } = await supabase
+      .from("orders")
+      .select("id, status")
+      .not('status', 'in', '(Completed,Cancelled)');
+
+    if (fetchError) {
+      console.error("Error fetching orders:", fetchError);
+      return { success: false, cancelled: 0, failed: 0, errors: [fetchError.message] };
+    }
+
+    if (!orders || orders.length === 0) {
+      return { success: true, cancelled: 0, failed: 0, errors: [] };
+    }
+
+    let cancelled = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    // Cancel each order using FSM
+    for (const order of orders) {
+      try {
+        const { error: fsmError } = await supabase.rpc('rpc_advance_order', {
+          p_order_id: order.id,
+          p_next_status: 'Cancelled',
+          p_metadata: {
+            reason: 'Bulk cancellation by admin',
+            cancelled_by: user.id,
+            bulk_cancellation: true
+          }
+        });
+
+        if (fsmError) {
+          failed++;
+          errors.push(`${order.id.slice(0, 8)}: ${fsmError.message}`);
+        } else {
+          cancelled++;
+        }
+      } catch (error: any) {
+        failed++;
+        errors.push(`${order.id.slice(0, 8)}: ${error.message}`);
+      }
+    }
+
+    return { success: true, cancelled, failed, errors };
+  } catch (error: any) {
+    console.error("Error in cancelAllLiveOrders:", error);
+    return { success: false, cancelled: 0, failed: 0, errors: [error.message] };
   }
 }
 
@@ -1127,5 +1927,348 @@ export async function createTestOrder(): Promise<{ success: boolean; orderId?: s
   } catch (error) {
     console.error("Error in createTestOrder:", error);
     return { success: false, message: "An unexpected error occurred" };
+  }
+}
+
+// Customer: Rate a completed delivery
+export async function updateOrderRating(
+  orderId: string,
+  rating: number,
+  comment: string | null
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, message: "Not authenticated" };
+    }
+
+    // Verify order belongs to customer and is completed
+    const { data: order, error: fetchError } = await supabase
+      .from("orders")
+      .select("id, customer_id, status")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("Error fetching order:", fetchError);
+      return { success: false, message: "Failed to fetch order" };
+    }
+
+    if (!order) {
+      return { success: false, message: "Order not found" };
+    }
+
+    if (order.customer_id !== user.id) {
+      return { success: false, message: "Unauthorized: This order does not belong to you" };
+    }
+
+    if (order.status !== 'Completed') {
+      return { success: false, message: "You can only rate completed orders" };
+    }
+
+    // Try to update rating (assuming rating columns exist)
+    // If they don't exist, this will fail gracefully and we'll use metadata approach
+    const updateData: any = {
+      rating: rating,
+      rating_comment: comment,
+      rating_submitted_at: new Date().toISOString()
+    };
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update(updateData)
+      .eq("id", orderId);
+
+    if (updateError) {
+      // If rating columns don't exist, fall back to storing in metadata via audit log
+      console.warn("Rating columns may not exist, using metadata fallback:", updateError);
+      
+      // Store rating in audit log as fallback
+      await createAuditLog(
+        "RATE_ORDER",
+        "order",
+        orderId,
+        {},
+        {
+          rating: rating,
+          comment: comment,
+          rated_at: new Date().toISOString()
+        }
+      );
+
+      // Return success even if direct update failed (rating stored in audit log)
+      return { success: true, message: "Rating submitted successfully (stored in audit log)" };
+    }
+
+    return { success: true, message: "Rating submitted successfully" };
+  } catch (error: any) {
+    console.error("Error in updateOrderRating:", error);
+    return { success: false, message: error.message || "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Rate a runner (customer → runner rating)
+ * Only works for completed orders and only if rating is not already set
+ */
+export async function rateRunner(orderId: string, rating: number): Promise<void> {
+  if (rating < 1 || rating > 5) {
+    throw new Error("Invalid rating. Rating must be between 1 and 5.");
+  }
+
+  // Fetch order with all fields to avoid column-specific issues
+  const { data: order, error: checkError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error("Error checking order for rating:", checkError);
+    // Log full error in dev for debugging
+    if (import.meta.env.DEV) {
+      console.error('[Rating rateRunner] Full error details:', {
+        code: checkError.code,
+        message: checkError.message,
+        details: checkError,
+        hint: checkError.hint
+      });
+    }
+    // Provide more specific error message
+    if (checkError.code === 'PGRST116') {
+      throw new Error("Order not found.");
+    }
+    if (checkError.code === '42501' || checkError.message?.includes('permission') || checkError.message?.includes('policy')) {
+      throw new Error("Permission denied. Please ensure you have access to this order.");
+    }
+    if (checkError.code === '42703' || checkError.message?.includes('column') || checkError.message?.includes('does not exist')) {
+      throw new Error("Rating feature is not available. Please run migrations: 20250113_add_ratings_to_orders.sql and 20250114_allow_runner_customer_ratings.sql");
+    }
+    throw new Error(`Failed to verify order: ${checkError.message || 'Unknown error'}`);
+  }
+
+  if (!order) {
+    throw new Error("Order not found.");
+  }
+
+  // Check status (case-sensitive: "Completed" not "completed")
+  if (order.status !== "Completed") {
+    throw new Error("You can only rate runners for completed deliveries.");
+  }
+
+  // Check if already rated (handle case where column might not exist)
+  const existingRating = (order as any).runner_rating;
+  if (existingRating !== null && existingRating !== undefined) {
+    throw new Error("You have already rated this runner.");
+  }
+
+  // Verify customer owns this order
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Not authenticated.");
+  }
+
+  // Check if customer owns this order
+  if ((order as any).customer_id !== user.id) {
+    throw new Error("You can only rate runners for your own orders.");
+  }
+
+  // Update rating
+  const { error } = await supabase
+    .from("orders")
+    .update({ runner_rating: rating })
+    .eq("id", orderId)
+    .eq("customer_id", user.id) // Extra security check
+    .eq("status", "Completed"); // Extra security check
+
+  if (error) {
+    console.error("Error rating runner:", error);
+    // Check if column doesn't exist
+    if (error.code === '42703' || error.message?.includes('runner_rating') || error.message?.includes('column')) {
+      if (import.meta.env.DEV) {
+        console.error('[Rating] runner_rating column may not exist. Run migration: 20250113_add_ratings_to_orders.sql');
+      }
+      throw new Error("Rating feature is not available. Please contact support.");
+    }
+    // Check for permission errors
+    if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      if (import.meta.env.DEV) {
+        console.error('[Rating] Permission denied. RLS policy may be blocking update. Run migration: 20250114_allow_runner_customer_ratings.sql');
+      }
+      throw new Error("Permission denied. Please contact support.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Rate a customer (runner → customer rating)
+ * Only works for completed orders and only if rating is not already set
+ */
+export async function rateCustomerByRunner(orderId: string, rating: number): Promise<void> {
+  if (rating < 1 || rating > 5) {
+    throw new Error("Invalid rating. Rating must be between 1 and 5.");
+  }
+
+  // Fetch order with all fields to avoid column-specific issues
+  const { data: order, error: checkError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error("Error checking order for rating:", checkError);
+    // Log full error in dev for debugging
+    if (import.meta.env.DEV) {
+      console.error('[Rating rateCustomerByRunner] Full error details:', {
+        code: checkError.code,
+        message: checkError.message,
+        details: checkError,
+        hint: checkError.hint
+      });
+    }
+    // Provide more specific error message
+    if (checkError.code === 'PGRST116') {
+      throw new Error("Order not found.");
+    }
+    if (checkError.code === '42501' || checkError.message?.includes('permission') || checkError.message?.includes('policy')) {
+      throw new Error("Permission denied. Please ensure you have access to this order. Run migration: 20250114_allow_runner_customer_ratings.sql");
+    }
+    if (checkError.code === '42703' || checkError.message?.includes('column') || checkError.message?.includes('does not exist')) {
+      throw new Error("Rating feature is not available. Please run migrations: 20250113_add_ratings_to_orders.sql and 20250114_allow_runner_customer_ratings.sql");
+    }
+    throw new Error(`Failed to verify order: ${checkError.message || 'Unknown error'}`);
+  }
+
+  if (!order) {
+    throw new Error("Order not found.");
+  }
+
+  // Check status (case-sensitive: "Completed" not "completed")
+  if (order.status !== "Completed") {
+    throw new Error("You can only rate customers for completed deliveries.");
+  }
+
+  // Check if already rated (handle case where column might not exist)
+  const existingRating = (order as any).customer_rating_by_runner;
+  if (existingRating !== null && existingRating !== undefined) {
+    throw new Error("You have already rated this customer.");
+  }
+
+  // Verify runner is assigned to this order
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Not authenticated.");
+  }
+
+  // Check if runner is assigned to this order
+  if ((order as any).runner_id !== user.id) {
+    throw new Error("You can only rate customers for orders you've completed.");
+  }
+
+  // Update rating
+  const { error } = await supabase
+    .from("orders")
+    .update({ customer_rating_by_runner: rating })
+    .eq("id", orderId)
+    .eq("runner_id", user.id) // Extra security check
+    .eq("status", "Completed"); // Extra security check
+
+  if (error) {
+    console.error("Error rating customer:", error);
+    // Check if column doesn't exist
+    if (error.code === '42703' || error.message?.includes('customer_rating_by_runner') || error.message?.includes('column')) {
+      if (import.meta.env.DEV) {
+        console.error('[Rating] customer_rating_by_runner column may not exist. Run migration: 20250113_add_ratings_to_orders.sql');
+      }
+      throw new Error("Rating feature is not available. Please contact support.");
+    }
+    // Check for permission errors
+    if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      if (import.meta.env.DEV) {
+        console.error('[Rating] Permission denied. RLS policy may be blocking update. Run migration: 20250114_allow_runner_customer_ratings.sql');
+      }
+      throw new Error("Permission denied. Please contact support.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Skip a runner offer
+ * Logs the skip event for analytics
+ */
+export async function skipRunnerOffer(
+  offerId: string,
+  reason: "manual" | "timeout"
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // Verify user is a runner
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.role.includes('runner')) {
+      return { success: false, error: "Unauthorized: Only runners can skip offers" };
+    }
+
+    // Log the skip event (this creates a record that the runner skipped this order)
+    await logRunnerOfferEvent({
+      offerId,
+      event: 'skipped',
+      reason,
+    });
+
+    // Mark the order as skipped by this runner in runner_offer_events
+    // This ensures the order won't be shown to this runner again
+    // The order remains available for other runners until accepted or cancelled
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error skipping offer:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to skip offer"
+    };
+  }
+}
+
+/**
+ * Log runner offer events for analytics
+ */
+export async function logRunnerOfferEvent(data: {
+  offerId: string;
+  event: 'received' | 'accepted' | 'skipped' | 'timeout';
+  reason?: string;
+}): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Try to insert into runner_offer_events table
+    // If table doesn't exist, just log to console (graceful degradation)
+    const { error } = await supabase
+      .from('runner_offer_events')
+      .insert({
+        runner_id: user.id,
+        offer_id: data.offerId,
+        event: data.event,
+        reason: data.reason || null,
+      });
+
+    if (error) {
+      // If table doesn't exist, just log to console
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('[RunnerOfferEvent] Table not found, logging to console:', data);
+      } else {
+        console.error('Error logging runner offer event:', error);
+      }
+    }
+  } catch (error) {
+    // Graceful degradation - don't break the app if logging fails
+    console.error('Error logging runner offer event:', error);
   }
 }

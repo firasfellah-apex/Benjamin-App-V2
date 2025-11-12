@@ -8,7 +8,7 @@
  * Philosophy: We never lie; we just group technical steps under simpler labels.
  */
 
-import type { OrderStatus } from '@/types/types';
+import type { OrderStatus, Order } from '@/types/types';
 
 export type CustomerFacingStep = 
   | 'REQUESTED' 
@@ -26,12 +26,61 @@ export interface CustomerFacingStatus {
 }
 
 /**
+ * Check if runner has arrived based on order data
+ * 
+ * Checks for order event with client_action_id = "runner_arrived"
+ * to determine if runner has confirmed arrival.
+ * 
+ * @param order - Order object with status and timestamps
+ * @returns true if runner has arrived
+ */
+async function hasRunnerArrivedFromOrder(order: Order | { status: OrderStatus; cash_withdrawn_at?: string | null; updated_at?: string; id?: string }): Promise<boolean> {
+  // For now, we check order events for arrival confirmation
+  // TODO: Add runner_arrived_at timestamp field for better performance
+  if (!order.id || order.status !== "Pending Handoff") {
+    return false;
+  }
+
+  try {
+    const { supabase } = await import("@/db/supabase");
+    const { data: events, error } = await supabase
+      .from("order_events")
+      .select("id, client_action_id, metadata")
+      .eq("order_id", order.id)
+      .eq("client_action_id", "runner_arrived")
+      .limit(1);
+
+    if (error) {
+      // If order_events table doesn't exist, gracefully degrade
+      if (import.meta.env.DEV && (error.code === '42P01' || error.message?.includes('does not exist'))) {
+        console.warn('[Customer Status] order_events table may not exist. Arrival tracking may not work.');
+      }
+      return false;
+    }
+
+    return events && events.length > 0;
+  } catch (error) {
+    console.error("Error checking runner arrival:", error);
+    return false;
+  }
+}
+
+/**
  * Convert internal status to customer-facing status
  * 
  * Internal statuses remain unchanged for system operations.
  * This function only affects what customers see in their UI.
+ * 
+ * Note: For Pending Handoff, this function returns "Heading Your Way" by default.
+ * Components should use getCustomerFacingStatusWithArrival() to check for actual arrival.
+ * 
+ * @param internalStatus - Internal order status
+ * @param order - Optional order object to check for runner arrival (for Pending Handoff)
  */
-export function getCustomerFacingStatus(internalStatus: OrderStatus): CustomerFacingStatus {
+export function getCustomerFacingStatus(
+  internalStatus: OrderStatus,
+  order?: Order | { status: OrderStatus; cash_withdrawn_at?: string | null; updated_at?: string; id?: string }
+): CustomerFacingStatus {
   switch (internalStatus) {
     case 'Pending':
       return {
@@ -56,16 +105,18 @@ export function getCustomerFacingStatus(internalStatus: OrderStatus): CustomerFa
     
     case 'Cash Withdrawn':
       return {
-        label: 'On the way',
+        label: 'Heading Your Way',
         step: 'ON_THE_WAY',
-        description: 'Your runner has your cash and is on the way.'
+        description: 'Your runner has your cash and is heading your way.'
       };
     
     case 'Pending Handoff':
+      // Default to "Heading Your Way" - components should check for arrival separately
+      // This avoids async issues in synchronous status mapping
       return {
-        label: 'Arrived',
-        step: 'ARRIVED',
-        description: 'Your runner has arrived. Please meet to receive your cash.'
+        label: 'Heading Your Way',
+        step: 'ON_THE_WAY',
+        description: 'Your runner has your cash and is heading your way.'
       };
     
     case 'Completed':
@@ -89,6 +140,41 @@ export function getCustomerFacingStatus(internalStatus: OrderStatus): CustomerFa
  * Get customer-friendly timeline steps
  * Simplified progression for customer tracking UI
  */
+/**
+ * Get customer-facing status with arrival check
+ * 
+ * This is an async version that checks for runner arrival.
+ * Use this in components that need to show "Arrived" vs "Heading Your Way".
+ * 
+ * @param internalStatus - Internal order status
+ * @param order - Order object to check for runner arrival
+ * @returns Customer-facing status with arrival check
+ */
+export async function getCustomerFacingStatusWithArrival(
+  internalStatus: OrderStatus,
+  order: Order | { status: OrderStatus; cash_withdrawn_at?: string | null; updated_at?: string; id?: string }
+): Promise<CustomerFacingStatus> {
+  if (internalStatus === 'Pending Handoff') {
+    const runnerArrived = await hasRunnerArrivedFromOrder(order);
+    if (runnerArrived) {
+      return {
+        label: 'Runner has arrived',
+        step: 'ARRIVED',
+        description: 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+      };
+    } else {
+      return {
+        label: 'Heading Your Way',
+        step: 'ON_THE_WAY',
+        description: 'Your runner has your cash and is heading your way.'
+      };
+    }
+  }
+  
+  // For other statuses, use the synchronous version
+  return getCustomerFacingStatus(internalStatus, order);
+}
+
 export const CUSTOMER_TIMELINE_STEPS = [
   {
     step: 'REQUESTED' as CustomerFacingStep,
@@ -112,7 +198,7 @@ export const CUSTOMER_TIMELINE_STEPS = [
   },
   {
     step: 'ARRIVED' as CustomerFacingStep,
-    label: 'Arrived',
+    label: 'Runner has arrived',
     description: 'Ready for handoff'
   },
   {

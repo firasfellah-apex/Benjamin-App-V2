@@ -78,6 +78,9 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        xl: '1rem',
+        '2xl': '1.5rem',
+        '3xl': '2rem',
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
@@ -87,6 +90,8 @@ export default {
       boxShadow: {
         card: 'var(--shadow-card)',
         hover: 'var(--shadow-hover)',
+        'elev-1': '0 2px 8px rgba(2,6,23,0.06)',
+        'elev-2': '0 8px 24px rgba(2,6,23,0.10)',
       },
       keyframes: {
         'accordion-down': {

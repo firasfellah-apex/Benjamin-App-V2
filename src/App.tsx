@@ -1,36 +1,40 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider, RequireAuth } from 'miaoda-auth-react';
+import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { supabase } from '@/db/supabase';
-import { ProfileProvider } from '@/contexts/ProfileContext';
-import Header from '@/components/common/Header';
+import { RequireAuth } from '@/components/auth/RequireAuth';
+import { RoleBasedRedirect } from '@/components/auth/RoleBasedRedirect';
+import { ViewportIndicator } from '@/components/dev/ViewportIndicator';
+import { useViewport } from '@/hooks/useViewport';
 import routes from './routes';
 
-const App = () => {
+// Debug page to prove renderer works
+function DebugPage() {
   return (
-    <Router>
-      <AuthProvider client={supabase}>
-        <ProfileProvider>
-          <Toaster position="top-center" richColors />
-          <RequireAuth whiteList={["/login", "/404", "/"]}>
-            <div className="flex flex-col min-h-screen">
-              <Header />
-              <main className="flex-grow">
-                <Routes>
-                  {routes.map((route, index) => (
-                    <Route
-                      key={index}
-                      path={route.path}
-                      element={route.element}
-                    />
-                  ))}
-                </Routes>
-              </main>
-            </div>
-          </RequireAuth>
-        </ProfileProvider>
-      </AuthProvider>
-    </Router>
+    <div style={{ padding: 24, fontSize: 18 }}>✅ Router works. This is /debug</div>
+  );
+}
+
+const App = () => {
+  // Initialize viewport management - this is inside Router context
+  useViewport();
+
+  return (
+    <>
+      <Toaster position="top-center" richColors />
+      <RequireAuth whitelist={["/login", "/404", "/debug", "/onboarding/profile"]}>
+        <Routes>
+          <Route path="/debug" element={<DebugPage />} />
+          <Route path="/" element={<RoleBasedRedirect />} />
+          {routes.map((route, index) => (
+            <Route
+              key={index}
+              path={route.path}
+              element={route.element}
+            />
+          ))}
+        </Routes>
+      </RequireAuth>
+      <ViewportIndicator />
+    </>
   );
 };
 

@@ -3,6 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
@@ -80,7 +90,7 @@ All colors MUST be HSL.
     --warning: 249 115 22;
   }
 
-  /* Benjamin Runner Theme (Dark) */
+  /* Benjamin Runner Theme (Dark Navy) */
   .app-runner {
     --bg-page-runner: 2 8 23;
     --bg-card-runner: 11 16 32;
@@ -92,14 +102,415 @@ All colors MUST be HSL.
     --success-runner: 34 197 94;
     --warning-runner: 251 191 36;
   }
+
+  /* Runner Bottom Nav Color System */
+  :root {
+    --bg-root: #020817;
+    --bg-card: #050816;
+    --bg-nav: #040814;
+    --bg-tab-selected: #021432;
+    --accent: #40F58C;
+    --text-primary: #F9FAFB;
+    --text-muted: #6B7280;
+    --icon-muted: #6B7280;
+    --shadow-nav: 0 12px 40px rgba(0, 0, 0, 0.75);
+  }
+
+  /* Benjamin Admin Theme (Graphite Neutral) */
+  .app-admin {
+    --bg-page-admin: 27 29 33; /* #1B1D21 */
+    --bg-card-admin: 35 38 43; /* #23262B */
+    --bg-hover-admin: 45 48 54; /* #2D3036 */
+    --border-admin: 47 50 56; /* #2F3238 */
+    --text-primary-admin: 241 243 245; /* #F1F3F5 */
+    --text-secondary-admin: 167 169 172; /* #A7A9AC */
+    --text-tertiary-admin: 108 110 115; /* #6C6E73 */
+    --accent-admin: 88 101 242; /* #5865F2 */
+    --accent-hover-admin: 71 82 196; /* #4752C4 */
+    --success-admin: 60 213 160; /* #3CD5A0 */
+    --warning-admin: 251 191 36; /* #FBBF24 */
+    --danger-admin: 239 68 68; /* #EF4444 */
+  }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Mobile App Viewport Constraints */
+  /* Runner and Customer apps are mobile-only */
+  body.mobile-app-viewport {
+    /* Constrain max width to simulate mobile app */
+    max-width: 100vw;
+    overflow-x: hidden;
+    /* Add subtle background to show mobile container */
+    background: #f5f5f7;
+    /* Disable text selection highlight on tap */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+
+  /* Responsive Viewport (Admin) */
+  /* Admin can be accessed on desktop/mobile, web + app */
+  body.responsive-viewport {
+    /* No constraints - fully responsive */
+  }
+
+  /* App-specific viewport classes */
+  body.customer-app-viewport {
+    /* Customer app styling - can add specific overrides if needed */
+  }
+
+  body.runner-app-viewport {
+    /* Runner app styling - can add specific overrides if needed */
+  }
+
+  body.admin-app-viewport {
+    /* Admin app styling - can add specific overrides if needed */
+  }
+
+  /* Mobile-only app container constraints */
+  /* ALWAYS show phone frame on desktop browsers, regardless of window size */
+  /* Only remove frame when in device emulation mode (detected via data attribute) */
+  body.mobile-app-viewport {
+    /* Center the mobile app container */
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+    min-height: 100vh;
+    background: #f5f5f7;
+  }
+
+  body.mobile-app-viewport #root {
+    /* On desktop, show mobile app in centered phone frame */
+    /* Fixed dimensions matching actual phone screen (iPhone 14 Pro Max: 428x926) */
+    width: 428px;
+    height: 926px; /* iPhone 14 Pro Max height */
+    max-width: 428px;
+    max-height: 926px;
+    margin: 0 auto;
+    background: white;
+    box-shadow: 
+      0 0 0 8px rgba(0, 0, 0, 0.08),
+      0 0 0 1px rgba(0, 0, 0, 0.04),
+      0 20px 60px rgba(0, 0, 0, 0.12);
+    border-radius: 24px;
+    overflow: hidden;
+    position: relative;
+    /* Ensure proper stacking */
+    z-index: 1;
+    /* Create a containing block for fixed/absolute children */
+    /* This makes fixed elements position relative to this container, not viewport */
+    transform: translateZ(0); /* Creates containing block */
+    will-change: transform; /* Optimize for transform */
+    /* Enable scrolling within the phone frame */
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Add phone frame notch indicator (visual cue) */
+  body.mobile-app-viewport #root::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 134px;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 0 0 12px 12px;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  /* Ensure all content respects the container */
+  body.mobile-app-viewport #root > * {
+    width: 100%;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Make sure layouts fill the container properly */
+  /* Target the actual layout components, not provider wrappers */
+  /* Note: Individual layouts handle their own scrolling internally */
+  body.mobile-app-viewport [class*="CustomerLayout"],
+  body.mobile-app-viewport [class*="RunnerLayout"] {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    position: relative;
+    /* Don't set overflow here - let layouts handle their own scrolling */
+    border-radius: 24px;
+    /* Ensure fixed children are contained within phone frame */
+    display: flex;
+    flex-direction: column;
+    /* Ensure content can scroll */
+    flex: 1;
+    min-height: 0; /* Important for flex scrolling */
+  }
+  
+  /* Admin layouts should be responsive, not constrained to phone frame */
+  body.mobile-app-viewport [class*="AdminLayout"] {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    position: relative;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Constrain fixed/absolute positioned elements to phone frame */
+  body.mobile-app-viewport #root [class*="fixed"],
+  body.mobile-app-viewport #root [class*="absolute"] {
+    /* Ensure fixed elements respect phone frame boundaries */
+    max-width: 100%;
+    left: 0;
+    right: 0;
+  }
+
+  /* Specifically handle bottom navigation - constrain to phone frame */
+  /* Fixed elements are viewport-relative, so we need to constrain them to phone frame */
+  /* EXCEPT: bottom navs with inset-x-0 should be full width of phone frame */
+  body.mobile-app-viewport #root [class*="fixed"][class*="bottom"]:not([data-request-flow-bottom-bar]):not([class*="CustomerBottomBar"]),
+  body.mobile-app-viewport #root [class*="fixed"][class*="inset-x"]:not([data-request-flow-bottom-bar]):not([class*="CustomerBottomBar"]):not([class*="inset-x-0"]) {
+    /* Constrain to phone frame width (428px) and center it */
+    /* Calculate: viewport center - half phone frame width */
+    left: calc(50% - 214px); /* 50% - (428px / 2) */
+    right: auto;
+    width: 428px;
+    max-width: 428px;
+    /* Ensure it respects rounded corners */
+    border-bottom-left-radius: 24px;
+    border-bottom-right-radius: 24px;
+    /* Position relative to phone frame bottom */
+    bottom: 0;
+  }
+
+  /* Bottom navs with inset-x-0 should be full width of phone frame */
+  body.mobile-app-viewport #root [class*="fixed"][class*="bottom"][class*="inset-x-0"],
+  body.mobile-app-viewport #root [data-request-flow-bottom-bar],
+  body.mobile-app-viewport #root [class*="CustomerBottomBar"] {
+    left: calc(50% - 214px) !important; /* Align to phone frame left edge */
+    right: auto !important; /* Don't use right positioning */
+    width: 428px !important; /* Full phone frame width */
+    max-width: 428px !important;
+    bottom: 0;
+  }
+
+  /* On smaller screens where phone frame might be narrower, use full width */
+  @media (max-width: 468px) {
+    body.mobile-app-viewport #root [class*="fixed"][class*="bottom"]:not([data-request-flow-bottom-bar]):not([class*="CustomerBottomBar"]),
+    body.mobile-app-viewport #root [class*="fixed"][class*="inset-x"]:not([data-request-flow-bottom-bar]):not([class*="CustomerBottomBar"]):not([class*="inset-x-0"]) {
+      left: 20px; /* Match body padding */
+      right: 20px;
+      width: auto;
+      max-width: 428px;
+    }
+
+    body.mobile-app-viewport #root [class*="fixed"][class*="bottom"][class*="inset-x-0"],
+    body.mobile-app-viewport #root [data-request-flow-bottom-bar],
+    body.mobile-app-viewport #root [class*="CustomerBottomBar"] {
+      left: 20px !important; /* Match body padding */
+      right: 20px !important;
+      width: auto !important;
+      max-width: 428px !important;
+    }
+  }
+
+  /* Only remove phone frame when in device emulation mode */
+  /* This is detected via data-device-emulation attribute set by useViewport hook */
+  body.mobile-app-viewport[data-device-emulation="true"] {
+    padding: 0;
+    background: transparent;
+  }
+
+  body.mobile-app-viewport[data-device-emulation="true"] #root {
+    max-width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    background: transparent;
+  }
+
+  body.mobile-app-viewport[data-device-emulation="true"] #root::before {
+    display: none;
+  }
+
+  /* Constrain Sheet/Dialog components (menu, modals) to phone frame */
+  /* Radix UI Portal renders at body level, so we need to target it directly */
+  /* Phone frame: centered, left at calc(50% - 214px), right at calc(50% + 214px) */
+  /* Phone frame: top at 40px (body padding), dimensions: 428px × 926px */
+  
+  /* Sheet overlay - constrain to phone frame area only */
+  body.mobile-app-viewport [data-radix-dialog-overlay],
+  body.mobile-app-viewport [data-radix-portal] > [data-radix-dialog-overlay],
+  body.mobile-app-viewport body > [data-radix-dialog-overlay] {
+    /* Match phone frame position and size exactly */
+    position: fixed !important;
+    left: calc(50% - 214px) !important;
+    right: auto !important;
+    width: 428px !important;
+    height: 926px !important;
+    max-width: 428px !important;
+    max-height: 926px !important;
+    min-width: 428px !important;
+    min-height: 926px !important;
+    /* Position at top of phone frame (accounting for body padding) */
+    top: 40px !important;
+    bottom: auto !important;
+    /* Remove viewport-relative inset classes */
+    inset: auto !important;
+    /* Respect phone frame rounded corners */
+    border-radius: 24px !important;
+    /* Ensure overlay doesn't extend beyond phone frame */
+    overflow: hidden !important;
+    /* Ensure it's above phone frame content but below modals */
+    z-index: 40 !important;
+  }
+
+  /* Sheet content (menu) - position relative to phone frame */
+  body.mobile-app-viewport [data-radix-dialog-content],
+  body.mobile-app-viewport [data-radix-portal] [data-radix-dialog-content],
+  body.mobile-app-viewport body > [data-radix-portal] [data-radix-dialog-content] {
+    /* Remove default positioning that uses viewport */
+    position: fixed !important;
+    /* Remove all inset classes that Radix UI/Tailwind applies */
+    inset: auto !important;
+    /* Remove viewport-relative positioning */
+    left: auto !important;
+    top: 40px !important;
+    bottom: auto !important;
+    
+    /* For right-side menu: align to phone frame right edge */
+    /* Phone frame: centered, right edge at calc(50% + 214px) from viewport left */
+    /* Menu: 320px wide, should have its right edge at phone frame right edge */
+    /* For fixed positioning: right = distance from viewport RIGHT edge */
+    /* Calculation: viewport width - (viewport center + 214px) = 50% - 214px */
+    /* Example: viewport 1200px, center 600px, phone right 814px, right = 1200 - 814 = 386px = 50% - 214px ✓ */
+    right: calc(50% - 214px) !important;
+    
+    /* Menu dimensions - constrained to phone frame */
+    width: 320px !important;
+    max-width: 320px !important;
+    min-width: 320px !important;
+    /* Height should match phone frame height */
+    height: 926px !important;
+    max-height: 926px !important;
+    min-height: 926px !important;
+    
+    /* Ensure it stays within phone frame - round only right corners */
+    border-radius: 0 24px 24px 0 !important;
+    
+    /* Ensure proper z-index above overlay */
+    z-index: 50 !important;
+  }
+
+  /* Specifically handle Sheet from right side (customer/runner menu) */
+  body.mobile-app-viewport [data-radix-dialog-content][data-side="right"] {
+    /* Ensure right edge aligns with phone frame right edge */
+    right: calc(50% - 214px) !important;
+    left: auto !important;
+    /* Remove any width constraints from Tailwind classes */
+    width: 320px !important;
+    max-width: 320px !important;
+    min-width: 320px !important;
+  }
+
+  /* Override ALL Tailwind classes that might interfere with positioning */
+  body.mobile-app-viewport [data-radix-dialog-content].w-80,
+  body.mobile-app-viewport [data-radix-dialog-content][class*="w-3/4"],
+  body.mobile-app-viewport [data-radix-dialog-content][class*="max-w"] {
+    width: 320px !important;
+    max-width: 320px !important;
+    min-width: 320px !important;
+  }
+
+  /* Override ALL height classes */
+  body.mobile-app-viewport [data-radix-dialog-content][class*="h-full"],
+  body.mobile-app-viewport [data-radix-dialog-content][class*="h-screen"],
+  body.mobile-app-viewport [data-radix-dialog-content][class*="inset-y"],
+  body.mobile-app-viewport [data-radix-dialog-content].inset-y-0 {
+    height: 926px !important;
+    max-height: 926px !important;
+    min-height: 926px !important;
+    top: 40px !important;
+    bottom: auto !important;
+  }
+
+  /* Override ALL inset classes */
+  body.mobile-app-viewport [data-radix-dialog-content][class*="inset"],
+  body.mobile-app-viewport [data-radix-dialog-content].inset-0,
+  body.mobile-app-viewport [data-radix-dialog-content].inset-x-0,
+  body.mobile-app-viewport [data-radix-dialog-content].inset-y-0 {
+    inset: auto !important;
+  }
+
+  /* Prevent any transforms that might move it outside phone frame */
+  body.mobile-app-viewport [data-radix-dialog-content][class*="translate"],
+  body.mobile-app-viewport [data-radix-dialog-content][style*="transform"] {
+    transform: none !important;
+  }
+
+  /* Hide spin buttons for number inputs (clean numeric input) */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
 }
+
+/* Benjamin Pulse Animation for New Delivery Cards */
+@keyframes benjamin-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(64, 245, 140, 0.18);
+    background-color: rgba(64, 245, 140, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 24px 6px rgba(64, 245, 140, 0.14);
+    background-color: rgba(64, 245, 140, 0.12);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(64, 245, 140, 0);
+    background-color: rgba(64, 245, 140, 0.08);
+  }
+}
+
+.benjamin-pulse {
+  animation: benjamin-pulse 1.4s ease-in-out infinite;
+}
+
+/* Runner tab slide animations */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+

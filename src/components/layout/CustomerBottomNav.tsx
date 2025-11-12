@@ -4,30 +4,102 @@
  * Fixed bottom navigation for customer app with single primary CTA.
  * Features:
  * - Single full-width "Request Cash" button
- * - Fixed positioning with backdrop blur
- * - Only renders on customer routes
+ * - Fixed positioning with safe-area-aware container
+ * - Only renders on customer routes (NOT in request flow)
+ * - Hidden when customer has an active order
  */
 
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useProfile } from '@/contexts/ProfileContext';
+import { supabase } from '@/db/supabase';
+import { RequestCashStepperNav } from '@/components/customer/RequestCashStepperNav';
 
 export function CustomerBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { profile } = useProfile();
+  const [hasActiveOrder, setHasActiveOrder] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Only show on /customer routes
-  if (!location.pathname.startsWith('/customer')) return null;
+  // Check for active orders
+  useEffect(() => {
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
+
+    const checkActiveOrders = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, status')
+          .eq('customer_id', profile.id)
+          .in('status', ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'])
+          .limit(1);
+
+        if (error) throw error;
+
+        setHasActiveOrder((data?.length || 0) > 0);
+      } catch (error) {
+        console.error('Error checking active orders:', error);
+        setHasActiveOrder(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkActiveOrders();
+
+    // Subscribe to order changes
+    const subscription = supabase
+      .channel('customer-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_id=eq.${profile.id}`,
+        },
+        () => {
+          checkActiveOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [profile]);
+
+  // CustomerFlowBottomBar now handles home, request flow, and tracking
+  // This component is kept for backward compatibility but should not render
+  // on routes where CustomerFlowBottomBar is used
+  const isHomeRoute = location.pathname === '/customer' || location.pathname === '/customer/home';
+  const isRequestRoute = location.pathname.startsWith('/customer/request');
+  const isTrackingRoute = location.pathname.startsWith('/customer/orders/');
+  const isAddressesRoute = location.pathname === '/customer/addresses';
+  
+  // Hide on all routes where CustomerFlowBottomBar is used or management pages
+  if (isHomeRoute || isRequestRoute || isTrackingRoute || isAddressesRoute) {
+    return null;
+  }
+
+  // For other customer routes (if any), show the old nav
+  // Hide if there's an active order or still loading
+  if (loading || hasActiveOrder) {
+    return null;
+  }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white backdrop-blur-lg border-t border-black/5 safe-area-inset-bottom">
-      <div className="container max-w-4xl mx-auto px-4 py-3">
-        <button
-          onClick={() => navigate('/customer/request')}
-          className="w-full h-14 rounded-2xl bg-black text-white font-semibold text-[15px] flex items-center justify-center shadow-[0_-4px_18px_rgba(0,0,0,0.18)] hover:bg-black/90 active:scale-[0.98] transition-all"
-        >
-          Request Cash
-        </button>
-      </div>
-    </div>
+    <RequestCashStepperNav
+      currentStep={1}
+      totalSteps={1}
+      showSteps={false}
+      onPrimary={() => navigate('/customer/request')}
+      primaryLabel="Request Cash"
+    />
   );
 }
 

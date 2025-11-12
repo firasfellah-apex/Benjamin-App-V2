@@ -7,11 +7,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { SafetyBanner } from '@/components/common/SafetyBanner';
 import { canShowLiveRoute } from '@/lib/reveal';
 import { OrderStatus } from '@/types/types';
-import { MapPin, Lock, Navigation, Clock } from 'lucide-react';
+import { Lock, Navigation, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Location {
@@ -53,92 +51,69 @@ export function CustomerOrderMap({
   };
 
   if (!canShowMap) {
+    // For full-screen map view, return a gradient background instead of card
     return (
-      <Card className={cn('overflow-hidden', className)}>
-        <CardContent className="p-0">
-          {/* Blurred Placeholder */}
-          <div className="relative h-64 bg-muted flex items-center justify-center">
-            <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted-foreground/20 blur-2xl" />
-            <div className="relative z-10 flex flex-col items-center gap-4 text-center p-6">
-              <div className="h-16 w-16 rounded-full bg-background/80 flex items-center justify-center">
-                <Lock className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="space-y-2">
-                <p className="font-medium">Location Hidden</p>
-                <p className="text-sm text-muted-foreground max-w-xs">
-                  Runner location will be visible after cash pickup
-                </p>
-              </div>
+      <div className={cn('relative h-full w-full bg-gradient-to-br from-slate-100 to-slate-200', className)}>
+        {/* Soft gradient background when map is not available */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center space-y-4 p-6">
+            <div className="h-16 w-16 rounded-full bg-white/80 flex items-center justify-center mx-auto shadow-lg">
+              <Lock className="h-8 w-8 text-slate-400" />
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium text-slate-700">Location Hidden</p>
+              <p className="text-sm text-slate-500 max-w-xs mx-auto">
+                Runner location will be visible after cash pickup
+              </p>
             </div>
           </div>
-
-          {/* Safety Banner */}
-          <div className="p-4">
-            <SafetyBanner />
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className={cn('overflow-hidden', className)}>
-      <CardContent className="p-0">
-        {/* Map View */}
-        <div
-          className={cn(
-            'relative h-64 bg-muted transition-all duration-500',
-            isRevealing && 'animate-in fade-in zoom-in-95'
-          )}
-        >
-          {customerLocation && (
-            <iframe
-              src={getStaticMapUrl(customerLocation.lat, customerLocation.lng)}
-              className="w-full h-full border-0"
-              title="Delivery location map"
-              loading="lazy"
-            />
-          )}
+    <div className={cn('relative h-full w-full bg-slate-100 pointer-events-none', className)}>
+      {/* Map View - Full Screen */}
+      <div
+        className={cn(
+          'relative h-full w-full bg-slate-100 transition-all duration-500 pointer-events-none',
+          isRevealing && 'animate-in fade-in zoom-in-95'
+        )}
+      >
+        {customerLocation && (
+          <iframe
+            src={getStaticMapUrl(customerLocation.lat, customerLocation.lng)}
+            className="w-full h-full border-0 pointer-events-none"
+            title="Delivery location map"
+            loading="lazy"
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
 
-          {/* ETA Overlay */}
-          {estimatedArrival && (
-            <div className="absolute top-4 left-4 right-4">
-              <Card className="bg-background/95 backdrop-blur">
-                <CardContent className="p-3 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Estimated Arrival</p>
-                    <p className="text-sm font-medium">{estimatedArrival}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Runner Location Indicator */}
-          {runnerLocation && (
-            <div className="absolute bottom-4 left-4">
-              <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-full shadow-lg">
-                <Navigation className="h-4 w-4" />
-                <span className="text-sm font-medium">Runner nearby</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Address Display */}
-        {customerLocation?.address && (
-          <div className="p-4">
-            <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+        {/* ETA Overlay */}
+        {estimatedArrival && (
+          <div className="absolute top-20 left-4 right-4 z-10">
+            <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg p-3 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-slate-600" />
               <div className="flex-1">
-                <p className="text-sm font-medium">Delivery Address</p>
-                <p className="text-sm text-muted-foreground">{customerLocation.address}</p>
+                <p className="text-xs text-slate-500">Estimated Arrival</p>
+                <p className="text-sm font-medium text-slate-900">{estimatedArrival}</p>
               </div>
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+
+        {/* Runner Location Indicator */}
+        {runnerLocation && (
+          <div className="absolute bottom-24 left-4 z-10">
+            <div className="flex items-center gap-2 bg-black text-white px-3 py-2 rounded-full shadow-lg">
+              <Navigation className="h-4 w-4" />
+              <span className="text-sm font-medium">Runner nearby</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

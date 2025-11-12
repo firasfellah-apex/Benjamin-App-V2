@@ -5,9 +5,16 @@ export type OrderStatus =
   | 'Runner Accepted' 
   | 'Runner at ATM' 
   | 'Cash Withdrawn' 
-  | 'Pending Handoff' 
+  | 'Pending Handoff' // Maps to: otp_generated, enroute_customer, arrived (DB may not have these yet)
   | 'Completed' 
   | 'Cancelled';
+
+/**
+ * Extended order statuses for tighter flow control
+ * These may not exist in DB yet, but are used for UI logic and reveal rules
+ * TODO: Add to DB enum when backend supports: 'OTP Generated', 'Enroute Customer', 'Arrived'
+ */
+export type ExtendedOrderStatus = OrderStatus | 'OTP Generated' | 'Enroute Customer' | 'Arrived';
 
 export type InvitationStatus = 'Pending' | 'Accepted' | 'Expired' | 'Revoked';
 
@@ -47,6 +54,7 @@ export interface Profile {
   last_name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  fun_fact: string | null;
   is_active: boolean;
   is_suspended: boolean;
   kyc_status: KYCStatus;
@@ -57,6 +65,11 @@ export interface Profile {
   daily_limit_last_reset: string;
   monthly_earnings: number;
   approved_by: string | null;
+  is_online: boolean;
+  avg_runner_rating: number | null;
+  runner_rating_count: number;
+  avg_customer_rating: number | null;
+  customer_rating_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -81,6 +94,7 @@ export interface CustomerAddress {
   id: string;
   customer_id: string;
   label: string;
+  icon: string | null; // Lucide icon name (e.g., 'Home', 'Building2', 'Heart')
   line1: string;
   line2: string | null;
   city: string;
@@ -95,6 +109,7 @@ export interface CustomerAddress {
 
 export interface AddressSnapshot {
   label: string;
+  icon: string | null;
   line1: string;
   line2: string | null;
   city: string;
@@ -131,6 +146,10 @@ export interface Order {
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancellation_reason: string | null;
+  runner_rating: number | null;
+  runner_rating_comment: string | null;
+  customer_rating_by_runner: number | null;
+  customer_rating_tags: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -282,7 +282,7 @@ export default function InvitationManagement() {
                   <div className="text-sm space-y-1">
                     <p><span className="font-medium">Email:</span> {createdInvitation.email}</p>
                     <p><span className="font-medium">Role:</span> {createdInvitation.role_to_assign}</p>
-                    <p><span className="font-medium">Expires:</span> {new Date(createdInvitation.expires_at).toLocaleDateString()}</p>
+                    <p><span className="font-medium">Expires:</span> {new Date(createdInvitation.expires_at).toLocaleDateString('en-US')}</p>
                   </div>
                 </div>
               )}
@@ -383,7 +383,7 @@ export default function InvitationManagement() {
                         {invitation.inviter?.first_name} {invitation.inviter?.last_name}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {new Date(invitation.expires_at).toLocaleDateString()}
+                        {new Date(invitation.expires_at).toLocaleDateString('en-US')}
                       </TableCell>
                       <TableCell className="text-right">
                         {invitation.status === "Pending" && (

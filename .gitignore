@@ -158,3 +158,9 @@ history/*.json
 # Local files
 *.local
 package-lock.json
+node_modules
+.vite
+dist
+.env*
+.supabase
+.DS_Store

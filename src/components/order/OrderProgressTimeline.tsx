@@ -35,6 +35,10 @@ export function OrderProgressTimeline({
     
     if (!isCanceled) {
       currentIndex = steps.findIndex(s => s.id === currentStep);
+      // Safety fallback: if step not found, default to 0
+      if (currentIndex === -1) {
+        currentIndex = currentStep === 'COMPLETED' ? steps.length - 1 : 0;
+      }
     }
   } else {
     // Internal chain-of-custody steps
@@ -69,9 +73,17 @@ export function OrderProgressTimeline({
         {/* Steps */}
         <div className="space-y-6">
           {steps.map((step, index) => {
-            const isCompleted = index < currentIndex;
-            const isCurrent = index === currentIndex;
-            const isFuture = index > currentIndex;
+            // Check if order is completed (last step in customer timeline is COMPLETED)
+            const isOrderCompleted = currentStatus === 'Completed';
+            // When status is Completed, all steps should be marked as completed
+            // For completed orders, mark all steps as completed
+            const isCompleted = isOrderCompleted ? true : index <= currentIndex;
+            // Only show "current" state if it's the current step AND order is not completed
+            // When order is completed, we want all steps to show as completed (not current)
+            const isCurrent = !isCanceled && !isOrderCompleted && index === currentIndex && currentIndex < steps.length - 1;
+            const isFuture = !isOrderCompleted && index > currentIndex;
+            // For completed orders, all steps should show as completed (not current)
+            const showAsCompleted = isCompleted && !isCurrent;
 
             return (
               <div key={step.id} className="relative flex items-start gap-4">
@@ -81,17 +93,17 @@ export function OrderProgressTimeline({
                     className={cn(
                       'flex items-center justify-center rounded-full transition-all duration-200',
                       isRunner ? (
-                        isCompleted && 'w-6 h-6 bg-[#6366F1]' ||
+                        showAsCompleted && 'w-6 h-6 bg-[#6366F1]' ||
                         isCurrent && 'w-7 h-7 bg-[#6366F1] ring-4 ring-[#6366F1]/20' ||
                         isFuture && 'w-6 h-6 border-2 border-slate-700 bg-[#0B1020]'
                       ) : (
-                        isCompleted && 'w-6 h-6 bg-black' ||
+                        showAsCompleted && 'w-6 h-6 bg-black' ||
                         isCurrent && 'w-7 h-7 bg-black ring-4 ring-black/10' ||
                         isFuture && 'w-6 h-6 border-2 border-neutral-300 bg-white'
                       )
                     )}
                   >
-                    {isCompleted && (
+                    {showAsCompleted && (
                       <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                     )}
                     {isCurrent && (
@@ -115,10 +127,10 @@ export function OrderProgressTimeline({
                     className={cn(
                       'text-sm font-semibold transition-colors',
                       isRunner ? (
-                        (isCompleted || isCurrent) && 'text-white' ||
+                        (showAsCompleted || isCurrent) && 'text-white' ||
                         isFuture && 'text-slate-500'
                       ) : (
-                        (isCompleted || isCurrent) && 'text-black' ||
+                        (showAsCompleted || isCurrent) && 'text-black' ||
                         isFuture && 'text-neutral-400'
                       )
                     )}
@@ -130,10 +142,10 @@ export function OrderProgressTimeline({
                       className={cn(
                         'text-xs mt-1 transition-colors',
                         isRunner ? (
-                          (isCompleted || isCurrent) && 'text-slate-300' ||
+                          (showAsCompleted || isCurrent) && 'text-slate-300' ||
                           isFuture && 'text-slate-600'
                         ) : (
-                          (isCompleted || isCurrent) && 'text-muted-foreground' ||
+                          (showAsCompleted || isCurrent) && 'text-muted-foreground' ||
                           isFuture && 'text-neutral-300'
                         )
                       )}

@@ -1,0 +1,17 @@
+# Query: tailwind.config.js
+# ContextLines: 1
+
+1 result - 1 file
+
+CODEBASE_DOWNLOAD_INFO.md:
+  13  - ✅ All source code (`src/` directory)
+  14: - ✅ Configuration files (`package.json`, `tsconfig.json`, `tailwind.config.js`, etc.)
+  15  - ✅ Database migrations (`supabase/migrations/`)
+
+theme: {
+  extend: {
+    fontFamily: {
+      ibrand: ['"IBrand"', 'system-ui', 'sans-serif'],
+    },
+  },
+},

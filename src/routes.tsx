@@ -1,27 +1,34 @@
 import type { ReactNode } from 'react';
-import Home from './pages/Home';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 import Account from './pages/Account';
 
 import { CustomerLayout } from './components/layout/CustomerLayout';
+import { RoleBasedLayout } from './components/layout/RoleBasedLayout';
 import CustomerHome from './pages/customer/CustomerHome';
 import CashRequest from './pages/customer/CashRequest';
 import MyOrders from './pages/customer/MyOrders';
-import OrderTracking from './pages/customer/OrderTracking';
+import CustomerOrderDetailPage from './pages/customer/CustomerOrderDetailPage';
+import ManageAddresses from './pages/customer/ManageAddresses';
+import History from './pages/customer/History';
 
 import { RunnerLayout } from './components/layout/RunnerLayout';
-import AvailableOrders from './pages/runner/AvailableOrders';
+import Work from './pages/runner/Work';
+import Earnings from './pages/runner/Earnings';
+import More from './pages/runner/More';
 import MyDeliveries from './pages/runner/MyDeliveries';
 import RunnerOrderDetail from './pages/runner/RunnerOrderDetail';
 
 import { RequireAdminAuth } from './components/auth/RequireAdminAuth';
+import { AdminLayout } from './components/layout/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
 import UserManagement from './pages/admin/UserManagement';
 import InvitationManagement from './pages/admin/InvitationManagement';
 import OrderMonitoring from './pages/admin/OrderMonitoring';
 import AdminOrderDetail from './pages/admin/AdminOrderDetail';
 import RunnerTraining from './pages/admin/RunnerTraining';
+
+import ProfileOnboarding from './pages/customer/OnboardingProfile';
 
 export interface RouteConfig {
   name: string;
@@ -31,12 +38,8 @@ export interface RouteConfig {
 }
 
 const routes: RouteConfig[] = [
-  {
-    name: 'Home',
-    path: '/',
-    element: <Home />,
-    visible: true
-  },
+  // Note: '/' route is handled by redirect in App.tsx to '/customer/home'
+  // Removed to prevent infinite redirect loop
   {
     name: 'Login',
     path: '/login',
@@ -44,9 +47,15 @@ const routes: RouteConfig[] = [
     visible: false
   },
   {
+    name: 'Profile Onboarding',
+    path: '/onboarding/profile',
+    element: <ProfileOnboarding />,
+    visible: false
+  },
+  {
     name: 'Account',
     path: '/account',
-    element: <Account />,
+    element: <RoleBasedLayout><Account /></RoleBasedLayout>,
     visible: false
   },
   {
@@ -74,63 +83,118 @@ const routes: RouteConfig[] = [
     visible: false
   },
   {
-    name: 'Order Tracking',
+    name: 'Order Detail',
     path: '/customer/orders/:orderId',
-    element: <CustomerLayout><OrderTracking /></CustomerLayout>,
+    element: <CustomerLayout><CustomerOrderDetailPage /></CustomerLayout>,
     visible: false
   },
   {
-    name: 'Available Orders',
+    name: 'Manage Addresses',
+    path: '/customer/addresses',
+    element: <CustomerLayout><ManageAddresses /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Order History',
+    path: '/customer/history',
+    element: <CustomerLayout><History /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Runner Work',
+    path: '/runner',
+    element: <RunnerLayout><Work /></RunnerLayout>,
+    visible: false
+  },
+  {
+    name: 'Runner Work',
+    path: '/runner/work',
+    element: <RunnerLayout><Work /></RunnerLayout>,
+    visible: false
+  },
+  {
+    name: 'Runner Earnings',
+    path: '/runner/earnings',
+    element: <RunnerLayout><Earnings /></RunnerLayout>,
+    visible: false
+  },
+  {
+    name: 'Runner More',
+    path: '/runner/more',
+    element: <RunnerLayout><More /></RunnerLayout>,
+    visible: false
+  },
+  {
+    name: 'Runner Home (Legacy)',
+    path: '/runner/home',
+    element: <RunnerLayout><Work /></RunnerLayout>,
+    visible: false
+  },
+  {
+    name: 'Available Orders (Legacy)',
     path: '/runner/available',
-    element: <RunnerLayout><AvailableOrders /></RunnerLayout>,
+    element: <RunnerLayout><Work /></RunnerLayout>,
     visible: false
   },
   {
     name: 'My Deliveries',
-    path: '/runner/orders',
-    element: <RunnerLayout><MyDeliveries /></RunnerLayout>,
+    path: '/runner/deliveries',
+    element: <MyDeliveries />,
     visible: false
   },
   {
     name: 'Runner Order Detail',
+    path: '/runner/deliveries/:orderId',
+    element: <RunnerOrderDetail />,
+    visible: false
+  },
+  // Legacy routes for backwards compatibility
+  {
+    name: 'My Deliveries (Legacy)',
+    path: '/runner/orders',
+    element: <MyDeliveries />,
+    visible: false
+  },
+  {
+    name: 'Runner Order Detail (Legacy)',
     path: '/runner/orders/:orderId',
-    element: <RunnerLayout><RunnerOrderDetail /></RunnerLayout>,
+    element: <RunnerOrderDetail />,
     visible: false
   },
   {
     name: 'Admin Dashboard',
     path: '/admin/dashboard',
-    element: <RequireAdminAuth><Dashboard /></RequireAdminAuth>,
+    element: <RequireAdminAuth><AdminLayout><Dashboard /></AdminLayout></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'User Management',
     path: '/admin/users',
-    element: <RequireAdminAuth><UserManagement /></RequireAdminAuth>,
+    element: <RequireAdminAuth><AdminLayout><UserManagement /></AdminLayout></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Invitation Management',
     path: '/admin/invitations',
-    element: <RequireAdminAuth><InvitationManagement /></RequireAdminAuth>,
+    element: <RequireAdminAuth><AdminLayout><InvitationManagement /></AdminLayout></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Order Monitoring',
     path: '/admin/orders',
-    element: <RequireAdminAuth><OrderMonitoring /></RequireAdminAuth>,
+    element: <RequireAdminAuth><AdminLayout><OrderMonitoring /></AdminLayout></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Admin Order Detail',
     path: '/admin/orders/:orderId',
-    element: <RequireAdminAuth><AdminOrderDetail /></RequireAdminAuth>,
+    element: <RequireAdminAuth><AdminLayout><AdminOrderDetail /></AdminLayout></RequireAdminAuth>,
     visible: false
   },
   {
     name: 'Runner Training',
     path: '/admin/training',
-    element: <RequireAdminAuth><RunnerTraining /></RequireAdminAuth>,
+    element: <RequireAdminAuth><AdminLayout><RunnerTraining /></AdminLayout></RequireAdminAuth>,
     visible: false
   },
   {

@@ -30,10 +30,42 @@ export function formatDate(
   date: Date | string | number,
   opts: Intl.DateTimeFormatOptions = {}
 ) {
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat("en-US", {
     month: opts.month ?? "long",
     day: opts.day ?? "numeric",
     year: opts.year ?? "numeric",
     ...opts,
   }).format(new Date(date));
+}
+
+/**
+ * Calculate order duration from start to end time
+ * Returns formatted string like "15m 30s" or "2h 15m"
+ */
+export function getOrderDuration(
+  start: Date | string | number | null,
+  end: Date | string | number | null
+): string {
+  if (!start || !end) return "—";
+  
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  
+  if (isNaN(startTime) || isNaN(endTime)) return "—";
+  if (endTime < startTime) return "—";
+  
+  const diffMs = endTime - startTime;
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  
+  if (diffHours > 0) {
+    const remainingMinutes = diffMinutes % 60;
+    return `${diffHours}h ${remainingMinutes}m`;
+  } else if (diffMinutes > 0) {
+    const remainingSeconds = diffSeconds % 60;
+    return `${diffMinutes}m ${remainingSeconds}s`;
+  } else {
+    return `${diffSeconds}s`;
+  }
 }

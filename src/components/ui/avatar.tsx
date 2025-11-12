@@ -21,12 +21,21 @@ function Avatar({
 
 function AvatarImage({
   className,
+  onError,
   ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+  const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    // Silently handle image load errors - fallback will be shown
+    if (onError) {
+      onError(e);
+    }
+  };
+
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn("aspect-square size-full", className)}
+      onError={handleError}
       {...props}
     />
   );

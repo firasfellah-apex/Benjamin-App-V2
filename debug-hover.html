@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug Hover Effects</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #f5f5f7;
+    }
+    .test-box {
+      padding: 20px;
+      margin: 10px 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .status.good {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.bad {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Debug Hover Effects in Mobile App Viewport</h1>
+  
+  <div class="test-box">
+    <h2>1. Check if class is applied</h2>
+    <div id="class-status" class="status">Checking...</div>
+    <p>Body classes: <code id="body-classes"></code></p>
+  </div>
+
+  <div class="test-box">
+    <h2>2. Check current route</h2>
+    <div id="route-status" class="status">Checking...</div>
+    <p>Current path: <code id="current-path"></code></p>
+  </div>
+
+  <div class="test-box">
+    <h2>3. Test hover override</h2>
+    <p>Hover over this box - it should NOT change appearance:</p>
+    <div style="padding: 20px; background: #e0e0e0; border-radius: 4px; cursor: pointer;" 
+         class="hover:bg-blue-500 hover:text-white hover:scale-105">
+      This box has hover:bg-blue-500 hover:text-white hover:scale-105
+    </div>
+    <p id="hover-test-status" class="status" style="margin-top: 10px;">Hover over the box above to test</p>
+  </div>
+
+  <div class="test-box">
+    <h2>4. Manual Fix</h2>
+    <p>If the class is not applied, run this in console:</p>
+    <code style="display: block; padding: 10px; background: #f4f4f4; margin: 10px 0;">
+      document.body.classList.add('mobile-app-viewport');<br>
+      document.body.classList.remove('responsive-viewport');
+    </code>
+    <button onclick="applyFix()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+      Apply Fix Now
+    </button>
+  </div>
+
+  <script>
+    function checkStatus() {
+      // Check class
+      const hasMobileClass = document.body.classList.contains('mobile-app-viewport');
+      const hasResponsiveClass = document.body.classList.contains('responsive-viewport');
+      
+      document.getElementById('body-classes').textContent = document.body.className || '(none)';
+      
+      if (hasMobileClass) {
+        document.getElementById('class-status').textContent = '✅ mobile-app-viewport class is applied';
+        document.getElementById('class-status').className = 'status good';
+      } else if (hasResponsiveClass) {
+        document.getElementById('class-status').textContent = '❌ responsive-viewport class is applied (wrong for mobile apps)';
+        document.getElementById('class-status').className = 'status bad';
+      } else {
+        document.getElementById('class-status').textContent = '❌ No viewport class found';
+        document.getElementById('class-status').className = 'status bad';
+      }
+
+      // Check route
+      const path = window.location.pathname;
+      document.getElementById('current-path').textContent = path;
+      
+      if (path.startsWith('/customer') || path.startsWith('/runner')) {
+        if (hasMobileClass) {
+          document.getElementById('route-status').textContent = '✅ Route matches mobile app viewport';
+          document.getElementById('route-status').className = 'status good';
+        } else {
+          document.getElementById('route-status').textContent = '❌ Route should have mobile-app-viewport class';
+          document.getElementById('route-status').className = 'status bad';
+        }
+      } else if (path.startsWith('/admin')) {
+        if (hasResponsiveClass) {
+          document.getElementById('route-status').textContent = '✅ Route matches responsive viewport';
+          document.getElementById('route-status').className = 'status good';
+        } else {
+          document.getElementById('route-status').textContent = '⚠️ Admin route - should have responsive-viewport class';
+          document.getElementById('route-status').className = 'status';
+        }
+      } else {
+        document.getElementById('route-status').textContent = '⚠️ Unknown route';
+        document.getElementById('route-status').className = 'status';
+      }
+    }
+
+    function applyFix() {
+      document.body.classList.add('mobile-app-viewport');
+      document.body.classList.remove('responsive-viewport');
+      checkStatus();
+      alert('Fix applied! Refresh the page to see if hover effects are gone.');
+    }
+
+    // Check on load
+    checkStatus();
+    
+    // Check every second (in case class changes)
+    setInterval(checkStatus, 1000);
+  </script>
+</body>
+</html>
+

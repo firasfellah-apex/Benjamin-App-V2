@@ -4,7 +4,7 @@
  * Allows users to upload, change, or remove their avatar
  * - Drag & drop or click to upload
  * - Shows current avatar or initials
- * - Center-crops to square automatically
+ * - Interactive crop modal to select square area (ensures faces are visible)
  */
 
 import { useRef, useState } from 'react';
@@ -14,6 +14,7 @@ import { useAvatar } from '@/hooks/use-avatar';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { AvatarCropModal } from './AvatarCropModal';
 
 interface AvatarUploaderProps {
   currentAvatarUrl?: string | null;
@@ -32,15 +33,71 @@ export function AvatarUploader({
 }: AvatarUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string | null>(null);
   const { uploading, uploadAvatar, removeAvatar } = useAvatar();
 
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = (file: File) => {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('File must be a JPEG, PNG, or WebP image');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    // Create object URL and show crop modal
+    const imageUrl = URL.createObjectURL(file);
+    setSelectedImageSrc(imageUrl);
+    setShowCropModal(true);
+  };
+
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
     try {
-      const url = await uploadAvatar(file);
-      toast.success('Avatar uploaded successfully');
+      // Create a File object from the blob
+      const croppedFile = new File([croppedImageBlob], 'avatar.jpg', {
+        type: 'image/jpeg',
+      });
+
+      console.log('[AvatarUploader] Starting upload for cropped image');
+      const url = await uploadAvatar(croppedFile);
+      console.log('[AvatarUploader] Upload successful, URL:', url);
+      toast.success('Profile picture updated successfully');
       onUploadComplete?.(url);
+      
+      // Clean up
+      if (selectedImageSrc) {
+        URL.revokeObjectURL(selectedImageSrc);
+      }
+      setShowCropModal(false);
+      setSelectedImageSrc(null);
+      
+      // Clear file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to upload avatar');
+      console.error('[AvatarUploader] Upload failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload avatar';
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleCropCancel = () => {
+    if (selectedImageSrc) {
+      URL.revokeObjectURL(selectedImageSrc);
+    }
+    setShowCropModal(false);
+    setSelectedImageSrc(null);
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -159,8 +216,17 @@ export function AvatarUploader({
       <p className="text-xs text-muted-foreground text-center max-w-xs">
         Click or drag & drop to upload. JPG, PNG, or WebP. Max 5MB.
         <br />
-        Image will be cropped to square.
+        You'll be able to select the crop area.
       </p>
+
+      {/* Crop Modal */}
+      {showCropModal && selectedImageSrc && (
+        <AvatarCropModal
+          imageSrc={selectedImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
     </div>
   );
 }

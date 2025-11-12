@@ -1,19 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { LoginPanel } from "miaoda-auth-react";
-import { useAuth } from "miaoda-auth-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/db/supabase";
 import { toast } from "sonner";
 import { validateInvitationToken, acceptInvitation, getCurrentProfile } from "@/db/api";
-
-const login_config = {
-  title: 'Benjamin Cash Delivery',
-  desc: 'Secure cash delivery at your fingertips',
-  privacyPolicyUrl: import.meta.env.VITE_PRIVACY_POLICY_URL,
-  userPolicyUrl: import.meta.env.VITE_USER_POLICY_URL,
-  showPolicy: import.meta.env.VITE_SHOW_POLICY,
-  policyPrefix: import.meta.env.VITE_POLICY_PREFIX,
-  loginType: import.meta.env.VITE_LOGIN_TYPE
-};
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Chrome } from "lucide-react";
+import { AnimatedLogo } from "@/components/branding/AnimatedLogo";
+import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -22,6 +17,7 @@ export default function Login() {
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [invitationValid, setInvitationValid] = useState<boolean | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get('invitation');
@@ -54,9 +50,9 @@ export default function Login() {
                 if (profile.role.includes('admin')) {
                   navigate("/admin/dashboard", { replace: true });
                 } else if (profile.role.includes('runner')) {
-                  navigate("/runner/available", { replace: true });
+                  navigate("/runner/work", { replace: true });
                 } else {
-                  navigate("/customer/request", { replace: true });
+                  navigate("/customer/home", { replace: true });
                 }
               } else {
                 navigate("/", { replace: true });
@@ -74,9 +70,9 @@ export default function Login() {
             if (profile.role.includes('admin')) {
               navigate("/admin/dashboard", { replace: true });
             } else if (profile.role.includes('runner')) {
-              navigate("/runner/available", { replace: true });
+              navigate("/runner/home", { replace: true });
             } else {
-              navigate("/customer/request", { replace: true });
+              navigate("/customer/home", { replace: true });
             }
           } else {
             navigate("/", { replace: true });
@@ -86,9 +82,44 @@ export default function Login() {
     }
   }, [user, invitationToken, invitationValid, navigate, redirecting]);
 
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    // Redirect to home page after OAuth, which will then redirect based on user role
+    const redirectTo = `${window.location.origin}/`;
+    console.log('Initiating Google OAuth with redirectTo:', redirectTo);
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { 
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+    
+    if (error) {
+      console.error('Google sign-in error', error);
+      toast.error('Could not sign in. Check console for details.');
+      setLoading(false);
+    } else {
+      console.log('OAuth redirect initiated, URL:', data?.url);
+      // User will be redirected to Google, then back to redirectTo
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md">
+        {/* Logo Section */}
+        <div className="flex flex-col items-center justify-center mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <AnimatedLogo size={64} loop variant="customer" />
+            <BenjaminLogo variant="customer" height={32} />
+          </div>
+        </div>
+
         {invitationToken && invitationValid && (
           <div className="mb-4 p-4 bg-accent/10 border border-accent rounded-lg text-center">
             <p className="text-sm font-medium">You're joining via invitation</p>
@@ -105,7 +136,23 @@ export default function Login() {
             </p>
           </div>
         )}
-        <LoginPanel {...login_config} />
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Benjamin Cash Delivery</CardTitle>
+            <CardDescription>Secure cash delivery at your fingertips</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full"
+              size="lg"
+            >
+              <Chrome className="mr-2 h-5 w-5" />
+              {loading ? "Signing in..." : "Sign in with Google"}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

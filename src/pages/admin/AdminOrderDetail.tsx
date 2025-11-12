@@ -28,6 +28,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getOrderById, subscribeToOrder, cancelOrder } from "@/db/api";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
+import { OrderChatThread } from "@/components/chat/OrderChatThread";
+import { MessageSquare } from "lucide-react";
+import { RatingStars } from "@/components/common/RatingStars";
 
 const statusColors: Record<OrderStatus, string> = {
   "Pending": "bg-muted text-muted-foreground",
@@ -162,7 +165,7 @@ export default function AdminOrderDetail() {
               <div>
                 <CardTitle className="text-2xl">Order #{order.id.slice(0, 8)}</CardTitle>
                 <CardDescription>
-                  Created {new Date(order.created_at).toLocaleString()}
+                  Created {new Date(order.created_at).toLocaleString('en-US')}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
@@ -170,7 +173,7 @@ export default function AdminOrderDetail() {
                   <StatusIcon className="mr-2 h-4 w-4" />
                   {order.status}
                 </Badge>
-                {order.status === 'Pending' && (
+                {order.status !== 'Cancelled' && order.status !== 'Completed' && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -309,7 +312,7 @@ export default function AdminOrderDetail() {
                     <div className="text-sm text-muted-foreground mb-1">Accepted At</div>
                     <div className="font-medium">
                       {order.runner_accepted_at 
-                        ? new Date(order.runner_accepted_at).toLocaleString()
+                        ? new Date(order.runner_accepted_at).toLocaleString('en-US')
                         : 'N/A'}
                     </div>
                   </div>
@@ -365,29 +368,66 @@ export default function AdminOrderDetail() {
           </CardContent>
         </Card>
 
-        {/* Security Information */}
-        {order.status === "Pending Handoff" && (
+        {/* Security Information - OTP Metadata (Admin God View) */}
+        {order.otp_code && (
           <Card>
             <CardHeader>
-              <CardTitle>Security Information</CardTitle>
-              <CardDescription>OTP verification details</CardDescription>
+              <CardTitle>OTP Verification Details</CardTitle>
+              <CardDescription>Complete OTP metadata for support and dispute resolution</CardDescription>
             </CardHeader>
             <CardContent>
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>OTP Active</AlertTitle>
-                <AlertDescription>
-                  A 6-digit OTP has been generated for secure delivery verification.
-                  {order.otp_expires_at && (
-                    <div className="mt-2 text-sm">
-                      Expires: {new Date(order.otp_expires_at).toLocaleString()}
-                    </div>
-                  )}
-                  <div className="mt-1 text-sm">
-                    Attempts used: {order.otp_attempts} / 3
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium mb-1">OTP Code (Support Only)</div>
+                  <div className="font-mono text-lg font-bold p-2 bg-muted rounded-md">
+                    {order.otp_code}
                   </div>
-                </AlertDescription>
-              </Alert>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-1">Generated At</div>
+                    <div className="text-sm font-medium">
+                      {order.otp_expires_at 
+                        ? new Date(order.cash_withdrawn_at || order.updated_at).toLocaleString('en-US')
+                        : 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-1">Expires At</div>
+                    <div className="text-sm font-medium">
+                      {order.otp_expires_at 
+                        ? new Date(order.otp_expires_at).toLocaleString('en-US')
+                        : 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-1">Verified At</div>
+                    <div className="text-sm font-medium">
+                      {(order as any).otp_verified_at
+                        ? new Date((order as any).otp_verified_at).toLocaleString('en-US')
+                        : order.status === 'Completed'
+                        ? 'Verified (completed)'
+                        : 'Not verified'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-1">Attempts</div>
+                    <div className="text-sm font-medium">
+                      {order.otp_attempts || 0} / 3
+                    </div>
+                  </div>
+                </div>
+                {order.status === "Pending Handoff" && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>OTP Active</AlertTitle>
+                    <AlertDescription>
+                      Customer and runner are in the verification process. Runner can enter this code to complete delivery.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -407,13 +447,78 @@ export default function AdminOrderDetail() {
                     <strong>Reason:</strong> {order.cancellation_reason}
                   </div>
                   <div className="mt-1 text-sm">
-                    Cancelled at: {order.cancelled_at ? new Date(order.cancelled_at).toLocaleString() : 'N/A'}
+                    Cancelled at: {order.cancelled_at ? new Date(order.cancelled_at).toLocaleString('en-US') : 'N/A'}
                   </div>
                 </AlertDescription>
               </Alert>
             </CardContent>
           </Card>
         )}
+
+        {/* Ratings (Admin View) */}
+        {order.status === "Completed" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Ratings</CardTitle>
+              <CardDescription>
+                Customer and runner ratings for this completed order
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl bg-[#15171c] px-3 py-2">
+                  <div className="text-xs text-slate-400 mb-2">Customer → Runner</div>
+                  <RatingStars
+                    value={order.runner_rating ?? 0}
+                    readOnly
+                    size="sm"
+                    className="mt-1"
+                  />
+                  {order.runner_rating && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      {order.runner_rating} out of 5 stars
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-xl bg-[#15171c] px-3 py-2">
+                  <div className="text-xs text-slate-400 mb-2">Runner → Customer</div>
+                  <RatingStars
+                    value={order.customer_rating_by_runner ?? 0}
+                    readOnly
+                    size="sm"
+                    className="mt-1"
+                  />
+                  {order.customer_rating_by_runner && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      {order.customer_rating_by_runner} out of 5 stars
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Order Messages (Admin God View - Read Only) */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              <CardTitle>Order Messages</CardTitle>
+            </div>
+            <CardDescription>
+              Complete conversation history for this order. All messages are visible for dispute resolution and QA.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OrderChatThread
+              orderId={order.id}
+              orderStatus={order.status}
+              role="admin"
+              variant="admin"
+            />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Cancel Order Dialog */}
@@ -506,7 +611,7 @@ function TimelineItem({ title, timestamp, completed, cancelled = false }: Timeli
       <div className="flex-1 min-w-0">
         <div className="font-medium">{title}</div>
         <div className="text-sm text-muted-foreground">
-          {timestamp ? new Date(timestamp).toLocaleString() : 'Pending'}
+          {timestamp ? new Date(timestamp).toLocaleString('en-US') : 'Pending'}
         </div>
       </div>
     </div>

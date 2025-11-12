@@ -1,13 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, DollarSign } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ShellCard } from "@/components/ui/ShellCard";
-import { StatusChip } from "@/components/ui/StatusChip";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getRunnerOrders, subscribeToOrders } from "@/db/api";
-import type { OrderWithDetails } from "@/types/types";
+import { getRunnerOrders } from "@/db/api";
+import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
+import { getRunnerPayout } from "@/lib/payouts";
+import type { OrderWithDetails, Order } from "@/types/types";
 import { useProfile } from "@/contexts/ProfileContext";
+import { RunnerSubpageLayout } from "@/components/layout/RunnerSubpageLayout";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { RatingStars } from "@/components/common/RatingStars";
+import { formatDate } from "@/lib/utils";
+
+function shortId(orderId: string): string {
+  return orderId.slice(0, 8);
+}
+
+function formattedDate(dateString: string | null | undefined): string {
+  if (!dateString) return 'N/A';
+  return formatDate(new Date(dateString), { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function statusPill(status: string): string {
+  if (status === 'Completed') {
+    return 'bg-emerald-500/10 text-emerald-400 rounded-full px-3 py-1 text-xs font-medium';
+  }
+  if (status === 'Cancelled') {
+    return 'bg-red-500/10 text-red-400 rounded-full px-3 py-1 text-xs font-medium';
+  }
+  return 'bg-slate-500/10 text-slate-400 rounded-full px-3 py-1 text-xs font-medium';
+}
 
 export default function MyDeliveries() {
   const navigate = useNavigate();
@@ -16,205 +36,99 @@ export default function MyDeliveries() {
   const [loading, setLoading] = useState(true);
 
   const loadOrders = async () => {
-    const data = await getRunnerOrders();
-    setOrders(data);
-    setLoading(false);
+    try {
+      const data = await getRunnerOrders();
+      // Only show completed orders in deliveries list
+      const completed = data.filter(o => o.status === "Completed");
+      setOrders(completed.sort((a, b) => {
+        const dateA = a.handoff_completed_at ? new Date(a.handoff_completed_at) : new Date(a.updated_at);
+        const dateB = b.handoff_completed_at ? new Date(b.handoff_completed_at) : new Date(b.updated_at);
+        return dateB.getTime() - dateA.getTime();
+      }));
+    } catch (error) {
+      console.error("Error loading orders:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadOrders();
-
-    const subscription = subscribeToOrders(() => {
-      loadOrders();
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
-  const activeOrders = orders.filter(o => 
-    o.status !== "Completed" && o.status !== "Cancelled"
-  );
-  const completedOrders = orders.filter(o => o.status === "Completed");
+  // Handle realtime order updates
+  const handleOrderUpdate = useCallback((order: Order) => {
+    if (order.status === 'Completed') {
+      loadOrders();
+    }
+  }, []);
+
+  // Subscribe to runner's orders
+  useOrdersRealtime({
+    filter: { mode: 'runner', runnerId: profile?.id },
+    onUpdate: handleOrderUpdate,
+    enabled: !!profile,
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">My Deliveries</h1>
-          <p className="text-sm text-slate-400">
-            Track your delivery orders and earnings
-          </p>
-        </div>
-        <Button 
-          onClick={() => navigate("/runner/available")}
-          className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl"
-        >
-          View Available Orders
-        </Button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <ShellCard variant="runner">
-          <div className="space-y-1">
-            <p className="text-sm text-slate-400">Monthly Earnings</p>
-            <p className="text-3xl font-bold text-white">
-              ${profile?.monthly_earnings.toFixed(2) || '0.00'}
+    <RunnerSubpageLayout title="My deliveries">
+      <section className="space-y-3 mt-2">
+        {loading ? (
+          <div className="text-center py-12 text-slate-400">
+            Loading deliveries...
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="rounded-3xl bg-[#050816] border border-white/5 px-4 py-12 text-center">
+            <p className="text-slate-300 mb-2">No completed deliveries yet</p>
+            <p className="text-sm text-slate-400">
+              Your delivery history will appear here
             </p>
           </div>
-        </ShellCard>
-
-        <ShellCard variant="runner">
-          <div className="space-y-1">
-            <p className="text-sm text-slate-400">Active Deliveries</p>
-            <p className="text-3xl font-bold text-white">
-              {activeOrders.length}
-            </p>
-          </div>
-        </ShellCard>
-
-        <ShellCard variant="runner">
-          <div className="space-y-1">
-            <p className="text-sm text-slate-400">Completed This Month</p>
-            <p className="text-3xl font-bold text-white">
-              {completedOrders.length}
-            </p>
-          </div>
-        </ShellCard>
-      </div>
-
-      {activeOrders.length > 0 && (
-        <ShellCard variant="runner">
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Active Deliveries</h2>
-              <p className="text-sm text-slate-400 mt-1">
-                Orders currently in progress
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
-                    <TableHead className="text-slate-300">Order ID</TableHead>
-                    <TableHead className="text-slate-300">Amount</TableHead>
-                    <TableHead className="text-slate-300">Earnings</TableHead>
-                    <TableHead className="text-slate-300">Status</TableHead>
-                    <TableHead className="text-slate-300">Accepted</TableHead>
-                    <TableHead className="text-right text-slate-300">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeOrders.map((order) => (
-                    <TableRow key={order.id} className="border-slate-700 hover:bg-slate-800/50">
-                      <TableCell className="font-mono text-sm text-slate-300">
-                        #{order.id.slice(0, 8)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-white">
-                        ${order.requested_amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-emerald-400">
-                        ${order.delivery_fee.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusChip status={order.status} tone="runner" />
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-400">
-                        {order.runner_accepted_at ? new Date(order.runner_accepted_at).toLocaleString() : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/runner/orders/${order.id}`)}
-                          className="text-slate-300 hover:text-white hover:bg-slate-700"
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </ShellCard>
-      )}
-
-      <ShellCard variant="runner">
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Delivery History</h2>
-            <p className="text-sm text-slate-400 mt-1">
-              All your completed deliveries
-            </p>
-          </div>
-          {loading ? (
-            <div className="text-center py-8 text-slate-400">
-              Loading deliveries...
-            </div>
-          ) : orders.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-slate-400 mb-4">No deliveries yet</p>
-              <Button 
-                onClick={() => navigate("/runner/available")}
-                className="bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl"
+        ) : (
+          orders.map((order) => {
+            const runnerEarning = getRunnerPayout(order);
+            const completedDate = order.handoff_completed_at || order.updated_at;
+            const dateFormatted = formattedDate(completedDate);
+            
+            return (
+              <button
+                key={order.id}
+                onClick={() => navigate(`/runner/deliveries/${order.id}`)}
+                className="w-full text-left rounded-3xl bg-[#050816] border border-white/5 px-4 py-3 hover:border-white/10 transition-colors active:scale-[0.99]"
               >
-                View Available Orders
-              </Button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
-                    <TableHead className="text-slate-300">Order ID</TableHead>
-                    <TableHead className="text-slate-300">Amount</TableHead>
-                    <TableHead className="text-slate-300">Earnings</TableHead>
-                    <TableHead className="text-slate-300">Status</TableHead>
-                    <TableHead className="text-slate-300">Completed</TableHead>
-                    <TableHead className="text-right text-slate-300">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id} className="border-slate-700 hover:bg-slate-800/50">
-                      <TableCell className="font-mono text-sm text-slate-300">
-                        #{order.id.slice(0, 8)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-white">
-                        ${order.requested_amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-emerald-400">
-                        ${order.delivery_fee.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusChip status={order.status} tone="runner" />
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-400">
-                        {order.handoff_completed_at ? new Date(order.handoff_completed_at).toLocaleDateString() : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/runner/orders/${order.id}`)}
-                          className="text-slate-300 hover:text-white hover:bg-slate-700"
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      </ShellCard>
-    </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="text-xs text-slate-500 mb-1">
+                      #{shortId(order.id)} · {dateFormatted}
+                    </span>
+                    <span className="text-sm text-slate-300">
+                      {order.customer?.first_name || "Customer"}
+                    </span>
+                  </div>
+                  <div className="text-right ml-4">
+                    <div className="text-sm text-white font-semibold">
+                      ${order.requested_amount.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-emerald-400">
+                      +${runnerEarning.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className={statusPill(order.status)}>Completed</span>
+                  {order.customer_rating_by_runner && (
+                    <RatingStars
+                      value={order.customer_rating_by_runner}
+                      readOnly
+                      size="sm"
+                    />
+                  )}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </section>
+    </RunnerSubpageLayout>
   );
 }
