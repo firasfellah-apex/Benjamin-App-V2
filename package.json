@@ -4,6 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:customer": "vite --config vite.customer.config.ts",
+    "dev:runner": "vite --config vite.runner.config.ts",
+    "dev:admin": "vite --config vite.admin.config.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsgo -p tsconfig.check.json; biome lint --only=correctness/noUndeclaredDependencies; ast-grep scan"

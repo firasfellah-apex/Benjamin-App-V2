@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Package } from "@/lib/icons";
+import { CustomerButton } from "@/pages/customer/components/CustomerButton";
 import { getCustomerOrders } from "@/db/api";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import { useAuth } from "@/contexts/AuthContext";
@@ -128,12 +128,11 @@ export default function MyOrders() {
             {strings.customer.ordersSubtitle}
           </p>
         </div>
-        <Button 
+        <CustomerButton 
           onClick={() => navigate("/customer/request")}
-          className="bg-black text-white hover:bg-black/90 rounded-full"
         >
           Request Cash
-        </Button>
+        </CustomerButton>
       </div>
 
       {loading ? (

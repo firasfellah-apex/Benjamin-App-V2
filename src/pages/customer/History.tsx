@@ -7,8 +7,9 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Package } from '@/lib/icons';
 import { CustomerLayout } from '@/components/layout/CustomerLayout';
+import { CustomerCard } from '@/pages/customer/components/CustomerCard';
 import { getCustomerOrders } from '@/db/api';
 import type { OrderWithDetails } from '@/types/types';
 import { formatDate } from '@/lib/utils';
@@ -112,7 +113,7 @@ export default function History() {
     <CustomerLayout>
       <div className="min-h-screen bg-[#F4F5F7]">
         {/* Header */}
-        <div className="bg-white px-6 pt-6 pb-4">
+        <div className="bg-white pt-6 pb-4">
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={handleBack}
@@ -131,7 +132,7 @@ export default function History() {
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4">
+        <div className="py-4">
           {loading ? (
             <div className="space-y-3">
               <OrderListSkeleton count={5} />
@@ -152,10 +153,12 @@ export default function History() {
                 const isRated = !!order.runner_rating;
                 
                 return (
-                  <button
+                  <CustomerCard
                     key={order.id}
                     onClick={() => handleOrderClick(order)}
-                    className="w-full text-left bg-white rounded-3xl border border-slate-100 shadow-[0_8px_24px_rgba(15,23,42,0.06)] px-5 py-4 hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)] transition-shadow"
+                    interactive
+                    hoverable
+                    className="w-full text-left px-5 py-4"
                   >
                     {/* Top row: Address and Date */}
                     <div className="flex items-start justify-between gap-3 mb-2">
@@ -183,7 +186,7 @@ export default function History() {
                         </div>
                       </div>
                     )}
-                  </button>
+                  </CustomerCard>
                 );
               })}
             </div>

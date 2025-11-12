@@ -6,7 +6,7 @@
  */
 
 import React from "react";
-import { Home, Plus, Trash2, PenLine } from "lucide-react";
+import { Home, Plus, Trash2, PenLine } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 interface AddressCardProps {

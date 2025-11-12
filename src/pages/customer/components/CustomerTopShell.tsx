@@ -7,8 +7,8 @@
  */
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { EllipsisVertical, MapPin, Home, ArrowLeft, User, LogOut, Package } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { EllipsisVertical, MapPin, Home, ArrowLeft, User, LogOut, Package } from "@/lib/icons";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useProfile } from "@/hooks/useProfile";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactNode } from "react";
 
 const ease = [0.22, 0.61, 0.36, 1];
@@ -45,6 +46,7 @@ interface CustomerTopShellProps {
   onOpenMenu?: () => void;
   showBack?: boolean;
   onBack?: () => void;
+  isReady?: boolean; // Whether profile/data is ready (controls shimmer)
 }
 
 export function CustomerTopShell({
@@ -54,13 +56,14 @@ export function CustomerTopShell({
   onOpenMenu,
   showBack = false,
   onBack,
+  isReady = true, // Default to true for backward compatibility
 }: CustomerTopShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { profile } = useProfile();
+  const { profile } = useProfile(user?.id);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -236,27 +239,55 @@ export function CustomerTopShell({
           )}
         </div>
 
-        {/* Title + subtitle (no animations - use skeleton loaders instead) */}
-        <div className="mt-6">
-          <h1 className="text-[24px] leading-tight font-semibold text-slate-900">
-            {title}
-          </h1>
-          <p className="mt-2 text-base text-slate-500">
-            {subtitle}
-          </p>
-        </div>
-
-        {/* Optional top content: hugs content, no extra frame */}
-        {/* Always render wrapper to allow smooth morphing when content appears/disappears */}
+        {/* Title + subtitle with fixed height and AnimatePresence */}
         <motion.div 
-          layoutId="customer-top-shell-content"
           layout
-          transition={{ duration: TRANSITION_DURATION, ease, layout: { duration: TRANSITION_DURATION } }}
-          className="mt-6"
-          style={{ minHeight: topContent ? 'auto' : 0 }}
+          className="mt-6 min-h-[88px]"
         >
-          {topContent}
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              key={typeof title === 'string' ? title : 'title-content'}
+              layout
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }}
+            >
+              {!isReady ? (
+                <>
+                  <Skeleton className="h-7 w-64 mb-2" />
+                  <Skeleton className="h-5 w-48" />
+                </>
+              ) : (
+                <>
+                  <h1 className="text-[24px] leading-tight font-semibold text-slate-900">
+                    {title}
+                  </h1>
+                  <p className="mt-2 text-base text-slate-500">
+                    {subtitle}
+                  </p>
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </motion.div>
+
+        {/* Optional top content: subtle layout + fade, avoid remounting */}
+        <AnimatePresence mode="wait">
+          {topContent && (
+            <motion.div 
+              key="top-content"
+              layout
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="mt-6"
+            >
+              {topContent}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.header>
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>

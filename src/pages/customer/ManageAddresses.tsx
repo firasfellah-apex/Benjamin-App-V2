@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trash2, Plus, X, PenLine } from "lucide-react";
+import { Trash2, Plus, X, PenLine } from "@/lib/icons";
+import { CustomerButton } from "@/pages/customer/components/CustomerButton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { getCustomerAddresses, deleteAddress, updateAddress, formatAddress } from "@/db/api";
@@ -170,18 +171,19 @@ export default function ManageAddresses() {
           <div className="flex flex-col h-full bg-[#F5F7FA]">
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-md mx-auto px-6 pt-4 pb-32 space-y-4">
+              <div className="pt-4 pb-32 space-y-4">
                 {addresses.length === 0 ? (
                   <div className="text-center py-16">
                     <div className="max-w-xs mx-auto">
                       <p className="text-gray-500 mb-6 text-base">No saved addresses yet</p>
-                      <button
+                      <CustomerButton
                         onClick={handleAddNew}
-                        className="w-full h-12 rounded-full bg-black text-white flex items-center justify-center gap-2 text-base font-semibold hover:bg-black/90 transition-colors"
+                        size="md"
+                        className="w-full"
                       >
                         <Plus className="h-5 w-5" />
                         Add Your First Address
-                      </button>
+                      </CustomerButton>
                     </div>
                   </div>
                 ) : (
@@ -221,15 +223,16 @@ export default function ManageAddresses() {
             {/* Sticky bottom CTA */}
             {addresses.length > 0 && (
               <div className="sticky bottom-0 left-0 right-0">
-                <div className="max-w-md mx-auto px-6 pt-3 pb-8 bg-[#F5F7FA]">
-                  <button
+                <div className="pt-3 pb-8 bg-[#F5F7FA]">
+                  <CustomerButton
                     type="button"
                     onClick={handleAddNew}
-                    className="w-full h-[72px] rounded-[36px] bg-black text-white flex items-center justify-center gap-2 text-base font-semibold shadow-[0_18px_40px_rgba(15,23,42,0.26)] active:scale-[0.98] transition-all"
+                    size="lg"
+                    className="w-full shadow-[0_18px_40px_rgba(15,23,42,0.26)]"
                   >
                     <Plus className="w-5 h-5" />
                     Add New Address
-                  </button>
+                  </CustomerButton>
                 </div>
               </div>
             )}

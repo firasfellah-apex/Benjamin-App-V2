@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "@/lib/icons";
 import { toast } from "sonner";
 import { createOrder, formatAddress } from "@/db/api";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -25,7 +25,7 @@ import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapVie
 import { CustomerOrderFlowFooter } from "@/components/customer/layout/CustomerOrderFlowFooter";
 import { useLocation } from "@/contexts/LocationContext";
 import { PricingSummarySkeleton } from "@/components/customer/CustomerSkeleton";
-import { MapPin } from "lucide-react";
+import { MapPin } from "@/lib/icons";
 
 type Step = 1 | 2;
 

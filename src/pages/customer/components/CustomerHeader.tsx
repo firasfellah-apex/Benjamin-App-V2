@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useState } from "react";
-import { EllipsisVertical, ArrowLeft } from "lucide-react";
+import { EllipsisVertical, ArrowLeft } from "@/lib/icons";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/contexts/ProfileContext";
-import { Home, User, LogOut, Package, MapPin } from "lucide-react";
+import { Home, User, LogOut, Package, MapPin } from "@/lib/icons";
 
 export function CustomerHeader({
   title,

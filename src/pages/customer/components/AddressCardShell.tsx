@@ -6,7 +6,7 @@
  */
 
 import React from "react";
-import { Home, Plus } from "lucide-react";
+import { Home, Plus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 interface AddressCardShellProps {

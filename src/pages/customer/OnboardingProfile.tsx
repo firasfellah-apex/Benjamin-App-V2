@@ -16,7 +16,7 @@ import { saveProfile } from '@/lib/profileMutations';
 import { AvatarCropModal } from '@/components/common/AvatarCropModal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload } from 'lucide-react';
+import { Upload } from '@/lib/icons';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { supabase } from '@/db/supabase';
