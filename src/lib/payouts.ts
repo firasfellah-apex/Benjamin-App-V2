@@ -63,3 +63,11 @@ export function calculateMonthlyEarnings(
   return calculateTotalEarnings(monthlyOrders);
 }
 
+
+
+
+
+
+
+
+

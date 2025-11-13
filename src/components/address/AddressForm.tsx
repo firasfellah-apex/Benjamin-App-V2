@@ -13,6 +13,7 @@ import { Plus, Minus } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { BenjaminMap } from "@/components/map/BenjaminMap";
 import { useLocation } from "@/contexts/LocationContext";
+import { useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
 
 export interface AddressFormRef {
   submit: () => void;
@@ -47,6 +48,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
     const [errors, setErrors] = useState<FormErrors>({});
     const formRef = useRef<HTMLFormElement>(null);
     const loadingCallbackRef = useRef<((loading: boolean) => void) | null>(null);
+    const invalidateAddresses = useInvalidateAddresses();
     
     // Delivery notes section - closed by default
     const [showDeliveryNotes, setShowDeliveryNotes] = useState(false);
@@ -145,6 +147,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
         // Update address fields
         const success = await updateAddress(address.id, updateFields);
         if (success) {
+          invalidateAddresses(); // Invalidate query cache
           toast.success("Address saved");
           const updatedAddress: CustomerAddress = { 
             ...address, 
@@ -177,13 +180,16 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           if (formData.is_default) {
             const defaultSuccess = await setDefaultAddress(result.id);
             if (defaultSuccess) {
+              invalidateAddresses(); // Invalidate query cache
               toast.success("Address saved");
               onSave({ ...result, is_default: true });
             } else {
+              invalidateAddresses(); // Invalidate query cache
               toast.success("Address saved, but failed to set as default");
               onSave(result);
             }
           } else {
+            invalidateAddresses(); // Invalidate query cache
             toast.success("Address saved");
             onSave(result);
           }
@@ -409,7 +415,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
             <button
               type="button"
               onClick={() => setShowDeliveryNotes(!showDeliveryNotes)}
-              className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors"
+              className="flex items-center gap-2 text-gray-500 transition-colors"
             >
               {formData.delivery_notes && !showDeliveryNotes && (
                 <span className="text-xs text-gray-500">
@@ -446,7 +452,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   key={template}
                   type="button"
                   onClick={() => handleNoteTemplateClick(template)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-300 bg-white text-gray-700 hover:border-[#22C55E] hover:text-[#22C55E] hover:bg-green-50 transition-colors whitespace-nowrap flex-shrink-0"
+                  className="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-300 bg-white text-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   {template}
                 </button>

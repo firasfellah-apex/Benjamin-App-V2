@@ -20,6 +20,7 @@ import { Upload } from '@/lib/icons';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { supabase } from '@/db/supabase';
+import { track } from '@/lib/analytics';
 
 // Phone masking utility
 function formatPhoneNumber(value: string): string {
@@ -197,6 +198,13 @@ export default function OnboardingProfile() {
         last_name: lastName.trim(),
         phone: phoneNumbers || null,
         avatar_url: avatarUrl,
+      });
+
+      // Track profile completion
+      track('profile_completed', {
+        has_avatar: !!avatarUrl,
+        has_phone: !!phoneNumbers,
+        field_count: 2 + (phoneNumbers ? 1 : 0),
       });
 
       toast.success('Profile saved successfully!');

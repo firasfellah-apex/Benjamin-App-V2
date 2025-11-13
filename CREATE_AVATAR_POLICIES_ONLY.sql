@@ -73,3 +73,11 @@ USING (bucket_id = 'avatars');
 --   AND tablename = 'objects' 
 --   AND policyname LIKE '%avatar%';
 
+
+
+
+
+
+
+
+

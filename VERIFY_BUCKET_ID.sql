@@ -18,3 +18,11 @@ WHERE LOWER(name) LIKE '%avatar%' OR LOWER(id) LIKE '%avatar%';
 -- If id = 'avatars', use: .from('avatars')
 -- ============================================================================
 
+
+
+
+
+
+
+
+

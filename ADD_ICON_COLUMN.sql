@@ -16,3 +16,11 @@ COMMENT ON COLUMN customer_addresses.icon IS 'Lucide icon name for address label
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_icon 
   ON customer_addresses(icon);
 
+
+
+
+
+
+
+
+

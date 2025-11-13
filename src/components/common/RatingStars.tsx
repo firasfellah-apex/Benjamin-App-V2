@@ -41,7 +41,7 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
             disabled={readOnly || !onChange}
             className={cn(
               "transition-transform",
-              !readOnly && onChange && "active:scale-95 hover:scale-110 cursor-pointer",
+              !readOnly && onChange && "active:scale-95 cursor-pointer",
               (readOnly || !onChange) && "cursor-default"
             )}
             aria-label={`Rate ${i + 1} out of 5 stars`}
@@ -62,4 +62,12 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
     </div>
   );
 };
+
+
+
+
+
+
+
+
 

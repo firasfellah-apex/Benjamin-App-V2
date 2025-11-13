@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package } from '@/lib/icons';
 import { CustomerLayout } from '@/components/layout/CustomerLayout';
-import { CustomerCard } from '@/pages/customer/components/CustomerCard';
+import CustomerCard from '@/pages/customer/components/CustomerCard';
 import { getCustomerOrders } from '@/db/api';
 import type { OrderWithDetails } from '@/types/types';
 import { formatDate } from '@/lib/utils';
@@ -113,7 +113,7 @@ export default function History() {
     <CustomerLayout>
       <div className="min-h-screen bg-[#F4F5F7]">
         {/* Header */}
-        <div className="bg-white pt-6 pb-4">
+        <div className="pt-6 pb-4">
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={handleBack}

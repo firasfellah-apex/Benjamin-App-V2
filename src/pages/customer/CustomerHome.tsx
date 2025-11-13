@@ -11,14 +11,14 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
-import { CustomerTopShell } from '@/pages/customer/components/CustomerTopShell';
 import { CustomerMapViewport } from '@/components/customer/layout/CustomerMapViewport';
 import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar';
 import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
 import { useLocation } from '@/contexts/LocationContext';
 import { getCustomerOrders } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
+import { Skeleton } from '@/components/common/Skeleton';
 import type { OrderWithDetails, Order } from '@/types/types';
 
 export default function CustomerHome() {
@@ -114,7 +114,7 @@ export default function CustomerHome() {
   
   // Handle view all action
   const handleViewAll = useCallback(() => {
-    navigate('/customer/history');
+    navigate('/customer/deliveries');
   }, [navigate]);
 
   /**
@@ -184,25 +184,23 @@ export default function CustomerHome() {
     // If orders.length === 0, show nothing (keep current logic - don't change)
     if (hasOrders && ordersLoading && !authLoading && isReady) {
       return (
-        <div className="mt-3">
-          <div className="w-full rounded-2xl bg-white border border-gray-200 px-6 py-5 flex flex-col gap-2">
-            {/* Header skeleton - matches LastDeliveryCard structure */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                <Skeleton className="h-[11px] w-24" />
-                <Skeleton className="h-[15px] w-48" />
-                <Skeleton className="h-[11px] w-32" />
-              </div>
-              {/* Status pill skeleton */}
-              <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+        <div className="space-y-3">
+          {/* Header skeleton - matches LastDeliveryCard structure */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+              <Skeleton className="h-[11px] w-24" />
+              <Skeleton className="h-[15px] w-48" />
+              <Skeleton className="h-[11px] w-32" />
             </div>
-            {/* Divider skeleton */}
-            <div className="border-t border-slate-200 mt-3 mb-3" />
-            {/* Actions skeleton */}
-            <div className="flex items-center justify-between gap-3">
-              <Skeleton className="h-10 w-32 rounded-full" />
-              <Skeleton className="h-4 w-36" />
-            </div>
+            {/* Status pill skeleton */}
+            <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+          </div>
+          {/* Divider skeleton */}
+          <div className="border-t border-slate-200" />
+          {/* Actions skeleton */}
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-10 w-32 rounded-full" />
+            <Skeleton className="h-4 w-36" />
           </div>
         </div>
       );
@@ -223,83 +221,35 @@ export default function CustomerHome() {
     return undefined;
   }, [orders.length, ordersLoading, authLoading, isReady, hasActiveOrder, lastCompletedOrder, handleRateRunner, handleViewAll]);
 
-  // Show skeleton loader while auth is loading or profile is not ready
-  if (authLoading || (user && !isReady)) {
-    return (
-      <CustomerScreen
-        header={
-          <div className="px-8 pt-10 pb-8">
-            {/* Logo + menu skeleton */}
-            <div className="flex items-center justify-between mb-6">
-              <Skeleton className="h-7 w-32" />
-              <Skeleton className="h-9 w-9 rounded-full" />
-            </div>
-            
-            {/* Title skeleton */}
-            <div className="space-y-2 mb-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-5 w-64" />
-            </div>
-            
-            {/* Last Delivery Card Skeleton */}
-            <div className="mt-6">
-              <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-4 w-16 rounded-full" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-24" />
-                  <Skeleton className="h-4 w-40" />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Skeleton className="h-10 flex-1 rounded-full" />
-                  <Skeleton className="h-10 w-24 rounded-full" />
-                </div>
-              </div>
-            </div>
-          </div>
-        }
-        map={<CustomerMapViewport center={location} />}
-        footer={
-          <RequestFlowBottomBar
-            mode="home"
-            onPrimary={() => navigate('/customer/request')}
-            useFixedPosition={true}
-          />
-        }
-      />
-    );
-  }
-
   // If no user, redirect to landing
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
+  // Combined loading state
+  const loading = authLoading || (user && !isReady) || ordersLoading;
+  const shelf = useTopShelfTransition();
+
   return (
     <CustomerScreen
-      header={
-        <CustomerTopShell
-          title={
-            !isReady ? (
-              <Skeleton className="h-8 w-64" />
-            ) : (
-              `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`
-            )
-          }
-          subtitle="Skip the ATM. Request cash in seconds."
-          topContent={topContent}
-        />
-      }
+      loading={loading}
+      title={!isReady ? undefined : `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`}
+      subtitle="Skip the ATM. Request cash in seconds."
       map={<CustomerMapViewport center={location} />}
       footer={
         <RequestFlowBottomBar
           mode="home"
-          onPrimary={() => navigate('/customer/request')}
+          onPrimary={() => shelf.goTo('/customer/request', 'address', 320)}
           useFixedPosition={true}
         />
       }
-    />
+    >
+      {/* Optional top content - no nested white card wrapper */}
+      {topContent && (
+        <div className="space-y-4">
+          {topContent}
+        </div>
+      )}
+    </CustomerScreen>
   );
 }

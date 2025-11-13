@@ -11,6 +11,27 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  .top-shelf {
+    -webkit-font-smoothing: antialiased;
+    backface-visibility: hidden;
+    transform: translateZ(0); /* helps Safari reduce flicker */
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe\:transition-none {
+    transition: none !important;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here.

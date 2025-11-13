@@ -37,3 +37,11 @@ The viewport logic was relying on `getAppliedMode` which could be influenced by 
 ## Files Modified
 - `src/hooks/useViewport.ts` - Simplified viewport logic, direct route checking, force mobile viewport for customer routes
 
+
+
+
+
+
+
+
+

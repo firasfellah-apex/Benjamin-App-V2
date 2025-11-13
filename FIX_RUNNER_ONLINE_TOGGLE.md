@@ -117,3 +117,11 @@ Should return:
 - Once the column is added, the toggle should work immediately
 - No code changes needed after adding the column
 
+
+
+
+
+
+
+
+

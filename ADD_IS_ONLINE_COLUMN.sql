@@ -31,3 +31,11 @@ CREATE INDEX IF NOT EXISTS profiles_is_online_idx ON public.profiles (is_online)
 -- FROM information_schema.columns
 -- WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'is_online';
 
+
+
+
+
+
+
+
+

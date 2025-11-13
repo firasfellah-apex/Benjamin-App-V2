@@ -8,7 +8,7 @@
  * - All Supabase calls unchanged
  * - All authentication and navigation unchanged
  */
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronDown, ChevronUp } from "@/lib/icons";
 import { toast } from "sonner";
@@ -20,12 +20,16 @@ import type { CustomerAddress } from "@/types/types";
 import { calculatePricing } from "@/lib/pricing";
 import CashAmountInput from "@/components/customer/CashAmountInput";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
-import { CustomerTopShell } from "@/pages/customer/components/CustomerTopShell";
 import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapViewport";
 import { CustomerOrderFlowFooter } from "@/components/customer/layout/CustomerOrderFlowFooter";
 import { useLocation } from "@/contexts/LocationContext";
 import { PricingSummarySkeleton } from "@/components/customer/CustomerSkeleton";
 import { MapPin } from "@/lib/icons";
+import { track } from "@/lib/analytics";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
+import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { motion } from "framer-motion";
 
 type Step = 1 | 2;
 
@@ -47,6 +51,7 @@ export default function CashRequest() {
   const [showFeeDetails, setShowFeeDetails] = useState(false); // Collapsed by default
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [draftAmountStr, setDraftAmountStr] = useState<string>("");
   const amountInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate map center: selected address > live location > fallback
@@ -94,20 +99,51 @@ export default function CashRequest() {
     : null;
 
   // Handle amount change from CashAmountInput component
-  const handleAmountChange = (newAmount: number) => {
+  const handleAmountChange = useCallback((newAmount: number) => {
     setAmount(newAmount);
-  };
+    track('cash_amount_changed', {
+      amount: newAmount,
+      amount_range: newAmount < 200 ? 'low' : newAmount < 500 ? 'medium' : 'high',
+    });
+  }, []);
 
   const handleAddressSelect = (address: CustomerAddress) => {
     setSelectedAddress(address);
   };
 
+  const shelf = useTopShelfTransition({ currentStep: step });
+  const { hasAnyAddress } = useCustomerAddresses();
+  
+  // Clean logic using cached hasAnyAddress:
+  // - If user has 0 addresses (from cache), button is always disabled
+  // - If user has >=1 addresses (from cache), enable button immediately (bypass selectedAddress check)
+  //   Auto-selection will set selectedAddress, but we trust the cache to prevent flicker
+  //   We still validate selectedAddress in handleNextStep to prevent edge cases
+  const isContinueDisabled = !hasAnyAddress;
+  
   const handleNextStep = () => {
     if (!selectedAddress) {
       toast.error(strings.customer.addressRequiredError);
       return;
     }
-    setStep(2);
+    // Prepare transition, then update step
+    shelf.prepare('amount', 420);
+    // Update step after reserve phase starts
+    setTimeout(() => {
+      setStep(2);
+    }, 140);
+  };
+  
+  const handleBackToAddress = () => {
+    shelf.prepare('address', 320);
+    // Update step after reserve phase starts
+    setTimeout(() => {
+      setStep(1);
+    }, 140);
+  };
+  
+  const handleBackToHome = () => {
+    shelf.goTo('/customer/home', 'home', 280);
   };
 
   const handleSubmit = async () => {
@@ -125,6 +161,16 @@ export default function CashRequest() {
       toast.error(`${strings.customer.dailyLimitExceeded} $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
       return;
     }
+
+    // Track order submission (no PII - no addresses, emails, phone numbers)
+    track('order_submitted', {
+      amount: amount,
+      total_cost: pricing.total,
+      platform_fee: pricing.platformFee,
+      compliance_fee: pricing.complianceFee,
+      delivery_fee: pricing.deliveryFee,
+      has_delivery_notes: !!selectedAddress.delivery_notes,
+    });
 
     setLoading(true);
     try {
@@ -149,231 +195,290 @@ export default function CashRequest() {
     }
   };
 
+  // Memoize the summary section (everything except breakdown) - stable reference
+  // MUST be before any conditional returns to follow Rules of Hooks
+  const summarySection = useMemo(() => {
+    const showSkeleton = shelf.phase !== "idle" && shelf.phase !== "swap" ? true : !pricing;
+    
+    if (!pricing && shelf.phase === "idle") {
+      return <PricingSummarySkeleton />;
+    }
+
+    return (
+      <div className="w-full">
+        <div className="w-full flex justify-between items-center mb-3">
+          <span className="text-base font-medium text-gray-900">You'll get</span>
+          {showSkeleton ? (
+            <span className="h-5 w-16 rounded bg-slate-100 animate-pulse" />
+          ) : (
+            <motion.span layout className="text-lg font-bold text-gray-900">
+              ${amount.toFixed(0)}
+            </motion.span>
+          )}
+        </div>
+        <div className="w-full flex justify-between items-center mb-3">
+          <span className="text-base font-medium text-gray-900">You'll pay</span>
+          {showSkeleton ? (
+            <span className="h-5 w-20 rounded bg-slate-100 animate-pulse" />
+          ) : (
+            <motion.span layout className="text-lg font-bold text-gray-900">
+              ${pricing?.total.toFixed(2) || '0.00'}
+            </motion.span>
+          )}
+        </div>
+        
+        {/* View breakdown link/expander */}
+        {/* Element fills container and sizes by content */}
+        <button
+          onClick={() => {
+            const newState = !showFeeDetails;
+            setShowFeeDetails(newState);
+            track('fee_breakdown_toggled', {
+              is_expanded: newState,
+            });
+          }}
+          className="w-full flex items-center justify-between transition-opacity pt-2 border-t border-gray-200 py-2"
+        >
+          <span className="text-sm font-medium text-gray-600">View breakdown</span>
+          {showFeeDetails ? (
+            <ChevronUp className="h-4 w-4 text-gray-600" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-gray-600" />
+          )}
+        </button>
+
+        {/* Fee Breakdown - smooth expand/collapse with proper height transition */}
+        {pricing && (
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{
+              maxHeight: showFeeDetails ? '200px' : '0',
+              opacity: showFeeDetails ? 1 : 0,
+              marginTop: showFeeDetails ? '0' : '0',
+            }}
+          >
+            <div className="space-y-2 pt-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Cash amount</span>
+                <span className="text-gray-900 font-medium">${amount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Platform fee</span>
+                <span className="text-gray-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Compliance fee</span>
+                <span className="text-gray-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Delivery fee</span>
+                <span className="text-gray-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }, [pricing, amount, showFeeDetails, shelf.phase]);
+
+  // Memoize the entire topContent to prevent remounting
+  // MUST be before any conditional returns to follow Rules of Hooks
+  const topContent = useMemo(() => (
+    <div className="space-y-6">
+      {/* Main Amount Display */}
+      {/* Element fills container and sizes by content */}
+      <div className="w-full flex items-center justify-center">
+        {!isEditingAmount ? (
+          <div 
+            onClick={() => {
+              setIsEditingAmount(true);
+              setDraftAmountStr(String(amount)); // seed with current value
+              setTimeout(() => amountInputRef.current?.focus(), 0);
+            }}
+            className="cursor-text transition-opacity"
+            style={{ 
+              fontSize: 48, 
+              fontWeight: 700, 
+              color: '#0F172A',
+              textAlign: 'center'
+            }}
+          >
+            ${amount.toLocaleString()}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <input
+              ref={amountInputRef}
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={draftAmountStr}
+              onChange={(e) => {
+                // allow free typing of digits; strip commas/spaces
+                const raw = e.target.value.replace(/[^\d]/g, "");
+                // optional: cap length to something sane (e.g., 5 digits)
+                setDraftAmountStr(raw);
+              }}
+              onBlur={() => {
+                // commit on blur: parse, clamp, step-round, then exit edit mode
+                const num = parseInt(draftAmountStr || "0", 10);
+                // if empty or 0, fall back to MIN so we never commit NaN
+                const safe = Number.isFinite(num) && num > 0 ? num : MIN_AMOUNT;
+                // round to nearest $20 and clamp to [MIN, MAX]
+                const rounded = Math.round(safe / 20) * 20;
+                const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, rounded));
+                setAmount(clamped);
+                setIsEditingAmount(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur(); // triggers the same commit logic
+                } else if (e.key === "Escape") {
+                  // cancel edits and revert
+                  setDraftAmountStr(String(amount));
+                  setIsEditingAmount(false);
+                }
+              }}
+              style={{
+                fontSize: 48,
+                fontWeight: 700,
+                color: '#0F172A',
+                textAlign: 'center',
+                width: '200px',
+                border: 'none',
+                borderBottom: '2px solid #000',
+                background: 'transparent',
+                outline: 'none',
+                paddingBottom: '4px'
+              }}
+              autoFocus
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Range Helper Text */}
+      {/* Element fills container and sizes by content */}
+      <div className="w-full text-center">
+        <p className="text-sm text-gray-600">
+          ${MIN_AMOUNT.toLocaleString()}–${MAX_AMOUNT.toLocaleString()} range
+        </p>
+      </div>
+
+      {/* Amount Selection Components (Preset Buttons & Slider) */}
+      {/* Element fills container and sizes by content */}
+      <div className="w-full">
+        <CashAmountInput
+          value={amount}
+          onChange={handleAmountChange}
+          min={MIN_AMOUNT}
+          max={MAX_AMOUNT}
+          step={20}
+          hideAmountDisplay={true}
+          hideRangeText={true}
+        />
+      </div>
+
+      {/* Summary Section */}
+      {/* Element fills container and sizes by content */}
+      <div className="w-full">
+        {summarySection}
+      </div>
+
+      {/* Terms Block */}
+      {/* Element fills container and sizes by content */}
+      <div className="w-full">
+        <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600">
+          <span>By confirming, you agree to Benjamin's terms</span>
+          <InfoTooltip
+            label="Order cancellation policy"
+            side="top"
+            align="center"
+          >
+            Once a runner begins preparing your order, it can't be changed or cancelled.
+          </InfoTooltip>
+        </div>
+      </div>
+    </div>
+  ), [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr]);
+
   // Step 1: Address Selection
   if (step === 1) {
     return (
       <CustomerScreen
-        header={
-          <CustomerTopShell
-            title="Where should we deliver?"
-            subtitle="Select a location. You can save more than one."
-            topContent={
-              <div className="space-y-4">
-                <AddressSelector
-                  selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
-                  onAddressSelect={handleAddressSelect}
-                  onAddressChange={() => {}}
-                  onEditingChange={setIsEditingAddress}
-                  onAddressesCountChange={() => {}}
-                  hideManageButton={true}
-                />
-                <button
-                  onClick={() => navigate("/customer/addresses")}
-                  className="
-                    w-full mt-4
-                    rounded-full border border-slate-200 bg-white
-                    py-4 px-6
-                    text-base font-semibold text-slate-900
-                    flex items-center justify-center gap-2
-                    shadow-sm
-                    active:scale-[0.98] active:bg-slate-50 transition-transform duration-150
-                  "
-                >
-                  <MapPin className="w-5 h-5" />
-                  Manage Addresses
-                </button>
-              </div>
-            }
-          />
-        }
+        loading={false}
+        title="Where should we deliver?"
+        subtitle="Select a location. You can save more than one."
         map={<CustomerMapViewport center={mapCenter} />}
         footer={
           !isEditingAddress ? (
             <CustomerOrderFlowFooter
               mode="address"
               onPrimary={handleNextStep}
-              onSecondary={() => navigate('/customer/home')}
+              onSecondary={handleBackToHome}
               isLoading={false}
-              primaryDisabled={!selectedAddress}
+              primaryDisabled={isContinueDisabled}
             />
           ) : undefined
         }
-      />
+      >
+        {/* Address selector content - no nested white card wrapper */}
+        <div className="space-y-4">
+          <AddressSelector
+            selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
+            onAddressSelect={handleAddressSelect}
+            onAddressChange={() => {}}
+            onEditingChange={setIsEditingAddress}
+            onAddressesCountChange={() => {}}
+            hideManageButton={true}
+          />
+          {/* Only show Manage Addresses button if user has addresses to manage */}
+          {hasAnyAddress && (
+            <button
+              onClick={() => navigate("/customer/addresses")}
+              className="
+                w-full mt-4
+                rounded-full border border-slate-200 bg-white
+                py-4 px-6
+                text-base font-semibold text-slate-900
+                flex items-center justify-center gap-2
+                shadow-sm
+                active:scale-[0.98] active:bg-slate-50 transition-transform duration-150
+              "
+            >
+              <MapPin className="w-5 h-5" />
+              Manage Addresses
+            </button>
+          )}
+        </div>
+      </CustomerScreen>
     );
   }
 
   // Step 2: Cash Amount
+  // Loading state: calculating pricing or submitting order
+  const isLoading = loading || !pricing;
+
   return (
     <CustomerScreen
-      header={
-        <CustomerTopShell
-          title="How much cash do you need?"
-          subtitle="Choose an amount to have delivered."
-          topContent={
-            <div className="space-y-6">
-              {/* Main Amount Display */}
-              <div className="flex-shrink-0 mb-2" style={{ minHeight: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {!isEditingAmount ? (
-                  <div 
-                    onClick={() => {
-                      setIsEditingAmount(true);
-                      setTimeout(() => amountInputRef.current?.focus(), 0);
-                    }}
-                    className="cursor-text transition-opacity hover:opacity-70"
-                    style={{ 
-                      fontSize: 48, 
-                      fontWeight: 700, 
-                      color: '#0F172A',
-                      textAlign: 'center'
-                    }}
-                  >
-                    ${amount.toLocaleString()}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <input
-                      ref={amountInputRef}
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={amount}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/,/g, '');
-                        if (/^\d*$/.test(val)) {
-                          const num = parseInt(val) || 0;
-                          const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, num));
-                          setAmount(clamped);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Round to nearest step
-                        const rounded = Math.round(amount / 20) * 20;
-                        const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, rounded));
-                        setAmount(clamped);
-                        setIsEditingAmount(false);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.currentTarget.blur();
-                        }
-                      }}
-                      style={{
-                        fontSize: 48,
-                        fontWeight: 700,
-                        color: '#0F172A',
-                        textAlign: 'center',
-                        width: '200px',
-                        border: 'none',
-                        borderBottom: '2px solid #000',
-                        background: 'transparent',
-                        outline: 'none',
-                        paddingBottom: '4px'
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Range Helper Text */}
-              <div className="flex-shrink-0 mb-4 text-center">
-                <p className="text-sm text-gray-600">
-                  ${MIN_AMOUNT.toLocaleString()}–${MAX_AMOUNT.toLocaleString()} range
-                </p>
-              </div>
-
-              {/* Amount Selection Components (Preset Buttons & Slider) */}
-              <div className="flex-shrink-0 mb-6">
-                <CashAmountInput
-                  value={amount}
-                  onChange={handleAmountChange}
-                  min={MIN_AMOUNT}
-                  max={MAX_AMOUNT}
-                  step={20}
-                  hideAmountDisplay={true}
-                  hideRangeText={true}
-                />
-              </div>
-
-              {/* Summary Section */}
-              <div className="flex-shrink-0 mb-6">
-                {!pricing ? (
-                  <PricingSummarySkeleton />
-                ) : (
-                  <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-base font-medium text-gray-900">You'll get</span>
-                      <span className="text-lg font-bold text-gray-900">
-                        ${amount.toFixed(0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-base font-medium text-gray-900">You'll pay</span>
-                      <span className="text-lg font-bold text-gray-900">
-                        ${pricing.total.toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    {/* View breakdown link/expander */}
-                    <button
-                      onClick={() => setShowFeeDetails(!showFeeDetails)}
-                      className="w-full flex items-center justify-between hover:opacity-70 transition-opacity pt-2 border-t border-gray-200"
-                    >
-                      <span className="text-sm font-medium text-gray-600">View breakdown</span>
-                      {showFeeDetails ? (
-                        <ChevronUp className="h-4 w-4 text-gray-600" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
-                      )}
-                    </button>
-
-                    {/* Fee Breakdown */}
-                    {showFeeDetails && (
-                      <div className="space-y-2 pt-3 animate-in fade-in duration-200">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600">Cash amount</span>
-                          <span className="text-gray-900 font-medium">${amount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600">Platform fee</span>
-                          <span className="text-gray-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600">Compliance fee</span>
-                          <span className="text-gray-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600">Delivery fee</span>
-                          <span className="text-gray-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Terms Block */}
-              <div className="flex-shrink-0">
-                <p className="text-xs text-gray-600 text-center leading-relaxed">
-                  By confirming, you agree to Benjamin's terms.<br />
-                  Once a runner begins preparing your order, it can't be changed.
-                </p>
-              </div>
-            </div>
-          }
-        />
-      }
+      loading={isLoading}
+      title="How much cash do you need?"
+      subtitle="Choose an amount to have delivered."
       map={<CustomerMapViewport center={mapCenter} />}
       footer={
         <CustomerOrderFlowFooter
           mode="amount"
           onPrimary={handleSubmit}
-          onSecondary={() => setStep(1)}
+          onSecondary={handleBackToAddress}
           isLoading={loading}
           primaryDisabled={loading || !selectedAddress || !pricing}
         />
       }
-    />
+    >
+      {/* Top content (amount input, summary, etc.) - no nested white card wrapper */}
+      {/* Elements fill container and size by content */}
+      {topContent}
+    </CustomerScreen>
   );
 }
 

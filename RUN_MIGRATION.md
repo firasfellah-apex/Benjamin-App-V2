@@ -41,3 +41,11 @@ supabase db push
 
 This will run all pending migrations in the `supabase/migrations/` directory.
 
+
+
+
+
+
+
+
+

@@ -163,3 +163,11 @@ The app automatically sets viewport meta tags:
 
 These are set automatically based on the current route - no manual configuration needed!
 
+
+
+
+
+
+
+
+

@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { getIconByName } from "@/components/address/IconPicker";
 import { formatAddress } from "@/db/api";
 import { AddressCard } from "./AddressCard";
+import { MapPin, Plus } from "@/lib/icons";
+import { track } from "@/lib/analytics";
 
 type AddressCarouselProps = {
   addresses: CustomerAddress[];
@@ -19,6 +21,7 @@ type AddressCarouselProps = {
   onSelectAddress: (address: CustomerAddress) => void;
   onAddAddress: () => void;
   onEditAddress?: (address: CustomerAddress) => void;
+  onDeleteAddress?: (address: CustomerAddress) => void;
 };
 
 type Slide = { type: "address"; address: CustomerAddress } | { type: "add" };
@@ -29,6 +32,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   onSelectAddress,
   onAddAddress,
   onEditAddress,
+  onDeleteAddress,
 }) => {
   const location = useLocation();
   const slides: Slide[] = useMemo(() => {
@@ -218,6 +222,12 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       if (isUserInitiatedChange.current && prevActiveAddressId.current !== currentAddressId) {
         prevActiveAddressId.current = currentAddressId;
         onSelectAddress(active.address);
+        // Track user-initiated address selection (swipe or pagination)
+        track('address_selected', {
+          address_count: addresses.length,
+          is_default: active.address.is_default || false,
+          source: 'carousel_swipe',
+        });
         isUserInitiatedChange.current = false;
       } else if (!isUserInitiatedChange.current) {
         // Update the ref even if we don't call onSelectAddress
@@ -228,7 +238,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       // This allows the user to stay on this slide
       isUserInitiatedChange.current = false;
     }
-  }, [active, onSelectAddress, index]);
+  }, [active, onSelectAddress, index, addresses.length]);
 
   // Initial scroll to selected index on mount (only if not index 0)
   const hasInitialScrolledRef = useRef(false);
@@ -561,6 +571,34 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
     return addr.label || addr.line1?.split(',')[0] || 'Address';
   };
 
+  // Zero-address state: show icon + short copy + "Add your first address" primary button
+  // Container owns padding, content owns layout
+  if (addresses.length === 0) {
+    return (
+      <div className="w-full px-5 pt-5 pb-5">
+        <div className="w-full flex flex-col items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center mb-4">
+            <MapPin className="w-8 h-8 text-slate-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2 text-center">
+            No Address Yet
+          </h3>
+          <p className="text-sm text-slate-500 mb-6 text-center">
+            Let's add your first address.
+          </p>
+          <button
+            type="button"
+            onClick={onAddAddress}
+            className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2 py-4 px-6"
+          >
+            <Plus className="w-5 h-5" />
+            Add Your First Address
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       {/* Swipeable carousel container - no side padding, extends edge-to-edge */}
@@ -606,20 +644,25 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
                   isUserInitiatedChange.current = true;
                   snapToIndex(i);
                   onSelectAddress(slide.address);
+                  track('address_selected', {
+                    address_count: addresses.length,
+                    is_default: slide.address.is_default || false,
+                    source: 'user_click',
+                  });
                 }}
                 onEdit={onEditAddress ? (e) => {
                   e.stopPropagation();
                   onEditAddress(slide.address);
                 } : undefined}
+                onDelete={onDeleteAddress ? (e) => {
+                  e.stopPropagation();
+                  onDeleteAddress(slide.address);
+                } : undefined}
               />
             ) : (
               <AddressCard
                 mode="add"
-                addressLine={
-                  addresses.length === 0
-                    ? "Save a place you'd like cash delivered."
-                    : "Save another place you'd like cash delivered."
-                }
+                addressLine="Save another place you'd like cash delivered."
                 onClick={() => {
                   isUserInitiatedChange.current = true;
                   snapToIndex(i);
@@ -644,6 +687,11 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
                 // Also handle address selection if clicking on an address dot
                 if (i < slides.length && slides[i]?.type === "address") {
                   onSelectAddress(slides[i].address);
+                  track('address_selected', {
+                    address_count: addresses.length,
+                    is_default: slides[i].address.is_default || false,
+                    source: 'pagination_dot',
+                  });
                 }
               }}
               className={cn(

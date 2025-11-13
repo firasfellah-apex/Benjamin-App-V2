@@ -17,13 +17,14 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { X, MapPin } from "lucide-react";
-import { getCustomerAddresses } from "@/db/api";
 import type { CustomerAddress } from "@/types/types";
 import { AddressForm, type AddressFormRef } from "./AddressForm";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { addAddressCopy } from "@/lib/copy/addAddress";
 import { AddressCarousel } from "@/pages/customer/components/AddressCarousel";
+import { track } from "@/lib/analytics";
+import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
 
 function AddressFormModal({
   editingAddress,
@@ -105,7 +106,7 @@ function AddressFormModal({
           <button
             type="button"
             onClick={handleClose}
-            className="text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full p-2 transition-colors"
+            className="text-gray-500 rounded-full p-2 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -140,13 +141,13 @@ function AddressFormModal({
               onClick={handleClose}
               disabled={loading}
               className={cn(
-                "flex-1 min-h-[56px] rounded-full",
+                "flex-1 rounded-full py-4 px-6",
                 "border border-gray-300",
                 "bg-white text-gray-900",
                 "text-base font-semibold",
                 "flex items-center justify-center",
                 "transition-all duration-200",
-                "hover:bg-gray-50 active:scale-[0.97]",
+                "active:scale-[0.97]",
                 loading && "opacity-60 cursor-not-allowed"
               )}
             >
@@ -157,12 +158,12 @@ function AddressFormModal({
               onClick={handleSave}
               disabled={loading}
               className={cn(
-                "flex-[2] min-h-[56px] rounded-full",
+                "flex-[2] rounded-full py-4 px-6",
                 "bg-black text-white",
                 "text-base font-semibold",
                 "flex items-center justify-center",
                 "transition-all duration-200",
-                "hover:scale-[1.02] active:scale-[0.97]",
+                "active:scale-[0.97]",
                 loading && "opacity-60 cursor-not-allowed"
               )}
             >
@@ -193,16 +194,68 @@ export function AddressSelector({
   hideManageButton = false,
 }: AddressSelectorProps) {
   const navigate = useNavigate();
-  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { addresses, isLoading: loading } = useCustomerAddresses();
+  const invalidateAddresses = useInvalidateAddresses();
   const [showForm, setShowForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
+  const prevSelectedAddressIdRef = useRef<string | null>(selectedAddressId);
+  const hasAutoSelectedRef = useRef(false);
 
-  // Load addresses only on mount
+  // Auto-select address when addresses first load
   useEffect(() => {
-    loadAddresses();
+    if (loading || addresses.length === 0) return;
+    
+    // Only auto-select once when addresses first become available
+    if (!hasAutoSelectedRef.current) {
+      // If selectedAddressId is provided (from URL params), try to select that address
+      if (selectedAddressId) {
+        const address = addresses.find(a => a.id === selectedAddressId);
+        if (address) {
+          onAddressSelect(address);
+          track('address_selected', {
+            address_count: addresses.length,
+            is_default: address.is_default || false,
+            source: 'url_param',
+          });
+          hasAutoSelectedRef.current = true;
+          return;
+        }
+      }
+      
+      // Otherwise, auto-select default address or first address
+      const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
+      if (defaultAddr) {
+        onAddressSelect(defaultAddr);
+        track('address_selected', {
+          address_count: addresses.length,
+          is_default: defaultAddr.is_default || false,
+          source: 'auto_select',
+        });
+        hasAutoSelectedRef.current = true;
+      }
+    }
+    
+    // Notify parent of addresses count
+    onAddressesCountChange?.(addresses.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only load on mount - no reload when selectedAddressId changes
+  }, [addresses, loading]);
+  
+  // Handle selectedAddressId changes (e.g., from URL params changing)
+  useEffect(() => {
+    if (loading || addresses.length === 0 || !selectedAddressId) return;
+    
+    const address = addresses.find(a => a.id === selectedAddressId);
+    if (address && prevSelectedAddressIdRef.current !== selectedAddressId) {
+      onAddressSelect(address);
+      prevSelectedAddressIdRef.current = selectedAddressId;
+      track('address_selected', {
+        address_count: addresses.length,
+        is_default: address.is_default || false,
+        source: 'url_param',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddressId]);
 
   useEffect(() => {
     // Notify parent when editing state changes
@@ -220,58 +273,26 @@ export function AddressSelector({
     };
   }, [showForm, onEditingChange]);
 
-  const loadAddresses = async (autoSelectId?: string) => {
-    setLoading(true);
-    const data = await getCustomerAddresses();
-    setAddresses(data);
-    
-    // Notify parent of addresses count
-    onAddressesCountChange?.(data.length);
-    
-    // If autoSelectId is provided, select that address (for newly created addresses)
-    if (autoSelectId) {
-      const address = data.find(a => a.id === autoSelectId);
-      if (address) {
-        onAddressSelect(address);
-        setLoading(false);
-        return;
-      }
-    }
-    
-    // If selectedAddressId is provided (from URL params), try to select that address
-    if (selectedAddressId) {
-      const address = data.find(a => a.id === selectedAddressId);
-      if (address) {
-        onAddressSelect(address);
-      } else if (data.length > 0) {
-        // If the selectedAddressId doesn't exist, fall back to default
-        const defaultAddr = data.find(a => a.is_default) || data[0];
-        onAddressSelect(defaultAddr);
-      }
-    } else if (data.length > 0) {
-      // Auto-select default address if no address is selected
-      const defaultAddr = data.find(a => a.is_default) || data[0];
-      onAddressSelect(defaultAddr);
-    }
-    
-    setLoading(false);
-  };
-
   const handleAddressCreated = async (newAddress: CustomerAddress) => {
-    // Modal will handle closing itself after animation completes
-    // Reload addresses from server and auto-select the new address
-    await loadAddresses(newAddress.id);
+    // Invalidate query cache - React Query will refetch automatically
+    invalidateAddresses();
+    
+    // Wait for addresses to refetch, then auto-select the new address
+    // The useEffect above will handle selection when addresses update
+    // For immediate selection, we can select it directly
+    setTimeout(() => {
+      onAddressSelect(newAddress);
+    }, 100);
     
     // Notify parent of change
     onAddressChange();
   };
 
   const handleAddressUpdated = (updatedAddress: CustomerAddress) => {
-    setAddresses(prev => {
-      const updated = prev.map(a => a.id === updatedAddress.id ? updatedAddress : a);
-      onAddressesCountChange?.(updated.length);
-      return updated;
-    });
+    // Invalidate query cache - React Query will refetch automatically
+    invalidateAddresses();
+    
+    // If this is the currently selected address, update the selection
     if (selectedAddressId === updatedAddress.id) {
       onAddressSelect(updatedAddress);
     }
@@ -341,6 +362,7 @@ export function AddressSelector({
           </div>
         </div>
         {/* Manage Addresses button skeleton - matches actual button */}
+        {/* Only show skeleton if we might have addresses (hide if we know there are 0) */}
         {!hideManageButton && (
           <div className="flex-shrink-0 mt-4 w-full">
             <div className="w-full rounded-[999px] bg-gray-200 animate-pulse h-14 flex items-center justify-center gap-2">
@@ -370,7 +392,8 @@ export function AddressSelector({
       </div>
 
       {/* (B) Manage Addresses Button - Standard pill button */}
-      {!hideManageButton && (
+      {/* Hide if user has 0 addresses (nothing to manage) */}
+      {!hideManageButton && addresses.length > 0 && (
         <div className="flex-shrink-0 mt-4 w-full">
           <button
             type="button"

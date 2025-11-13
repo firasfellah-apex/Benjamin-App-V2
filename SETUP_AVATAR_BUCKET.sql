@@ -84,3 +84,11 @@ USING (bucket_id = 'avatars');
 -- 3. Test in your app by uploading a profile photo
 -- ============================================================================
 
+
+
+
+
+
+
+
+

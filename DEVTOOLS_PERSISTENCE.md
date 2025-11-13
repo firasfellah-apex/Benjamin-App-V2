@@ -84,3 +84,11 @@ When you **close DevTools**, the device emulation settings **reset to default**.
 
 The phone frame gives you a quick mobile view without DevTools, while DevTools gives you professional device simulation when you need it.
 
+
+
+
+
+
+
+
+

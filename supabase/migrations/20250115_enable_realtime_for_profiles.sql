@@ -32,3 +32,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
 -- 2. Find the `profiles` table
 -- 3. Toggle Realtime to ON
 
+
+
+
+
+
+
+
+

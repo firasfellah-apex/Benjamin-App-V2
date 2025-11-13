@@ -54,11 +54,13 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
       className={cn(
         useFixedPosition ? "fixed bottom-0 inset-x-0 z-40" : "w-full",
         "bg-white rounded-t-3xl",
-        "shadow-[0_-8px_24px_rgba(15,23,42,0.08)]",
-        "px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))]"
+        "shadow-[0_-8px_24px_rgba(15,23,42,0.08)]"
       )}
     >
-      <div className="w-full max-w-md mx-auto">
+      {/* Container sets padding: horizontal AND vertical (equal) */}
+      {/* Bottom padding includes safe area inset for devices with home indicator */}
+      {/* Full width - fills phone sideways, responsive */}
+      <div className="w-full px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
         {/* Stepper (only on steps 1 & 2) */}
       <AnimatePresence>
         {showStepper && (
@@ -86,12 +88,12 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
         )}
       </AnimatePresence>
 
-      <div className={cn("flex w-full gap-3 items-center justify-center min-h-[56px]")}>
+      <div className={cn("flex w-full gap-3 items-center justify-center")}>
         <AnimatePresence mode="wait" initial={false}>
           {isSingleMode ? (
             <motion.button
               key="single"
-              layoutId="action-bar-primary"
+              layoutId="ts-cta"
               initial={{ opacity: 0, scale: 0.92 }}
               animate={{ 
                 scale: 1,
@@ -111,9 +113,8 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
               onClick={onPrimary}
               disabled={isLoading || primaryDisabled}
               whileTap={(!isLoading && !primaryDisabled) ? { scale: 0.97 } : {}}
-              whileHover={(!isLoading && !primaryDisabled) ? { scale: 1.02, backgroundColor: '#000000E6' } : {}}
               className={cn(
-                "w-full max-w-[480px] min-h-[56px] rounded-full",
+                "w-full rounded-full py-4 px-6",
                 "text-base font-semibold",
                 "flex items-center justify-center",
                 "transition-colors duration-200",
@@ -148,7 +149,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                   ease: [0.34, 1.56, 0.64, 1]
                 }
               }}
-              className="flex gap-3 w-full max-w-[480px]"
+              className="flex gap-3 w-full"
             >
               {/* Secondary button (Cancel / Back) */}
               {onSecondary && (
@@ -171,12 +172,11 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                   disabled={isLoading}
                   whileTap={{ scale: 0.97 }}
                   className={cn(
-                    "flex-1 min-h-[56px] rounded-full",
+                    "flex-1 rounded-full py-4 px-6",
                     "border border-gray-300",
                     "bg-white text-gray-900",
                     "text-base font-semibold",
                     "flex items-center justify-center",
-                    "hover:bg-gray-50",
                     isLoading && "opacity-60 cursor-not-allowed"
                   )}
                 >
@@ -196,7 +196,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
 
               {/* Primary CTA (black pill) - morphs from single button */}
               <motion.button
-                layoutId="action-bar-primary"
+                layoutId="ts-cta"
                 layout
                 initial={{ opacity: 0, scale: 0.8, x: 30 }}
                 animate={{ 
@@ -218,9 +218,8 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                 onClick={onPrimary}
                 disabled={isLoading || primaryDisabled}
                 whileTap={(!isLoading && !primaryDisabled) ? { scale: 0.97 } : {}}
-                whileHover={(!isLoading && !primaryDisabled) ? { scale: 1.02, backgroundColor: '#000000E6' } : {}}
                 className={cn(
-                  "flex-[2] min-h-[56px] rounded-full",
+                  "flex-[2] rounded-full py-4 px-6",
                   "text-base font-semibold",
                   "flex items-center justify-center",
                   "transition-colors duration-200",

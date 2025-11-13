@@ -92,3 +92,11 @@ After applying the fix, verify:
 3. Active/tap states still work (for touch feedback)
 4. Admin routes (`/admin/*`) still have hover effects (they use `responsive-viewport` class)
 
+
+
+
+
+
+
+
+

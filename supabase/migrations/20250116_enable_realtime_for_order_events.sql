@@ -39,3 +39,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.order_events;
 -- SELECT relreplident FROM pg_class WHERE relname = 'order_events';
 -- SELECT * FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'order_events';
 
+
+
+
+
+
+
+
+

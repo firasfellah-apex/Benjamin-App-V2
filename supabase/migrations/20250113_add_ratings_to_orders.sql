@@ -28,3 +28,11 @@ COMMENT ON COLUMN orders.customer_rating_by_runner IS 'Runner rating of customer
 COMMENT ON COLUMN profiles.avg_runner_rating IS 'Average rating received by runner (read-only aggregate)';
 COMMENT ON COLUMN profiles.avg_customer_rating IS 'Average rating received by customer (read-only aggregate)';
 
+
+
+
+
+
+
+
+

@@ -74,3 +74,11 @@ CREATE POLICY "Users can view events for own orders" ON order_events
 CREATE POLICY "System can insert order events" ON order_events
   FOR INSERT TO authenticated WITH CHECK (true);
 
+
+
+
+
+
+
+
+

@@ -4,9 +4,11 @@
  * Provides map functionality with fallback to static maps
  * - Default: Static map images (no external dependencies)
  * - Optional: Google Maps integration (if VITE_ENABLE_GOOGLE_MAPS=1)
+ * Uses runtime environment selector to get the correct API key per app.
  */
 
 import { createContext, useContext, ReactNode } from 'react';
+import { getEnv } from '@/lib/env';
 
 interface MapContextValue {
   isGoogleMapsEnabled: boolean;
@@ -27,7 +29,9 @@ interface MapProviderProps {
 
 export function MapProvider({ children }: MapProviderProps) {
   const isGoogleMapsEnabled = import.meta.env.VITE_ENABLE_GOOGLE_MAPS === '1';
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  // Get API key from runtime env selector (customer/runner/admin)
+  const E = getEnv();
+  const googleMapsApiKey = E.GOOGLE_MAPS_API_KEY;
 
   return (
     <MapContext.Provider

@@ -12,3 +12,11 @@ If you're getting an OTS parsing error, verify the font file is valid:
 2. If it fails to open, re-export from the original source
 3. Ensure it's exported as OTF (OpenType Font) format
 
+
+
+
+
+
+
+
+

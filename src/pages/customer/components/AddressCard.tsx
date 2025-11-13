@@ -34,27 +34,28 @@ export function AddressCard({
   onEdit,
   onDelete,
 }: AddressCardProps) {
-  const baseClasses = "w-full rounded-[32px] px-6 py-4 flex flex-col gap-2";
+  const baseClasses = "w-full rounded-2xl px-4 sm:px-5 py-4 sm:py-5 flex flex-col gap-2";
   const clickableClasses = onClick && mode === "carousel" ? "cursor-pointer active:scale-[0.98] transition-transform duration-150" : "";
 
-  // Determine variant styles
+  // Determine variant styles - use tile styling, not panel styling
   const getVariantClasses = () => {
     if (mode === "add") {
-      return "bg-[#F9FBFF] border-[2px] border-dashed border-[#C5D0E0]";
+      return "bg-slate-50/40 border border-dashed border-slate-200/70";
     }
     
     if (mode === "carousel") {
       if (isSelected) {
-        return "bg-[#F5FFF7] border border-[#B4EFC3]";
+        // Selected: green stroke + light green gradient
+        return "bg-gradient-to-br from-green-50/80 to-emerald-50/60 border-2 border-green-500/60";
       }
-      return "bg-white border border-[rgba(15,23,42,0.06)]";
+      return "bg-slate-50/40 border border-slate-200/70";
     }
     
     // manage mode
     if (isDefault) {
-      return "bg-[#F5FFF7] border border-[#B4EFC3]";
+      return "bg-slate-50/40 border border-slate-200/70";
     }
-    return "bg-white border border-[rgba(15,23,42,0.06)]";
+    return "bg-slate-50/40 border border-slate-200/70";
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
@@ -129,7 +130,7 @@ export function AddressCard({
               <button
                 type="button"
                 onClick={handleEditClick}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                className="p-1 rounded transition-colors"
                 title="Edit address"
               >
                 <PenLine className="w-4 h-4" />
@@ -139,7 +140,7 @@ export function AddressCard({
               <button
                 type="button"
                 onClick={handleDeleteClick}
-                className="p-1 hover:bg-red-50 rounded transition-colors"
+                className="p-1 rounded transition-colors"
                 title="Delete address"
               >
                 <Trash2 className="w-4 h-4 text-red-500" />
@@ -191,15 +192,27 @@ export function AddressCard({
         </div>
         
         {/* Actions for carousel mode */}
-        {onEdit && (
-          <button
-            type="button"
-            onClick={handleEditClick}
-            className="text-sm text-[#111827] underline underline-offset-2 shrink-0"
-          >
-            Edit
-          </button>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={handleEditClick}
+              className="text-sm text-[#111827] underline underline-offset-2"
+            >
+              Edit
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              className="p-1 hover:bg-red-50 rounded transition-colors"
+              title="Delete address"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Row 2: Address line */}

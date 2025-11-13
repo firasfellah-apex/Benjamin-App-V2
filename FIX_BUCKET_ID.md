@@ -41,3 +41,11 @@ If you prefer, you can rename the bucket in the Dashboard to `avatars` (lowercas
 
 After fixing the bucket ID, the upload should work. If you still get errors, check the browser console for the exact error message.
 
+
+
+
+
+
+
+
+

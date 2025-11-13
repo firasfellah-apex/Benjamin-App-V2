@@ -1,42 +1,46 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
-
-export interface CustomerCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  /**
-   * Whether the card is clickable/interactive
-   */
-  interactive?: boolean;
-  /**
-   * Whether the card has a hover effect
-   */
-  hoverable?: boolean;
-}
-
 /**
  * CustomerCard Component
  * 
- * Standardized card component for customer pages.
- * Provides consistent styling: rounded-3xl, border, subtle shadow.
+ * Standardized white rounded container for customer page content.
+ * Single morphing panel per screen - no nested containers.
  */
-export const CustomerCard = React.forwardRef<HTMLDivElement, CustomerCardProps>(
-  ({ className, interactive = false, hoverable = false, children, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "rounded-3xl border border-gray-200 bg-white",
-          "shadow-sm",
-          interactive && "cursor-pointer active:scale-[0.99] transition-transform",
-          hoverable && "hover:shadow-md transition-shadow",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  }
-);
+import React from "react";
 
-CustomerCard.displayName = "CustomerCard";
+export default function CustomerCard({
+  className = "",
+  children,
+  interactive = false,
+  hoverable = false,
+  onClick,
+}: React.PropsWithChildren<{ 
+  className?: string;
+  interactive?: boolean;
+  hoverable?: boolean;
+  onClick?: () => void;
+}>) {
+  const baseClasses = "rounded-3xl bg-white shadow-xl/5 p-6 sm:p-7 " +
+    "transition-[height,padding,margin] duration-300 ease-out";
+  
+  const interactiveClasses = interactive ? "cursor-pointer active:scale-[0.99] transition-transform" : "";
+  const hoverableClasses = hoverable ? "hover:shadow-md transition-shadow" : "";
+  
+  return (
+    <div
+      className={`${baseClasses} ${interactiveClasses} ${hoverableClasses} ${className}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
+
 

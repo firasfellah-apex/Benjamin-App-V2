@@ -90,3 +90,11 @@ CREATE POLICY "Customers can rate runners on completed orders"
     status = 'Completed'
   );
 
+
+
+
+
+
+
+
+

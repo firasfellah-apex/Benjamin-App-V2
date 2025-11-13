@@ -32,3 +32,11 @@ WHERE schemaname = 'storage'
   AND (policyname LIKE '%avatar%' OR policyname LIKE '%Avatar%')
 ORDER BY policyname;
 
+
+
+
+
+
+
+
+

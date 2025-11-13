@@ -9,12 +9,16 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { LocationProvider } from "./contexts/LocationContext";
 import { GoogleMapsProvider } from "./components/maps/GoogleMapsProvider";
+import { TopShelfHeightProvider } from "./components/customer/layout/TopShelfHeight";
 import { queryClient } from "./lib/queryClient";
+import { getEnv } from "./lib/env";
 
-console.log(
-  "MAP KEY PRESENT?",
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? "YES" : "NO"
-);
+// Debug log: show active env profile
+if (typeof window !== 'undefined') {
+  const activeApp = window.location.pathname.split('/')[1] || 'customer';
+  const env = getEnv();
+  console.log('[ENV] active profile:', activeApp, env);
+}
 
 
 createRoot(document.getElementById("root")!).render(
@@ -26,7 +30,9 @@ createRoot(document.getElementById("root")!).render(
             <ProfileProvider>
               <LocationProvider>
                 <BrowserRouter>
-                  <App />
+                  <TopShelfHeightProvider>
+                    <App />
+                  </TopShelfHeightProvider>
                 </BrowserRouter>
               </LocationProvider>
             </ProfileProvider>

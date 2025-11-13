@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, User, LogOut, Home, Package, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useProfile } from "@/hooks/useProfile";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import {
   Sheet,
@@ -32,7 +33,7 @@ export function CustomerHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { profile } = useProfile();
+  const { profile, isReady } = useProfile(user?.id);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -105,15 +106,24 @@ export function CustomerHeader() {
                   <SheetDescription asChild>
                     {user ? (
                       <div className="text-left">
-                        {profile ? (
+                        {!isReady ? (
                           <>
-                            <p className="font-semibold text-foreground">{profile.first_name} {profile.last_name}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <Skeleton className="h-5 w-32 mb-2" />
+                            <Skeleton className="h-4 w-48" />
+                          </>
+                        ) : profile?.first_name || profile?.last_name ? (
+                          <>
+                            <p className="font-semibold text-foreground">
+                              {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
+                            </p>
+                            {profile.phone && (
+                              <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                            )}
                           </>
                         ) : (
                           <>
-                            <p className="font-semibold text-foreground">Loading profile...</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <p className="font-semibold text-foreground">Complete your profile</p>
+                            <p className="text-sm text-muted-foreground">Add your name to get started</p>
                           </>
                         )}
                       </div>

@@ -7,7 +7,6 @@
  */
 
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { EllipsisVertical, MapPin, Home, ArrowLeft, User, LogOut, Package } from "@/lib/icons";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
@@ -36,34 +35,27 @@ import { useProfile } from "@/hooks/useProfile";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactNode } from "react";
 
-const ease = [0.22, 0.61, 0.36, 1];
-const TRANSITION_DURATION = 0.3;
-
 interface CustomerTopShellProps {
-  title: string | ReactNode; // Allow ReactNode for skeleton loaders
-  subtitle: string;
-  topContent?: ReactNode; // last delivery / address cards / etc.
-  onOpenMenu?: () => void;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  children: ReactNode; // page-specific content (should include exactly ONE CustomerCard)
   showBack?: boolean;
   onBack?: () => void;
-  isReady?: boolean; // Whether profile/data is ready (controls shimmer)
 }
 
 export function CustomerTopShell({
   title,
   subtitle,
-  topContent,
-  onOpenMenu,
+  children,
   showBack = false,
   onBack,
-  isReady = true, // Default to true for backward compatibility
 }: CustomerTopShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { profile } = useProfile(user?.id);
+  const { profile, isReady: profileReady } = useProfile(user?.id);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -110,14 +102,9 @@ export function CustomerTopShell({
 
   return (
     <>
-      <motion.header
-        layoutId="customer-top-shell-header"
-        layout="position"
-        transition={{ duration: TRANSITION_DURATION, ease, layout: { duration: TRANSITION_DURATION } }}
-        className="px-8 pt-10 pb-8"
-      >
-        {/* Logo + menu (fixed position & styling across screens) */}
-        <div className="flex items-center justify-between">
+      <div className="relative px-4 pt-6 pb-2 sm:px-5">
+        {/* Logo / kebab live OUTSIDE of the morphing panel */}
+        <header className="mb-4 flex items-center justify-between">
           {showBack ? (
             <button
               onClick={onBack || (() => navigate(-1))}
@@ -146,15 +133,24 @@ export function CustomerTopShell({
                   <SheetDescription asChild>
                     {user ? (
                       <div className="text-left">
-                        {profile ? (
+                        {!profileReady ? (
                           <>
-                            <p className="font-semibold text-foreground">{profile.first_name} {profile.last_name}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <Skeleton className="h-5 w-32 mb-2" />
+                            <Skeleton className="h-4 w-48" />
+                          </>
+                        ) : profile?.first_name || profile?.last_name ? (
+                          <>
+                            <p className="font-semibold text-foreground">
+                              {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
+                            </p>
+                            {profile.phone && (
+                              <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                            )}
                           </>
                         ) : (
                           <>
-                            <p className="font-semibold text-foreground">Loading profile...</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <p className="font-semibold text-foreground">Complete your profile</p>
+                            <p className="text-sm text-muted-foreground">Add your name to get started</p>
                           </>
                         )}
                       </div>
@@ -237,58 +233,19 @@ export function CustomerTopShell({
               </SheetContent>
             </Sheet>
           )}
-        </div>
+        </header>
 
-        {/* Title + subtitle with fixed height and AnimatePresence */}
-        <motion.div 
-          layout
-          className="mt-6 min-h-[88px]"
-        >
-          <AnimatePresence mode="popLayout">
-            <motion.div
-              key={typeof title === 'string' ? title : 'title-content'}
-              layout
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18 }}
-            >
-              {!isReady ? (
-                <>
-                  <Skeleton className="h-7 w-64 mb-2" />
-                  <Skeleton className="h-5 w-48" />
-                </>
-              ) : (
-                <>
-                  <h1 className="text-[24px] leading-tight font-semibold text-slate-900">
-                    {title}
-                  </h1>
-                  <p className="mt-2 text-base text-slate-500">
-                    {subtitle}
-                  </p>
-                </>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </motion.div>
+        {/* Top text sits OUTSIDE the white card */}
+        {(title || subtitle) && (
+          <div className="mb-3">
+            {title ? <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1> : null}
+            {subtitle ? <p className="mt-1 text-slate-500">{subtitle}</p> : null}
+          </div>
+        )}
 
-        {/* Optional top content: subtle layout + fade, avoid remounting */}
-        <AnimatePresence mode="wait">
-          {topContent && (
-            <motion.div 
-              key="top-content"
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="mt-6"
-            >
-              {topContent}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.header>
+        {/* Children should include exactly ONE <CustomerCard> */}
+        <div className="relative">{children}</div>
+      </div>
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>

@@ -123,3 +123,11 @@ Or use the migration file: `supabase/migrations/20251111_add_runner_online_statu
 - Headers are role-specific and theme-appropriate
 - Online/offline status is enforced in UI and queries
 
+
+
+
+
+
+
+
+

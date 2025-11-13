@@ -86,3 +86,11 @@ ALTER TABLE public.orders REPLICA IDENTITY FULL;
 
 Then **enable Realtime in the dashboard** (Database → Replication → orders table → toggle ON).
 
+
+
+
+
+
+
+
+

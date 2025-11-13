@@ -11,6 +11,8 @@ import MyOrders from './pages/customer/MyOrders';
 import CustomerOrderDetailPage from './pages/customer/CustomerOrderDetailPage';
 import ManageAddresses from './pages/customer/ManageAddresses';
 import History from './pages/customer/History';
+import CustomerDeliveriesHistory from './pages/customer/CustomerDeliveriesHistory';
+import CustomerDeliveryDetail from './pages/customer/CustomerDeliveryDetail';
 
 import { RunnerLayout } from './components/layout/RunnerLayout';
 import Work from './pages/runner/Work';
@@ -98,6 +100,18 @@ const routes: RouteConfig[] = [
     name: 'Order History',
     path: '/customer/history',
     element: <CustomerLayout><History /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Customer Deliveries',
+    path: '/customer/deliveries',
+    element: <CustomerLayout><CustomerDeliveriesHistory /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Customer Delivery Detail',
+    path: '/customer/deliveries/:deliveryId',
+    element: <CustomerLayout><CustomerDeliveryDetail /></CustomerLayout>,
     visible: false
   },
   {

@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useProfile } from "@/hooks/useProfile";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface CustomerTopShellProps {
@@ -46,7 +47,7 @@ export function CustomerTopShell({ children, className }: CustomerTopShellProps)
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { profile } = useProfile();
+  const { profile, isReady } = useProfile(user?.id);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -122,15 +123,24 @@ export function CustomerTopShell({ children, className }: CustomerTopShellProps)
                 <SheetDescription asChild>
                   {user ? (
                     <div className="text-left">
-                      {profile ? (
+                      {!isReady ? (
                         <>
-                          <p className="font-semibold text-foreground">{profile.first_name} {profile.last_name}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <Skeleton className="h-5 w-32 mb-2" />
+                          <Skeleton className="h-4 w-48" />
+                        </>
+                      ) : profile?.first_name || profile?.last_name ? (
+                        <>
+                          <p className="font-semibold text-foreground">
+                            {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
+                          </p>
+                          {profile.phone && (
+                            <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                          )}
                         </>
                       ) : (
                         <>
-                          <p className="font-semibold text-foreground">Loading profile...</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <p className="font-semibold text-foreground">Complete your profile</p>
+                          <p className="text-sm text-muted-foreground">Add your name to get started</p>
                         </>
                       )}
                     </div>

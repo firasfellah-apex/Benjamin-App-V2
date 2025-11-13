@@ -61,3 +61,11 @@ USING (bucket_id = 'avatars');
 -- You should see "POLICIES: 4" in the Storage → Buckets view
 -- ============================================================================
 
+
+
+
+
+
+
+
+

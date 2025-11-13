@@ -174,3 +174,11 @@ This confirms:
 - `src/index.css` - Phone frame CSS styles
 - `VIEWPORT_TESTING_GUIDE.md` - Detailed viewport testing guide
 
+
+
+
+
+
+
+
+

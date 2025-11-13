@@ -147,3 +147,11 @@ VITE_APP_ENV=production  # or 'development' | 'staging'
 - Map respects existing reveal rules (`canShowLiveLocation`, `canRevealRunnerIdentity`)
 - Styles match existing customer theme (neutral colors, rounded cards)
 
+
+
+
+
+
+
+
+

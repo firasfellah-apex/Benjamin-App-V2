@@ -143,3 +143,11 @@ If you're still having issues:
 3. Make sure you're using the correct Supabase project
 4. Check that Storage is enabled for your project
 
+
+
+
+
+
+
+
+

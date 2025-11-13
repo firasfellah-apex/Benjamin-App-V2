@@ -38,3 +38,11 @@ WHERE from_status = 'Pending Handoff'
 -- - Should see transitions: Runner at ATM → Cancelled, Cash Withdrawn → Cancelled, Pending Handoff → Cancelled
 -- - Function should contain logic checking v_is_admin before transition table validation
 
+
+
+
+
+
+
+
+

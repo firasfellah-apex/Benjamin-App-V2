@@ -58,3 +58,11 @@ The `CASE` statement was causing PostgreSQL's type inference to treat the result
 - Explicit cast `::user_role` ensures type safety
 - The `order_events.actor_role` column expects a single `user_role` enum, not an array
 
+
+
+
+
+
+
+
+

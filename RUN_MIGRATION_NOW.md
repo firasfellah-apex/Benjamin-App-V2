@@ -54,3 +54,11 @@ If you're still getting errors after running the migration:
 2. Verify your user has the `admin` role in the `profiles` table
 3. Make sure the migration ran successfully (no errors in Supabase SQL Editor)
 
+
+
+
+
+
+
+
+

@@ -136,7 +136,7 @@ export const BenjaminMap: React.FC<BenjaminMapProps> = ({
   );
 
   // Use context to check if Maps is ready (from GoogleMapsProvider)
-  const { isMapsReady: contextMapsReady } = useGoogleMapsReady();
+  const { isReady: contextMapsReady } = useGoogleMapsReady();
   
   // Also check directly as fallback
   const [mapsReady, setMapsReady] = useState(() => {

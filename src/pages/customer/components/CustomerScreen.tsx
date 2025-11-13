@@ -2,55 +2,74 @@
  * CustomerScreen Component
  * 
  * Shared 3-zone layout for customer pages:
- * - Header: hugs content (logo/menu + page content)
+ * - Header Bar: persistent header row (logo + menu) - never remounts
+ * - Top Shelf: full-width, bottom-rounded, bottom-shadow only - morphs smoothly
  * - Map: flex-1 fills remaining space (with padding-bottom for fixed footer)
  * - Footer: fixed to bottom, hugs content (bottom nav/CTAs)
  * 
- * No nested cards or frames - full viewport layout.
- * Includes smooth morphing transitions between states.
+ * Header bar stays mounted; only shelf body morphs between routes.
  */
 
 import React from "react";
-import { motion } from "framer-motion";
+import { useLocation } from "react-router-dom";
+import CustomerHeaderBar from "@/components/customer/layout/CustomerHeaderBar";
+import CustomerTopShelf from "@/components/customer/layout/CustomerTopShelf";
+import TopShelfSection from "@/components/customer/layout/TopShelfSection";
 
 interface CustomerScreenProps {
-  header: React.ReactNode;       // top nav / content
-  map?: React.ReactNode;         // middle map area
-  footer?: React.ReactNode;      // bottom nav / CTAs (will be fixed to bottom)
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  loading?: boolean;              // Loading state for skeletons
+  actions?: React.ReactNode;      // Optional action buttons/chips
+  nextKey?: string;               // Optional next route key for pre-measurement
+  nextEstimate?: React.ReactNode; // Optional lightweight estimate of next view
+  headerLeft?: React.ReactNode;   // Optional custom left header (defaults to logo)
+  headerRight?: React.ReactNode;  // Optional custom right header (defaults to menu)
+  children?: React.ReactNode;     // Content that goes inside the TopShelf
+  map?: React.ReactNode;          // middle map area
+  footer?: React.ReactNode;       // bottom nav / CTAs (will be fixed to bottom)
 }
 
-const transitionConfig = {
-  duration: 0.3,
-  ease: [0.22, 0.61, 0.36, 1] as [number, number, number, number],
-  layout: {
-    duration: 0.3,
-    ease: [0.22, 0.61, 0.36, 1] as [number, number, number, number],
-  },
-};
+export function CustomerScreen({ 
+  title, 
+  subtitle,
+  loading = false,
+  actions,
+  nextKey,
+  nextEstimate,
+  headerLeft,
+  headerRight,
+  children,
+  map, 
+  footer 
+}: CustomerScreenProps) {
+  const location = useLocation();
+  const routeKey = location.pathname;
 
-export function CustomerScreen({ header, map, footer }: CustomerScreenProps) {
   return (
     <div className="flex min-h-screen flex-col bg-[#F4F5F7]">
-      {/* TOP: hugs content with rounded bottom corners and shadow */}
-      <motion.header
-        layoutId="customer-screen-header"
-        layout="position"
-        transition={transitionConfig}
-        style={{ willChange: 'height' }}
-        className="relative z-20 bg-white rounded-b-[32px] shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
-      >
-        {header}
-      </motion.header>
+      {/* Persistent header bar - never remounts, no animations */}
+      <CustomerHeaderBar 
+        headerLeft={headerLeft}
+        headerRight={headerRight}
+      />
 
-      {/* MIDDLE: flex map / content - tucks under top nav with negative margin */}
-      <motion.main
-        layout
-        transition={transitionConfig}
-        style={{ willChange: 'transform' }}
-        className="relative z-10 flex-1 min-h-0 -mt-8"
-      >
+      {/* Full-width shelf - bleeds to edges, morphs smoothly */}
+      <CustomerTopShelf>
+        <TopShelfSection
+          loading={loading}
+          title={title}
+          subtitle={subtitle}
+          actions={actions}
+        >
+          {children}
+        </TopShelfSection>
+      </CustomerTopShelf>
+
+      {/* MIDDLE: flex map / content - full width background, no padding constraints */}
+      <main className="relative z-10 flex-1 min-h-0 w-full">
         {map}
-      </motion.main>
+      </main>
 
       {/* BOTTOM: fixed to bottom, hugging content */}
       {/* Footer components handle their own fixed positioning */}

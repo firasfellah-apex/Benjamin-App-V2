@@ -115,13 +115,13 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
     if (onViewAll) {
       onViewAll();
     } else {
-      navigate('/customer/history');
+      navigate('/customer/deliveries');
     }
   };
   
   return (
-    <div className="mt-3">
-      <div className="w-full rounded-2xl bg-white border border-gray-200 px-6 py-5 flex flex-col gap-2">
+    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 p-4 sm:p-5">
+      <div className="space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -143,7 +143,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
         </div>
         
         {/* Divider */}
-        <div className="border-t border-slate-200 mt-3 mb-3" />
+        <div className="border-t border-slate-200" />
         
         {/* Actions */}
         <div className="flex items-center justify-between gap-3">
@@ -169,7 +169,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
           <button
             type="button"
             onClick={handleViewAllClick}
-            className="ml-auto text-[10px] font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 transition-colors"
+            className="ml-auto text-[10px] font-medium text-slate-500 inline-flex items-center gap-1 transition-colors"
           >
             View all deliveries
             <span aria-hidden="true" className="text-slate-400">→</span>
