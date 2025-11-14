@@ -15,15 +15,14 @@ interface CustomerMapViewportProps {
 export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
   selectedAddress,
 }) => {
-  // Single source of truth for the map band height in the request flow
-  // MUST be a fixed pixel value for Google Maps to render tiles
+  // Minimum height fallback for Google Maps to render tiles
+  // On home screen, this will grow to fill available space via flex-1
   const HEIGHT = 236;
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-t-3xl"
+      className="relative w-full h-full overflow-hidden rounded-t-3xl rounded-b-3xl"
       style={{ 
-        height: `${HEIGHT}px`, 
         minHeight: `${HEIGHT}px`,
         display: "block", // NOT flex
       }}

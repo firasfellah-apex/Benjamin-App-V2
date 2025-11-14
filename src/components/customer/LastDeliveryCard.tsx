@@ -130,7 +130,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5 flex-1 min-w-0">
             <div className="text-[11px] font-medium uppercase tracking-[0.05em] text-slate-500">
-              Last delivery
+              Latest delivery
             </div>
             <div className="text-[15px] font-medium text-slate-900">
               ${amount.toFixed(0)} {isCancelled ? 'requested' : 'delivered'} to {addressLabel}

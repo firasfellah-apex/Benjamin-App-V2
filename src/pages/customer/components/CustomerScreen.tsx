@@ -41,6 +41,9 @@ export function CustomerScreen({
   children,
   className,
 }: CustomerScreenProps) {
+  // Determine if this is a "home screen" case (no children content)
+  const isHomeScreen = !children;
+
   return (
     <div className={cn("flex flex-col flex-1 min-h-0", className)}>
       {/* TOP: Header bar + top shelf (flex-shrink-0, auto height) */}
@@ -64,12 +67,17 @@ export function CustomerScreen({
         </div>
       </div>
 
-      {/* MIDDLE: Map band – fixed height, fills the row, sits directly under the header */}
+      {/* MIDDLE: Map band – expands to fill space on home screen, fixed height on other screens */}
       {map && (
-        <div className="flex-shrink-0">
+        <div className={cn(
+          isHomeScreen ? "flex-1 min-h-[230px]" : "flex-shrink-0"
+        )}>
           {/* Let the map bleed edge-to-edge inside the mobile shell */}
-          <div className="-mx-6 overflow-hidden rounded-t-3xl">
-            <div className="h-[230px] w-full overflow-hidden">
+          <div className="-mx-6 overflow-hidden rounded-t-3xl rounded-b-3xl">
+            <div className={cn(
+              "w-full overflow-hidden",
+              isHomeScreen ? "h-full" : "h-[230px]"
+            )}>
               {map}
             </div>
           </div>
@@ -79,9 +87,11 @@ export function CustomerScreen({
       {/* MAIN: Scrollable content area (flex-1, overflow-y-auto) */}
       {/* This is the ONE scroll container per page */}
       {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
-      <main className="flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6">
-        {children}
-      </main>
+      {children && (
+        <main className="flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6">
+          {children}
+        </main>
+      )}
     </div>
   );
 }
