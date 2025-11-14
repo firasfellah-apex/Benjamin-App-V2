@@ -76,7 +76,7 @@ export function BenjaminMap({
   return (
     <div
       className={cn("w-full", className)}
-      style={{ minHeight: height, border: "4px solid red" }}
+      style={{ minHeight: height }}
     >
       <div
         ref={mapDivRef}

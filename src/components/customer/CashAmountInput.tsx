@@ -212,12 +212,12 @@ export default function CashAmountInput({
 
       {/* Slider - Premium Benjamin Design */}
       <div className="space-y-1">
-        <div className="relative w-full flex items-center" style={{ height: '22px' }}>
+        <div className="relative w-full flex items-center" style={{ height: '44px' }}>
           {/* Background track - matte gray with subtle depth */}
           <div 
             className="absolute left-0 right-0 slider-track-bg"
             style={{ 
-              top: '8px', 
+              top: '19px', 
               height: '6px'
             }}
           >
@@ -234,7 +234,7 @@ export default function CashAmountInput({
           <motion.div 
             className="absolute left-0 pointer-events-none rounded-full slider-fill"
             style={{ 
-              top: '8px',
+              top: '19px',
               height: '6px'
             }}
             initial={false}
@@ -289,6 +289,12 @@ export default function CashAmountInput({
             step={step}
             value={value}
             onChange={handleSliderChange}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              setIsDragging(true);
+              setShowPulse(true);
+              setTimeout(() => setShowPulse(false), 600);
+            }}
             onMouseDown={() => {
               setIsDragging(true);
               setShowPulse(true);
@@ -297,20 +303,15 @@ export default function CashAmountInput({
             }}
             onMouseUp={() => setIsDragging(false)}
             onMouseLeave={() => setIsDragging(false)}
-            onTouchStart={() => {
-              setIsDragging(true);
-              setShowPulse(true);
-              // Hide pulse after animation completes
-              setTimeout(() => setShowPulse(false), 600);
-            }}
             onTouchEnd={() => setIsDragging(false)}
             disabled={isEditing}
             className={cn(
-              "relative w-full appearance-none cursor-pointer disabled:opacity-50 touch-manipulation bg-transparent z-10 slider-benjamin",
+              "relative w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-benjamin",
               isDragging && "slider-dragging"
             )}
             style={{ 
-              height: '22px', 
+              height: '44px',
+              touchAction: 'pan-y',
               margin: 0, 
               padding: 0
             }}
@@ -322,20 +323,21 @@ export default function CashAmountInput({
               -webkit-appearance: none;
               appearance: none;
               outline: none;
+              touch-action: pan-y;
             }
             
             /* Webkit Thumb - Elegant white circle */
             .slider-benjamin::-webkit-slider-thumb {
               -webkit-appearance: none;
               appearance: none;
-              width: 22px;
-              height: 22px;
+              width: 32px;
+              height: 32px;
               border-radius: 50%;
               background: #ffffff;
               cursor: pointer;
               border: 2px solid #111827;
               box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-              margin-top: -8px;
+              margin-top: -13px;
               transition: transform 0.15s ease, box-shadow 0.15s ease;
             }
             
@@ -352,8 +354,8 @@ export default function CashAmountInput({
             
             /* Firefox Thumb */
             .slider-benjamin::-moz-range-thumb {
-              width: 22px;
-              height: 22px;
+              width: 32px;
+              height: 32px;
               border-radius: 50%;
               background: #ffffff;
               cursor: pointer;

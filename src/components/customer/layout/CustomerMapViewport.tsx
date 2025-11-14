@@ -21,12 +21,11 @@ export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
 
   return (
     <div
-      className="relative w-full"
+      className="relative w-full overflow-hidden rounded-t-3xl"
       style={{ 
         height: `${HEIGHT}px`, 
         minHeight: `${HEIGHT}px`,
         display: "block", // NOT flex
-        overflow: "visible", // NOT hidden
       }}
     >
       {/* CustomerMap will stretch to fill this container */}

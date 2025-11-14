@@ -17,6 +17,15 @@
     backface-visibility: hidden;
     transform: translateZ(0); /* helps Safari reduce flicker */
   }
+
+  /* Safe area insets for iOS notch/status bar */
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 /* Reduced motion support */
@@ -169,6 +178,7 @@ All colors MUST be HSL.
     /* Edge-to-edge rendering - no phone frame */
     max-width: 100vw;
     overflow-x: hidden;
+    overscroll-behavior-x: none;
     /* Disable text selection highlight on tap */
     -webkit-tap-highlight-color: transparent;
   }
@@ -179,12 +189,15 @@ All colors MUST be HSL.
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
 
   /* Ensure all content respects the container */
   body.mobile-app-viewport #root > * {
     width: 100%;
     position: relative;
+    overflow-x: hidden;
   }
 
   /* Make sure layouts fill the container properly */

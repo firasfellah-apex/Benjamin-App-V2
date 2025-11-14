@@ -16,6 +16,7 @@ export function MobilePageShell({
     <div
       className={cn(
         "w-full",
+        "pt-safe-top",
         className
       )}
     >

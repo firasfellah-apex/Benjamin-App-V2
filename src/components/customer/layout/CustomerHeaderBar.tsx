@@ -29,6 +29,7 @@ const CustomerHeaderBar = React.memo(function CustomerHeaderBar({
   return (
     <div
       className="w-full bg-white sticky top-0 z-40"
+      // Safe-area top padding is handled by MobilePageShell via pt-safe-top
       aria-label="App header"
     >
       {/* Container sets padding: px-6 (24px) horizontal, no vertical padding */}

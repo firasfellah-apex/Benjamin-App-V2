@@ -68,8 +68,8 @@ export function CustomerScreen({
       {map && (
         <div className="flex-shrink-0">
           {/* Let the map bleed edge-to-edge inside the mobile shell */}
-          <div className="-mx-6">
-            <div className="h-[230px] w-full">
+          <div className="-mx-6 overflow-hidden rounded-t-3xl">
+            <div className="h-[230px] w-full overflow-hidden">
               {map}
             </div>
           </div>
