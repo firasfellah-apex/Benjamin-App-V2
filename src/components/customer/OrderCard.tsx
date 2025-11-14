@@ -50,7 +50,7 @@ export function OrderCard({ order, onReorder, onRate, isExpanded, onToggle }: Or
   // If completed, navigate to order detail page on click
   const handleCardClick = () => {
     if (order.status === 'Completed') {
-      navigate(`/customer/orders/${order.id}`);
+      navigate(`/customer/deliveries/${order.id}`);
       return;
     }
     // For non-completed orders, use toggle if provided

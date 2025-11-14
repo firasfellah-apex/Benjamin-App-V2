@@ -1,39 +1,38 @@
-/**
- * CustomerMapViewport Component
- * 
- * Map viewport that fills the space between top shell and bottom bar.
- * Uses flex-1 to automatically adjust when top/bottom heights change.
- * Includes smooth fade transitions when center changes.
- * Shows live user location when available.
- */
-
-import React, { useEffect, useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { BenjaminMap } from "@/components/map/BenjaminMap";
-import { useLocation } from "@/contexts/LocationContext";
+import React from "react";
+import { CustomerMap } from "@/components/maps/CustomerMap";
+import type { CustomerAddress } from "@/types/types";
 
 interface CustomerMapViewportProps {
-  center: { lat: number; lng: number } | null; // usually live-location or selected address
-  children?: React.ReactNode; // optional overlay later
+  selectedAddress?: CustomerAddress | {
+    lat?: number;
+    lng?: number;
+    latitude?: number;
+    longitude?: number;
+    label?: string;
+  } | null;
 }
 
-const FALLBACK_CENTER = { lat: 25.7617, lng: -80.1918 }; // Miami
+export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
+  selectedAddress,
+}) => {
+  // Single source of truth for the map band height in the request flow
+  // MUST be a fixed pixel value for Google Maps to render tiles
+  const HEIGHT = 236;
 
-export const CustomerMapViewport = React.memo(function CustomerMapViewport({ center, children }: CustomerMapViewportProps) {
-  const mapCenter = useMemo(() => center || FALLBACK_CENTER, [center]);
-  const { location: liveLocation } = useLocation();
-
-  // GoogleMap component handles center prop changes automatically without remounting
   return (
-    <div className="h-full w-full relative overflow-hidden">
-      <BenjaminMap
-        center={mapCenter}
-        customerPosition={liveLocation || undefined}
-        zoom={14}
-        height="100%"
-      />
-      {children}
+    <div
+      className="relative w-full"
+      style={{ 
+        height: `${HEIGHT}px`, 
+        minHeight: `${HEIGHT}px`,
+        display: "block", // NOT flex
+        overflow: "visible", // NOT hidden
+      }}
+    >
+      {/* CustomerMap will stretch to fill this container */}
+      <CustomerMap selectedAddress={selectedAddress} className="h-full" />
     </div>
   );
-});
+};
 
+export default CustomerMapViewport;

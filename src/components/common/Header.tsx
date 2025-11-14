@@ -68,7 +68,7 @@ const Header = () => {
     }
     
     // For non-exact matches, check if pathname starts with the path
-    // This handles sub-routes like /customer/orders/123
+    // This handles sub-routes like /customer/deliveries/123
     return location.pathname.startsWith(path);
   };
 

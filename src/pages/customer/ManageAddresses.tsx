@@ -111,16 +111,29 @@ export default function ManageAddresses() {
         map={
           <div className="flex flex-col h-full bg-[#F5F7FA]" />
         }
+        topContent={
+          <div className="space-y-6">
+            {/* Address carousel - inside top shelf */}
+            <AddressCarousel
+              addresses={addresses}
+              selectedAddressId={null}
+              onSelectAddress={() => {}}
+              onAddAddress={handleAddNew}
+              onEditAddress={handleEdit}
+              onDeleteAddress={handleDelete}
+            />
+            {/* Add Address button - below carousel */}
+            <button
+              onClick={handleAddNew}
+              className="w-full rounded-full border border-slate-200 bg-white py-4 px-6 text-base font-semibold text-slate-900 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
+            >
+              <Plus className="w-5 h-5" />
+              Add Address
+            </button>
+          </div>
+        }
       >
-        {/* Address carousel - no nested white card wrapper */}
-        <AddressCarousel
-          addresses={addresses}
-          selectedAddressId={null}
-          onSelectAddress={() => {}}
-          onAddAddress={handleAddNew}
-          onEditAddress={handleEdit}
-          onDeleteAddress={handleDelete}
-        />
+        {/* Main content area - empty for now */}
       </CustomerScreen>
 
       {/* Edit/Add Modal */}

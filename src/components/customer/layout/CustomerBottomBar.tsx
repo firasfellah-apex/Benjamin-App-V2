@@ -59,7 +59,7 @@ export function CustomerBottomBar({
         "max-w-md mx-auto w-full",
         "bg-white rounded-t-[32px]",
         "shadow-[0_-8px_24px_rgba(15,23,42,0.08)]",
-        "px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))]",
+        "px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]",
         className
       )}
     >

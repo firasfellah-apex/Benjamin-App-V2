@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { CustomerMap } from "./CustomerMap";
+import { CustomerMap } from "@/components/maps/CustomerMap";
 
 export interface RequestFlowShellProps {
   /** Main title, e.g. "Where should we deliver?" */

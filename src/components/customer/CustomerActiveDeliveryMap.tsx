@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { BenjaminMap, MapPosition } from '@/components/map/BenjaminMap';
+import { BenjaminMap, LatLngLiteral } from '@/components/maps/BenjaminMap';
 import { canShowLiveLocation, canRevealRunnerIdentity } from '@/lib/reveal';
 import { isProd, hasGoogleMaps } from '@/lib/env';
 import type { OrderWithDetails } from '@/types/types';
@@ -39,7 +39,7 @@ export interface CustomerActiveDeliveryMapProps {
 /**
  * Mock coordinates for Brickell, Miami (Brickell City Centre area)
  */
-const MOCK_BRICKELL_CUSTOMER: MapPosition = {
+const MOCK_BRICKELL_CUSTOMER: LatLngLiteral = {
   lat: 25.7683,
   lng: -80.1937,
 };
@@ -48,7 +48,7 @@ const MOCK_BRICKELL_CUSTOMER: MapPosition = {
  * Mock runner path (small array of points around Brickell)
  * Creates a short path from a starting point to customer
  */
-const MOCK_RUNNER_PATH: MapPosition[] = [
+const MOCK_RUNNER_PATH: LatLngLiteral[] = [
   { lat: 25.7730, lng: -80.1900 }, // Start point (slightly north)
   { lat: 25.7715, lng: -80.1915 }, // Mid point 1
   { lat: 25.7700, lng: -80.1925 }, // Mid point 2
@@ -64,14 +64,14 @@ export const CustomerActiveDeliveryMap: React.FC<CustomerActiveDeliveryMapProps>
   order,
   runnerProfile,
 }) => {
-  const [animatedRunnerPosition, setAnimatedRunnerPosition] = useState<MapPosition | null>(null);
+  const [animatedRunnerPosition, setAnimatedRunnerPosition] = useState<LatLngLiteral | null>(null);
   const [animationStep, setAnimationStep] = useState(0);
 
   // Determine if we should show the map
   const shouldShowMap = canShowLiveLocation(order.status);
 
   // Determine customer position
-  const customerPosition = useMemo<MapPosition | null>(() => {
+  const customerPosition = useMemo<LatLngLiteral | null>(() => {
     // In production, use real coordinates from order
     if (isProd && order.address_snapshot?.latitude && order.address_snapshot?.longitude) {
       return {
@@ -89,7 +89,7 @@ export const CustomerActiveDeliveryMap: React.FC<CustomerActiveDeliveryMapProps>
   }, [order.address_snapshot, isProd]);
 
   // Determine runner position
-  const runnerPosition = useMemo<MapPosition | null>(() => {
+  const runnerPosition = useMemo<LatLngLiteral | null>(() => {
     // In production, use real coordinates from order/runner (when available)
     // For now, we don't have runner location in DB yet, so we'll use mock in all cases
     // This is future-ready: when order.runner_lat/lng exist, use them here
@@ -108,7 +108,7 @@ export const CustomerActiveDeliveryMap: React.FC<CustomerActiveDeliveryMapProps>
   }, [animatedRunnerPosition, order.runner_id, isProd]);
 
   // Calculate path from runner to customer
-  const path = useMemo<MapPosition[] | undefined>(() => {
+  const path = useMemo<LatLngLiteral[] | undefined>(() => {
     if (!runnerPosition || !customerPosition) return undefined;
     
     // In dev/non-prod: use mock path
@@ -192,7 +192,7 @@ export const CustomerActiveDeliveryMap: React.FC<CustomerActiveDeliveryMapProps>
   }
 
   // Calculate map center (between runner and customer, or just customer)
-  const mapCenter: MapPosition = runnerPosition
+  const mapCenter: LatLngLiteral = runnerPosition
     ? {
         lat: (runnerPosition.lat + customerPosition.lat) / 2,
         lng: (runnerPosition.lng + customerPosition.lng) / 2,

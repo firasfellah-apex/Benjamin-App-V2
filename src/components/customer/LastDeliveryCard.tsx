@@ -90,14 +90,16 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
   
   const isRated = !!order.runner_rating;
   const canRate = order.status === 'Completed' && !isRated;
+  const isCancelled = order.status === 'Cancelled';
   
-  const completedDate = order.handoff_completed_at 
-    ? new Date(order.handoff_completed_at)
-    : new Date(order.created_at);
+  // For completed orders, use handoff_completed_at; for cancelled, use updated_at
+  const orderDate = isCancelled
+    ? new Date(order.updated_at)
+    : (order.handoff_completed_at ? new Date(order.handoff_completed_at) : new Date(order.created_at));
   
   const addressLabel = getAddressLabel(order);
-  const dateLabel = formatDateLabel(completedDate);
-  const timeLabel = formatTimeLabel(completedDate);
+  const dateLabel = formatDateLabel(orderDate);
+  const timeLabel = formatTimeLabel(orderDate);
   const amount = order.requested_amount;
   
   const handleRateClick = (e: React.MouseEvent) => {
@@ -106,7 +108,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
       onRateRunner(order.id);
     } else {
       // Navigate to order detail page where rating can be done
-      navigate(`/customer/orders/${order.id}`);
+      navigate(`/customer/deliveries/${order.id}`);
     }
   };
   
@@ -120,8 +122,10 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
   };
   
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 p-4 sm:p-5">
-      <div className="space-y-3">
+    // Standardized spacing: px-6 (24px) horizontal and vertical
+    // Internal spacing: space-y-6 (24px) for grouped UI blocks
+    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 px-6 py-6">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -129,7 +133,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
               Last delivery
             </div>
             <div className="text-[15px] font-medium text-slate-900">
-              ${amount.toFixed(0)} delivered to {addressLabel}
+              ${amount.toFixed(0)} {isCancelled ? 'requested' : 'delivered'} to {addressLabel}
             </div>
             <div className="text-[11px] text-slate-500">
               {dateLabel} · {timeLabel}
@@ -137,9 +141,15 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
           </div>
           
           {/* Status pill */}
-          <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-            Delivered
-          </div>
+          {isCancelled ? (
+            <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+              Cancelled
+            </div>
+          ) : (
+            <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Delivered
+            </div>
+          )}
         </div>
         
         {/* Divider */}
@@ -159,6 +169,10 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
           ) : isRated && order.runner_rating ? (
             <div className="text-[10px] text-amber-500">
               ★ {order.runner_rating.toFixed(1)} • You rated this runner
+            </div>
+          ) : isCancelled ? (
+            <div className="text-[10px] text-slate-400">
+              This order was cancelled.
             </div>
           ) : (
             <div className="text-[10px] text-slate-400">

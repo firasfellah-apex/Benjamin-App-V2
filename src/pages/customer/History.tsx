@@ -8,12 +8,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package } from '@/lib/icons';
-import { CustomerLayout } from '@/components/layout/CustomerLayout';
+import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
 import CustomerCard from '@/pages/customer/components/CustomerCard';
 import { getCustomerOrders } from '@/db/api';
 import type { OrderWithDetails } from '@/types/types';
 import { formatDate } from '@/lib/utils';
-import { EmptyState } from '@/components/common/EmptyState';
 import { OrderListSkeleton } from '@/components/order/OrderListSkeleton';
 
 /**
@@ -106,94 +105,96 @@ export default function History() {
   };
 
   const handleOrderClick = (order: OrderWithDetails) => {
-    navigate(`/customer/orders/${order.id}`);
+    navigate(`/customer/deliveries/${order.id}`);
   };
 
   return (
-    <CustomerLayout>
-      <div className="min-h-screen bg-[#F4F5F7]">
-        {/* Header */}
-        <div className="pt-6 pb-4">
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={handleBack}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
-              aria-label="Back to home"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">Your deliveries</h1>
-              <p className="text-sm text-gray-600 mt-0.5">
-                A record of where, when, and how much cash you've received.
-              </p>
+    <CustomerScreen
+      loading={loading}
+      title="Your deliveries"
+      subtitle="A record of where, when, and how much cash you've received."
+      headerLeft={
+        <button
+          onClick={handleBack}
+          className="p-2 rounded-full transition-colors -ml-2"
+          aria-label="Back to home"
+        >
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
+        </button>
+      }
+      map={<div className="flex flex-col h-full bg-[#F5F7FA]" />}
+    >
+      {loading ? (
+        <div className="space-y-4">
+          <OrderListSkeleton count={5} />
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="w-full px-6 pt-6 pb-6">
+          <div className="w-full flex flex-col items-center justify-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
+              <Package className="w-8 h-8 text-slate-600" />
             </div>
+            <h3 className="text-lg font-semibold text-slate-900 text-center">
+              No deliveries yet
+            </h3>
+            <p className="text-sm text-slate-500 text-center max-w-[280px]">
+              Your history will appear here after your first completed order.
+            </p>
+            <button
+              onClick={() => navigate('/customer/request')}
+              className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2 py-4 px-6"
+            >
+              Request Cash
+            </button>
           </div>
         </div>
-
-        {/* Content */}
-        <div className="py-4">
-          {loading ? (
-            <div className="space-y-3">
-              <OrderListSkeleton count={5} />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              title="No deliveries yet"
-              description="Your history will appear here after your first completed order."
-              actionLabel="Request Cash"
-              onAction={() => navigate('/customer/request')}
-            />
-          ) : (
-            <div className="space-y-3">
-              {filteredOrders.map((order) => {
-                const addressLabel = getAddressLabel(order);
-                const deliveryDate = formatDeliveryDate(order);
-                const isRated = !!order.runner_rating;
-                
-                return (
-                  <CustomerCard
-                    key={order.id}
-                    onClick={() => handleOrderClick(order)}
-                    interactive
-                    hoverable
-                    className="w-full text-left px-5 py-4"
-                  >
-                    {/* Top row: Address and Date */}
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                        <div className="text-[15px] font-semibold text-slate-900">
-                          ${order.requested_amount.toFixed(0)} delivered to {addressLabel}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {deliveryDate}
-                        </div>
-                      </div>
-                      {/* Status badge */}
-                      <div className="flex-shrink-0">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Delivered
-                        </span>
-                      </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order) => {
+            const addressLabel = getAddressLabel(order);
+            const deliveryDate = formatDeliveryDate(order);
+            const isRated = !!order.runner_rating;
+            
+            return (
+              <CustomerCard
+                key={order.id}
+                onClick={() => handleOrderClick(order)}
+                interactive
+                hoverable
+                className="w-full text-left"
+              >
+                {/* Top row: Address and Date */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <div className="text-[15px] font-semibold text-slate-900">
+                      ${order.requested_amount.toFixed(0)} delivered to {addressLabel}
                     </div>
+                    <div className="text-[11px] text-slate-500">
+                      {deliveryDate}
+                    </div>
+                  </div>
+                  {/* Status badge */}
+                  <div className="flex-shrink-0">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Delivered
+                    </span>
+                  </div>
+                </div>
 
-                    {/* Bottom row: Rating if rated */}
-                    {isRated && order.runner_rating && (
-                      <div className="flex items-center mt-2 pt-2 border-t border-slate-100">
-                        <div className="text-[10px] text-amber-500">
-                          ★ {order.runner_rating.toFixed(1)} • You rated this runner
-                        </div>
-                      </div>
-                    )}
-                  </CustomerCard>
-                );
-              })}
-            </div>
-          )}
+                {/* Bottom row: Rating if rated */}
+                {isRated && order.runner_rating && (
+                  <div className="flex items-center mt-2 pt-2 border-t border-slate-100">
+                    <div className="text-[10px] text-amber-500">
+                      ★ {order.runner_rating.toFixed(1)} • You rated this runner
+                    </div>
+                  </div>
+                )}
+              </CustomerCard>
+            );
+          })}
         </div>
-      </div>
-    </CustomerLayout>
+      )}
+    </CustomerScreen>
   );
 }
 

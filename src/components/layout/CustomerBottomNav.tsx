@@ -78,7 +78,7 @@ export function CustomerBottomNav() {
   // on routes where CustomerFlowBottomBar is used
   const isHomeRoute = location.pathname === '/customer' || location.pathname === '/customer/home';
   const isRequestRoute = location.pathname.startsWith('/customer/request');
-  const isTrackingRoute = location.pathname.startsWith('/customer/orders/');
+  const isTrackingRoute = location.pathname.startsWith('/customer/deliveries/');
   const isAddressesRoute = location.pathname === '/customer/addresses';
   
   // Hide on all routes where CustomerFlowBottomBar is used or management pages

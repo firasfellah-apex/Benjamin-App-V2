@@ -1,7 +1,8 @@
 import React from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
 import { Skeleton } from "@/components/common/Skeleton";
+import { TopShelfContentTransition } from "./TopShelfContentTransition";
 
 type Props = {
   loading?: boolean;
@@ -9,103 +10,96 @@ type Props = {
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
   children?: React.ReactNode;
+  stepKey?: string; // Optional step key override (defaults to route-based)
 };
 
-/** Silky, shared-layout top-shelf content with phase-based transitions & no layout shift. */
+/**
+ * Top shelf content section with global transition pattern.
+ * 
+ * - Uses TopShelfContentTransition for consistent fade/slide between steps
+ * - No layoutId/layout animations across steps
+ * - Fixed min-heights to prevent shrink-then-grow
+ * - Simple skeletons that respect slot heights
+ */
 export default function TopShelfSection({
   loading,
   title,
   subtitle,
   actions,
   children,
+  stepKey,
 }: Props) {
-  const prefersReduced = useReducedMotion();
+  const location = useLocation();
   const shelf = useTopShelfTransition({ minBase: 168, settleDelayMs: 240 });
 
-  const transition = prefersReduced
-    ? { duration: 0 }
-    : { type: "spring", stiffness: 220, damping: 26, mass: 0.6 };
-
-  const fade = {
-    initial: { opacity: 0, y: 6 },
-    animate: { opacity: 1, y: 0, transition },
-    exit: { opacity: 0, y: -6, transition: { duration: 0.16 } },
-  };
+  // Determine step key from route or prop
+  const currentStepKey = stepKey || (() => {
+    const path = location.pathname;
+    if (path.includes("/customer/home")) return "home";
+    if (path.includes("/customer/request")) {
+      // Check if we're on step 2 (amount) - this will be passed as stepKey from CashRequest
+      return "address"; // Default to address, CashRequest will override
+    }
+    if (path.includes("/customer/addresses")) return "address";
+    return "home";
+  })();
 
   // Show skeleton during reserve phase or when data is loading
   const showSkeleton = shelf.phase === "reserve" || (loading && shelf.phase !== "idle" && shelf.phase !== "swap");
 
   return (
     <>
-      {/* Title row */}
-      <motion.header layout="position" className="flex items-start justify-between gap-3 mb-3">
-        <motion.div layoutId="ts-title" layout="position">
+      {/* Title row - no layout animations, just static */}
+      {/* No mb-* here - spacing comes from parent space-y-6 */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="space-y-2">
           {showSkeleton ? (
             <>
-              <div className="h-7 w-2/5 animate-pulse rounded bg-slate-100 mb-2" />
+              <div className="h-7 w-2/5 animate-pulse rounded bg-slate-100" />
               <div className="h-5 w-1/4 animate-pulse rounded bg-slate-100" />
             </>
           ) : (
             <>
               {title ? (
-                <motion.h1
-                  layoutId="ts-h1"
-                  layout="position"
-                  className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-tight text-slate-900"
-                  transition={transition}
-                >
+                <h1 className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-tight text-slate-900">
                   {title}
-                </motion.h1>
+                </h1>
               ) : null}
               {subtitle ? (
-                <motion.p
-                  layoutId="ts-sub"
-                  layout="position"
-                  className="mt-1.5 text-[16px] sm:text-[17px] text-slate-500 leading-snug"
-                  transition={transition}
-                >
+                <p className="text-[16px] sm:text-[17px] text-slate-500 leading-snug">
                   {subtitle}
-                </motion.p>
+                </p>
               ) : null}
             </>
           )}
-        </motion.div>
+        </div>
 
-        <motion.div layoutId="ts-actions" layout="position" className="shrink-0">
+        <div className="shrink-0">
           {showSkeleton ? (
             <div className="h-12 w-44 animate-pulse rounded-full bg-slate-100" />
           ) : (
             actions
           )}
-        </motion.div>
-      </motion.header>
+        </div>
+      </header>
 
-      {/* Content wrapper we measure */}
+      {/* Content wrapper we measure - wrapped in global transition */}
+      {/* No space-y-* here - spacing comes from parent space-y-6 in CustomerTopShelf */}
       <div ref={shelf.measureRef}>
-        <AnimatePresence mode="wait">
-          {(shelf.phase === "idle" || shelf.phase === "swap" || shelf.phase === "settle") && (
-            <motion.div
-              key={`content-${shelf.currKey}`}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              variants={fade}
-              transition={transition}
-              className="mt-6"
-            >
+        <TopShelfContentTransition stepKey={currentStepKey}>
+          {shelf.phase === "reserve" ? (
+            // Skeleton placeholder - same height as content
+            <div className="space-y-4" style={{ minHeight: "180px" }}>
+              <div className="h-5 w-2/5 animate-pulse rounded bg-slate-100" />
+              <div className="h-5 w-1/4 animate-pulse rounded bg-slate-100" />
+              <div className="h-12 w-44 animate-pulse rounded-full bg-slate-100" />
+            </div>
+          ) : (
+            <div>
               {children}
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
-
-        {/* Lightweight structure skeleton while settling or when data not ready */}
-        {shelf.phase === "reserve" && (
-          <div className="space-y-3 mt-6">
-            <div className="h-5 w-2/5 animate-pulse rounded bg-slate-100" />
-            <div className="h-5 w-1/4 animate-pulse rounded bg-slate-100" />
-            <div className="h-12 w-44 animate-pulse rounded-full bg-slate-100" />
-          </div>
-        )}
+        </TopShelfContentTransition>
       </div>
     </>
   );

@@ -183,8 +183,8 @@ export function CustomerTopShell({
 
                       {isCustomer && (
                         <button
-                          onClick={() => handleMenuItemClick("/customer/orders")}
-                          className={getMenuItemClasses("/customer/orders", false)}
+                          onClick={() => handleMenuItemClick("/customer/deliveries")}
+                          className={getMenuItemClasses("/customer/deliveries", false)}
                         >
                           <Package className="h-5 w-5" />
                           <span>My Deliveries</span>
@@ -240,8 +240,8 @@ export function CustomerTopShell({
           <div className="mb-3">
             {title ? <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1> : null}
             {subtitle ? <p className="mt-1 text-slate-500">{subtitle}</p> : null}
-          </div>
-        )}
+            </div>
+          )}
 
         {/* Children should include exactly ONE <CustomerCard> */}
         <div className="relative">{children}</div>

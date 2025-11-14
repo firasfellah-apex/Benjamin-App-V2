@@ -27,7 +27,7 @@ export const addAddressCopy = {
 
   // --- Buttons ---
   cancelButton: "Cancel",
-  saveButton: "Save & Use This Address",
+  saveButton: "Save & Use Address",
   saveHelper: "You can edit or remove it anytime.",
 };
 

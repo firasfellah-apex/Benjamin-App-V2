@@ -3,21 +3,19 @@ import { cn } from "@/lib/utils";
 
 /**
  * MobilePageShell
- * 
- * Constrains width (max-w-[420px]), centers, and applies consistent padding.
- * Single source of truth for customer mobile page layout.
+ *
+ * Dumb, presentational component that ONLY constrains width and centers content.
+ * No layout logic, no bottom slots, no overflow handling.
+ * Full screen width - no side padding.
  */
 export function MobilePageShell({
   children,
   className,
-}: PropsWithChildren<{
-  className?: string;
-}>) {
+}: PropsWithChildren<{ className?: string }>) {
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[420px]",
-        "px-4 sm:px-0",
+        "w-full",
         className
       )}
     >

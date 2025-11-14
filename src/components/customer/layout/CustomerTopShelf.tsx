@@ -7,7 +7,7 @@ import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
  * - Sits directly under the persistent header bar
  * - Full width, rounded only at bottom
  * - Bottom-only shadow (no top shadow)
- * - Uses phase-based transitions for zero jitter
+ * - Height hugs content (no fixed min-height)
  */
 type Props = {
   children?: React.ReactNode;
@@ -28,20 +28,20 @@ export default function CustomerTopShelf({
       {/* top offset ~= header height; keep same bg as header */}
       <motion.section
         layout
-        layoutId="customer-top-shelf"
         transition={transition}
         // Full width edge-to-edge, rounded only on bottom, bottom-only shadow:
+        // Height hugs content - no minHeight constraint
         className="w-full rounded-t-none rounded-b-3xl bg-white shadow-[0_14px_32px_rgba(0,0,0,0.08)]"
         style={{ 
-          willChange: 'height',
-          minHeight: shelf.reservedMinH 
+          willChange: 'height'
         }}
         role="region"
         aria-label="Top content"
       >
         {/* Inner content wrapper - full width, container sets padding */}
-        {/* Container sets padding: horizontal AND vertical (equal) */}
-        <div className="w-full px-5 pt-5 pb-5">
+        {/* Standardized spacing: px-6 (24px) horizontal, pt-6 pb-6 (24px) vertical */}
+        {/* space-y-6 (24px) between direct children (logo row, greeting block, first card) */}
+        <div className="w-full px-6 pt-6 pb-6 space-y-6">
           {children}
         </div>
       </motion.section>

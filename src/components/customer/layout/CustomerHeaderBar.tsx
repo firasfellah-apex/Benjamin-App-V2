@@ -31,8 +31,9 @@ const CustomerHeaderBar = React.memo(function CustomerHeaderBar({
       className="w-full bg-white sticky top-0 z-40"
       aria-label="App header"
     >
-      {/* Container sets padding: horizontal AND vertical (equal) */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-5">
+      {/* Container sets padding: px-6 (24px) horizontal, no vertical padding */}
+      {/* Vertical spacing comes from CustomerTopShelf's space-y-6 */}
+      <div className="flex items-center justify-between px-6">
         <div className="flex items-center">{headerLeft || defaultHeaderLeft}</div>
         <div className="flex items-center">{headerRight || defaultHeaderRight}</div>
       </div>

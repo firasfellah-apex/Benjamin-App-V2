@@ -80,7 +80,7 @@ export function CustomerMenuButton() {
     <>
       <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2">
+          <Button variant="ghost" size="sm" className="gap-2 hover:bg-transparent hover:text-current">
             <EllipsisVertical className="h-5 w-5" />
             <span className="sr-only">Open menu</span>
           </Button>
@@ -141,8 +141,8 @@ export function CustomerMenuButton() {
 
                 {isCustomer && (
                   <button
-                    onClick={() => handleMenuItemClick("/customer/orders")}
-                    className={getMenuItemClasses("/customer/orders", false)}
+                    onClick={() => handleMenuItemClick("/customer/deliveries")}
+                    className={getMenuItemClasses("/customer/deliveries", false)}
                   >
                     <Package className="h-5 w-5" />
                     <span>My Deliveries</span>

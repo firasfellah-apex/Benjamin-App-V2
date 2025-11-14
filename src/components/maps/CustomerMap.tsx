@@ -1,77 +1,104 @@
 /**
- * CustomerMap Component
- * 
+ * CustomerMap
+ *
  * Shared map component for customer screens.
- * Centers on selected address if provided, otherwise centers on customer's live location.
- * Falls back to Miami if no location is available.
+ * - Centers on selected address if provided
+ * - Falls back to customer's live location
+ * - Falls back to Miami if nothing else is available
+ *
+ * IMPORTANT: Parent is responsible for height. This component assumes it sits
+ * inside a container that gives it a real height, and it stretches to 100%.
  */
 
 import React, { useMemo, useRef, useEffect, useState } from "react";
-import { BenjaminMap } from "@/components/map/BenjaminMap";
+import { BenjaminMap } from "@/components/maps/BenjaminMap";
 import { useCustomerLocation } from "@/hooks/useCustomerLocation";
 import type { CustomerAddress } from "@/types/types";
+import { cn } from "@/lib/utils";
 
-type CustomerMapProps = {
-  selectedAddress?: CustomerAddress | null;
-};
+type LooseAddress =
+  | CustomerAddress
+  | {
+      lat?: number;
+      lng?: number;
+      latitude?: number;
+      longitude?: number;
+      label?: string;
+    }
+  | null
+  | undefined;
 
-export function CustomerMap({ selectedAddress }: CustomerMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerHeight, setContainerHeight] = useState<string>("400px");
+interface CustomerMapProps {
+  selectedAddress?: LooseAddress;
+  className?: string;
+}
+
+export const CustomerMap: React.FC<CustomerMapProps> = ({
+  selectedAddress,
+  className,
+}) => {
   const { location, isLoading } = useCustomerLocation();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [mapHeight, setMapHeight] = useState<string>("236px"); // Default fallback
 
-  // Measure container height
+  // Measure parent height and convert to pixels for BenjaminMap
   useEffect(() => {
-    const updateHeight = () => {
-      if (containerRef.current) {
-        const height = containerRef.current.offsetHeight;
+    if (containerRef.current) {
+      const parent = containerRef.current.parentElement;
+      if (parent) {
+        const height = parent.getBoundingClientRect().height;
         if (height > 0) {
-          setContainerHeight(`${height}px`);
+          setMapHeight(`${Math.floor(height)}px`);
         }
       }
-    };
-
-    updateHeight();
-    const resizeObserver = new ResizeObserver(updateHeight);
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
     }
-
-    return () => resizeObserver.disconnect();
   }, []);
 
+  // Support both { latitude, longitude } and { lat, lng }
+  const selectedLat =
+    (selectedAddress as any)?.latitude ?? (selectedAddress as any)?.lat;
+  const selectedLng =
+    (selectedAddress as any)?.longitude ?? (selectedAddress as any)?.lng;
+
   const center = useMemo(() => {
-    // Priority 1: Selected address coordinates
-    if (selectedAddress?.latitude && selectedAddress?.longitude) {
+    // 1) Selected address coordinates
+    if (selectedLat && selectedLng) {
       return {
-        lat: selectedAddress.latitude,
-        lng: selectedAddress.longitude,
+        lat: selectedLat,
+        lng: selectedLng,
       };
     }
 
-    // Priority 2: Customer's live location
+    // 2) Customer's live location
     if (location) {
       return location;
     }
 
-    // Priority 3: Fallback to Miami
+    // 3) Fallback to Miami
     return { lat: 25.7617, lng: -80.1918 };
-  }, [selectedAddress, location]);
+  }, [selectedLat, selectedLng, location]);
 
-  // Determine if we should show a marker
-  // Show marker for selected address, or for customer location if no address is selected
-  const showAddressMarker = selectedAddress?.latitude && selectedAddress?.longitude;
-  const showCustomerMarker = !showAddressMarker && !isLoading && location;
+  const showAddressMarker = Boolean(selectedLat && selectedLng);
+  const showCustomerMarker = !showAddressMarker && !isLoading && Boolean(location);
 
   return (
-    <div ref={containerRef} className="h-full w-full" style={{ minHeight: '160px' }}>
+    <div 
+      ref={containerRef}
+      className={cn("w-full h-full", className)}
+      style={{ 
+        height: "100%",
+        display: "block", // NOT flex
+        overflow: "visible", // NOT hidden
+      }}
+    >
       <BenjaminMap
         center={center}
         customerPosition={showAddressMarker || showCustomerMarker ? center : undefined}
         zoom={14}
-        height={containerHeight}
+        height={mapHeight} // Use measured pixel height, not "100%"
       />
     </div>
   );
-}
+};
 
+export default CustomerMap;

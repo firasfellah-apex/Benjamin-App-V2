@@ -23,13 +23,13 @@ import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapViewport";
 import { CustomerOrderFlowFooter } from "@/components/customer/layout/CustomerOrderFlowFooter";
 import { useLocation } from "@/contexts/LocationContext";
-import { PricingSummarySkeleton } from "@/components/customer/CustomerSkeleton";
-import { MapPin } from "@/lib/icons";
+import { MapPin, Plus } from "@/lib/icons";
 import { track } from "@/lib/analytics";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
 import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 
 type Step = 1 | 2;
 
@@ -52,18 +52,10 @@ export default function CashRequest() {
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [isEditingAmount, setIsEditingAmount] = useState(false);
   const [draftAmountStr, setDraftAmountStr] = useState<string>("");
+  const [showAddAddressForm, setShowAddAddressForm] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
 
-  // Calculate map center: selected address > live location > fallback
-  const mapCenter = useMemo(() => {
-    if (selectedAddress?.latitude && selectedAddress?.longitude) {
-      return {
-        lat: selectedAddress.latitude,
-        lng: selectedAddress.longitude,
-      };
-    }
-    return liveLocation;
-  }, [selectedAddress, liveLocation]);
+  // Map center is now computed inside CustomerMapViewport using computeCustomerMapCenter
 
   // Handle reorder prefilling from URL params
   useEffect(() => {
@@ -87,16 +79,23 @@ export default function CashRequest() {
     }
   }, [searchParams, step]);
 
-  // Calculate pricing
-  const pricing = selectedAddress 
-    ? calculatePricing({
-        amount,
-        customerAddress: {
-          lat: selectedAddress.latitude || 0,
-          lng: selectedAddress.longitude || 0
-        }
-      })
-    : null;
+  // Calculate pricing (memoized so identity is stable)
+  const pricing = useMemo(() => {
+    if (!selectedAddress) return null;
+
+    return calculatePricing({
+      amount,
+      customerAddress: {
+        lat: selectedAddress.latitude || 0,
+        lng: selectedAddress.longitude || 0,
+      },
+    });
+  }, [
+    amount,
+    selectedAddress?.id,
+    selectedAddress?.latitude,
+    selectedAddress?.longitude,
+  ]);
 
   // Handle amount change from CashAmountInput component
   const handleAmountChange = useCallback((newAmount: number) => {
@@ -113,6 +112,14 @@ export default function CashRequest() {
 
   const shelf = useTopShelfTransition({ currentStep: step });
   const { hasAnyAddress } = useCustomerAddresses();
+  const prefersReduced = useReducedMotion();
+  const { setBottomSlot } = useCustomerBottomSlot();
+  
+  // Use ref to store latest shelf to avoid recreating handlers when shelf changes
+  const shelfRef = useRef(shelf);
+  useEffect(() => {
+    shelfRef.current = shelf;
+  }, [shelf]);
   
   // Clean logic using cached hasAnyAddress:
   // - If user has 0 addresses (from cache), button is always disabled
@@ -121,32 +128,32 @@ export default function CashRequest() {
   //   We still validate selectedAddress in handleNextStep to prevent edge cases
   const isContinueDisabled = !hasAnyAddress;
   
-  const handleNextStep = () => {
+  const handleNextStep = useCallback(() => {
     if (!selectedAddress) {
       toast.error(strings.customer.addressRequiredError);
       return;
     }
     // Prepare transition, then update step
-    shelf.prepare('amount', 420);
+    shelfRef.current.prepare('amount', 420);
     // Update step after reserve phase starts
     setTimeout(() => {
       setStep(2);
     }, 140);
-  };
+  }, [selectedAddress]);
   
-  const handleBackToAddress = () => {
-    shelf.prepare('address', 320);
+  const handleBackToAddress = useCallback(() => {
+    shelfRef.current.prepare('address', 320);
     // Update step after reserve phase starts
     setTimeout(() => {
       setStep(1);
     }, 140);
-  };
+  }, []);
   
-  const handleBackToHome = () => {
-    shelf.goTo('/customer/home', 'home', 280);
-  };
+  const handleBackToHome = useCallback(() => {
+    shelfRef.current.goTo('/customer/home', 'home', 280);
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!selectedAddress) {
       toast.error(strings.customer.addressRequiredError);
       return;
@@ -184,7 +191,7 @@ export default function CashRequest() {
       );
       if (order) {
         toast.success(strings.toasts.orderPlaced);
-        navigate(`/customer/orders/${order.id}`);
+        navigate(`/customer/deliveries/${order.id}`);
       }
     } catch (error: any) {
       console.error("Error creating order:", error);
@@ -193,38 +200,45 @@ export default function CashRequest() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAddress, pricing, profile, amount, navigate]);
 
   // Memoize the summary section (everything except breakdown) - stable reference
   // MUST be before any conditional returns to follow Rules of Hooks
   const summarySection = useMemo(() => {
-    const showSkeleton = shelf.phase !== "idle" && shelf.phase !== "swap" ? true : !pricing;
-    
-    if (!pricing && shelf.phase === "idle") {
-      return <PricingSummarySkeleton />;
-    }
+    // Simple transition for numbers - only opacity/Y, no layoutId
+    const numTransition = prefersReduced 
+      ? { duration: 0 } 
+      : { duration: 0.15, ease: "easeOut" };
 
     return (
-      <div className="w-full">
-        <div className="w-full flex justify-between items-center mb-3">
+      <div className="w-full space-y-4">
+        <div className="w-full flex justify-between items-center">
           <span className="text-base font-medium text-gray-900">You'll get</span>
-          {showSkeleton ? (
-            <span className="h-5 w-16 rounded bg-slate-100 animate-pulse" />
-          ) : (
-            <motion.span layout className="text-lg font-bold text-gray-900">
-              ${amount.toFixed(0)}
-            </motion.span>
-          )}
+          <motion.span 
+            key={amount} // Key on amount value, not step
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={numTransition}
+            className="text-lg font-bold text-gray-900"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            ${amount.toFixed(0)}
+          </motion.span>
         </div>
-        <div className="w-full flex justify-between items-center mb-3">
+        <div className="w-full flex justify-between items-center">
           <span className="text-base font-medium text-gray-900">You'll pay</span>
-          {showSkeleton ? (
-            <span className="h-5 w-20 rounded bg-slate-100 animate-pulse" />
-          ) : (
-            <motion.span layout className="text-lg font-bold text-gray-900">
-              ${pricing?.total.toFixed(2) || '0.00'}
-            </motion.span>
-          )}
+          <motion.span 
+            key={pricing?.total || 0} // Key on pricing value, not step
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={numTransition}
+            className="text-lg font-bold text-gray-900"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            ${pricing?.total.toFixed(2) || '0.00'}
+          </motion.span>
         </div>
         
         {/* View breakdown link/expander */}
@@ -237,7 +251,7 @@ export default function CashRequest() {
               is_expanded: newState,
             });
           }}
-          className="w-full flex items-center justify-between transition-opacity pt-2 border-t border-gray-200 py-2"
+          className="w-full flex items-center justify-between transition-opacity pt-4 border-t border-gray-200"
         >
           <span className="text-sm font-medium text-gray-600">View breakdown</span>
           {showFeeDetails ? (
@@ -279,17 +293,30 @@ export default function CashRequest() {
         )}
       </div>
     );
-  }, [pricing, amount, showFeeDetails, shelf.phase]);
+  }, [pricing, amount, showFeeDetails, prefersReduced]);
 
   // Memoize the entire topContent to prevent remounting
   // MUST be before any conditional returns to follow Rules of Hooks
-  const topContent = useMemo(() => (
-    <div className="space-y-6">
+  // Standardized spacing: space-y-4 (16px) for main content blocks
+  const topContent = useMemo(() => {
+    // Simple transition for main amount - only opacity/Y, no layoutId
+    const numTransition = prefersReduced 
+      ? { duration: 0 } 
+      : { duration: 0.15, ease: "easeOut" };
+    
+    return (
+    <div className="space-y-4" style={{ minHeight: "180px" }}>
       {/* Main Amount Display */}
       {/* Element fills container and sizes by content */}
-      <div className="w-full flex items-center justify-center">
+      {/* Reserve space with minHeight to prevent layout shift */}
+      <div className="w-full flex items-center justify-center" style={{ minHeight: '60px' }}>
         {!isEditingAmount ? (
-          <div 
+          <motion.div 
+            key={amount} // Key on amount value, not step
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={numTransition}
             onClick={() => {
               setIsEditingAmount(true);
               setDraftAmountStr(String(amount)); // seed with current value
@@ -300,11 +327,12 @@ export default function CashRequest() {
               fontSize: 48, 
               fontWeight: 700, 
               color: '#0F172A',
-              textAlign: 'center'
+              textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums'
             }}
           >
             ${amount.toLocaleString()}
-          </div>
+          </motion.div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <input
@@ -400,7 +428,44 @@ export default function CashRequest() {
         </div>
       </div>
     </div>
-  ), [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr]);
+  );
+  }, [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr, prefersReduced, pricing]);
+
+  // Memoize footer to prevent infinite re-renders
+  const footer = useMemo(() => {
+    if (step === 1) {
+      if (!isEditingAddress) {
+        return (
+          <CustomerOrderFlowFooter
+            mode="address"
+            onPrimary={handleNextStep}
+            onSecondary={handleBackToHome}
+            isLoading={false}
+            primaryDisabled={isContinueDisabled}
+          />
+        );
+      } else {
+        return null;
+      }
+    } else if (step === 2) {
+      return (
+        <CustomerOrderFlowFooter
+          mode="amount"
+          onPrimary={handleSubmit}
+          onSecondary={handleBackToAddress}
+          isLoading={loading}
+          primaryDisabled={loading || !selectedAddress || !pricing}
+        />
+      );
+    }
+    return null;
+  }, [step, isEditingAddress, handleNextStep, handleBackToHome, handleSubmit, handleBackToAddress, loading, selectedAddress, pricing, isContinueDisabled]);
+
+  // Set bottom slot - only depends on memoized footer and stable setBottomSlot
+  useEffect(() => {
+    setBottomSlot(footer);
+    return () => setBottomSlot(null);
+  }, [setBottomSlot, footer]);
 
   // Step 1: Address Selection
   if (step === 1) {
@@ -409,48 +474,32 @@ export default function CashRequest() {
         loading={false}
         title="Where should we deliver?"
         subtitle="Select a location. You can save more than one."
-        map={<CustomerMapViewport center={mapCenter} />}
-        footer={
-          !isEditingAddress ? (
-            <CustomerOrderFlowFooter
-              mode="address"
-              onPrimary={handleNextStep}
-              onSecondary={handleBackToHome}
-              isLoading={false}
-              primaryDisabled={isContinueDisabled}
-            />
-          ) : undefined
-        }
+        stepKey="address"
+        map={<CustomerMapViewport selectedAddress={selectedAddress} />}
       >
-        {/* Address selector content - no nested white card wrapper */}
-        <div className="space-y-4">
-          <AddressSelector
-            selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
-            onAddressSelect={handleAddressSelect}
-            onAddressChange={() => {}}
-            onEditingChange={setIsEditingAddress}
-            onAddressesCountChange={() => {}}
-            hideManageButton={true}
-          />
-          {/* Only show Manage Addresses button if user has addresses to manage */}
-          {hasAnyAddress && (
-            <button
-              onClick={() => navigate("/customer/addresses")}
-              className="
-                w-full mt-4
-                rounded-full border border-slate-200 bg-white
-                py-4 px-6
-                text-base font-semibold text-slate-900
-                flex items-center justify-center gap-2
-                shadow-sm
-                active:scale-[0.98] active:bg-slate-50 transition-transform duration-150
-              "
-            >
-              <MapPin className="w-5 h-5" />
-              Manage Addresses
-            </button>
-          )}
-        </div>
+        {/* Address selector content */}
+        <AddressSelector
+          selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
+          onAddressSelect={handleAddressSelect}
+          onAddressChange={() => {}}
+          onEditingChange={setIsEditingAddress}
+          onAddressesCountChange={() => {}}
+          hideManageButton={true}
+          triggerAddAddress={showAddAddressForm}
+          onAddAddressTriggered={() => setShowAddAddressForm(false)}
+        />
+        {/* Add Address button - only show when user has 1+ addresses */}
+        {hasAnyAddress && (
+          <button
+            onClick={() => {
+              setShowAddAddressForm(true);
+            }}
+            className="w-full rounded-full border border-slate-200 bg-white py-4 px-6 text-base font-semibold text-slate-900 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
+          >
+            <Plus className="w-5 h-5" />
+            Add Address
+          </button>
+        )}
       </CustomerScreen>
     );
   }
@@ -464,19 +513,10 @@ export default function CashRequest() {
       loading={isLoading}
       title="How much cash do you need?"
       subtitle="Choose an amount to have delivered."
-      map={<CustomerMapViewport center={mapCenter} />}
-      footer={
-        <CustomerOrderFlowFooter
-          mode="amount"
-          onPrimary={handleSubmit}
-          onSecondary={handleBackToAddress}
-          isLoading={loading}
-          primaryDisabled={loading || !selectedAddress || !pricing}
-        />
-      }
+      stepKey="amount"
+      map={<CustomerMapViewport selectedAddress={selectedAddress} />}
     >
-      {/* Top content (amount input, summary, etc.) - no nested white card wrapper */}
-      {/* Elements fill container and size by content */}
+      {/* Amount input, summary, etc. */}
       {topContent}
     </CustomerScreen>
   );

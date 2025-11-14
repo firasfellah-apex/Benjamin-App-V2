@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getOrderById } from "@/db/api";
+import { isTerminalStatus } from "@/lib/orderStatus";
 import type { OrderWithDetails, Order } from "@/types/types";
-import { CompletedOrderDetail } from "@/components/customer/CompletedOrderDetail";
+import CustomerDeliveryDetail from "./CustomerDeliveryDetail";
 import OrderTracking from "./OrderTracking";
 import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
 
@@ -16,7 +17,8 @@ import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
  * Handles realtime updates and switches to completed view when order becomes completed.
  */
 export default function CustomerOrderDetailPage() {
-  const { orderId } = useParams<{ orderId: string }>();
+  // Route uses :deliveryId but it's actually an order ID
+  const { deliveryId: orderId } = useParams<{ deliveryId: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,15 +54,15 @@ export default function CustomerOrderDetailPage() {
       } as OrderWithDetails;
     });
     
-    // If order becomes completed, fetch full details to get relations
-    if (updatedOrder.status === "Completed") {
-      getOrderById(orderId).then((data) => {
-        if (data) {
-          setOrder(data);
-        }
-      }).catch((error) => {
-        console.error("Error fetching completed order details:", error);
-      });
+    // If order becomes terminal (Completed or Cancelled), fetch full details to get relations
+    if (isTerminalStatus(updatedOrder.status)) {
+      getOrderById(orderId)
+        .then((data) => {
+          if (data) setOrder(data);
+        })
+        .catch((error) => {
+          console.error("Error fetching terminal order details:", error);
+        });
     }
   }, [orderId]);
 
@@ -95,12 +97,17 @@ export default function CustomerOrderDetailPage() {
     );
   }
 
-  // If completed, show completed detail view
-  if (order.status === "Completed") {
-    return <CompletedOrderDetail order={order} />;
+  // Determine if order is terminal (Completed or Cancelled)
+  const terminal = isTerminalStatus(order.status);
+
+  if (terminal) {
+    // Terminal order → history detail view (top shelf)
+    // CustomerDeliveryDetail expects deliveryId param and will find it from useCustomerDeliveries
+    // Since we filtered deliveries to only terminal orders, it will find this one
+    return <CustomerDeliveryDetail />;
   }
 
-  // Otherwise, show live tracking
-  return <OrderTracking />;
+  // Active order → live tracking flow (bottom sheet, OTP, real-time updates)
+  return <OrderTracking orderId={order.id} />;
 }
 

@@ -1,4 +1,6 @@
-import React, { useState, useRef, forwardRef, useImperativeHandle } from "react";
+/// <reference path="../../global.d.ts" />
+
+import React, { useState, useRef, forwardRef, useImperativeHandle, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,10 +12,12 @@ import { cn } from "@/lib/utils";
 import { IconPicker, ALL_ICONS } from "./IconPicker";
 import { addAddressCopy } from "@/lib/copy/addAddress";
 import { Plus, Minus } from "lucide-react";
-import { AddressAutocomplete } from "./AddressAutocomplete";
-import { BenjaminMap } from "@/components/map/BenjaminMap";
+import { AddressAutocomplete, type NormalizedAddress } from "./AddressAutocomplete";
+import { BenjaminMap } from "@/components/maps/BenjaminMap";
 import { useLocation } from "@/contexts/LocationContext";
 import { useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { hasGoogleMaps } from "@/lib/env";
+import { useGoogleMaps } from "@/components/maps/GoogleMapsProvider";
 
 export interface AddressFormRef {
   submit: () => void;
@@ -67,6 +71,104 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
     });
 
     const { location: liveLocation } = useLocation();
+    const { isReady, googleMaps } = useGoogleMaps();
+    const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+    const geocodeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Initialize geocoder when Maps is ready
+    useEffect(() => {
+      if (isReady && googleMaps?.maps && !geocoderRef.current) {
+        geocoderRef.current = new googleMaps.maps.Geocoder();
+      }
+    }, [isReady, googleMaps]);
+
+    // Geocode address when line1, city, state, or postal_code changes
+    const geocodeAddress = useCallback(async () => {
+      // Only geocode if we have enough address info and Maps is available
+      if (!isReady || !googleMaps || !geocoderRef.current) return;
+      
+      const hasLine1 = formData.line1.trim().length > 0;
+      const hasCity = formData.city.trim().length > 0;
+      const hasState = formData.state.trim().length > 0;
+      const hasPostal = formData.postal_code.trim().length > 0;
+      
+      // Need at least line1 to attempt geocoding
+      // More fields = better accuracy, but we'll try with just line1 if it looks complete
+      if (!hasLine1) {
+        return;
+      }
+
+      // Build address string for geocoding
+      const addressParts = [
+        formData.line1.trim(),
+        formData.city.trim(),
+        formData.state.trim(),
+        formData.postal_code.trim(),
+      ].filter(Boolean);
+      
+      const addressString = addressParts.join(", ");
+
+      try {
+        const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+          geocoderRef.current?.geocode(
+            { address: addressString },
+            (results, status) => {
+              if (status === "OK" && results) {
+                resolve(results);
+              } else {
+                // Don't reject - just silently fail if geocoding doesn't work
+                resolve([]);
+              }
+            }
+          );
+        });
+
+        if (results && results.length > 0) {
+          const location = results[0].geometry.location;
+          const latitude = location.lat();
+          const longitude = location.lng();
+          
+          // Update coordinates - this will trigger map preview to update
+          setFormData(prev => ({
+            ...prev,
+            latitude,
+            longitude,
+          }));
+        }
+      } catch (error) {
+        // Silently fail - don't show error to user, just don't update map
+        console.debug("Geocoding failed:", error);
+      }
+    }, [isReady, googleMaps, formData.line1, formData.city, formData.state, formData.postal_code]);
+
+    // Debounced geocoding - wait 500ms after user stops typing
+    useEffect(() => {
+      // Clear existing timeout
+      if (geocodeTimeoutRef.current) {
+        clearTimeout(geocodeTimeoutRef.current);
+      }
+
+      // Geocode when user types in address line (line1) or other address fields
+      // We'll attempt geocoding with just line1, or with line1 + other fields for better accuracy
+      const hasLine1 = formData.line1.trim().length > 0;
+      const hasOtherFields = formData.city.trim().length > 0 || 
+                            formData.state.trim().length > 0 || 
+                            formData.postal_code.trim().length > 0;
+      
+      // Geocode if we have line1 (with or without other fields)
+      // This ensures map preview updates as user types
+      if (hasLine1) {
+        geocodeTimeoutRef.current = setTimeout(() => {
+          geocodeAddress();
+        }, 500);
+      }
+
+      return () => {
+        if (geocodeTimeoutRef.current) {
+          clearTimeout(geocodeTimeoutRef.current);
+        }
+      };
+    }, [formData.line1, formData.city, formData.state, formData.postal_code, geocodeAddress]);
 
     const updateLoading = (newLoading: boolean) => {
       setLoading(newLoading);
@@ -261,16 +363,38 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="line1">{addAddressCopy.streetAddress}</Label>
         <AddressAutocomplete
           id="line1"
           name="line1"
+          label={addAddressCopy.streetAddress}
           value={formData.line1}
           onChange={(value) => {
             setFormData({ ...formData, line1: value });
             if (errors.line1) setErrors({ ...errors, line1: undefined });
           }}
+          onAddressSelected={(normalized: NormalizedAddress) => {
+            // When place is selected from autocomplete, set all fields and coordinates
+            setFormData({
+              ...formData,
+              line1: normalized.streetLine1,
+              line2: normalized.streetLine2 || formData.line2,
+              city: normalized.city || formData.city,
+              state: normalized.state || formData.state,
+              postal_code: normalized.postalCode || formData.postal_code,
+              latitude: normalized.location?.lat || formData.latitude,
+              longitude: normalized.location?.lng || formData.longitude,
+            });
+            // Clear errors for auto-filled fields
+            setErrors({
+              ...errors,
+              line1: undefined,
+              city: undefined,
+              state: undefined,
+              postal_code: undefined,
+            });
+          }}
           onPlaceSelect={(place) => {
+            // Legacy callback for backwards compatibility
             setFormData({
               ...formData,
               line1: place.line1,
@@ -280,7 +404,6 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               latitude: place.latitude,
               longitude: place.longitude,
             });
-            // Clear errors for auto-filled fields
             setErrors({
               ...errors,
               line1: undefined,
@@ -299,27 +422,6 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           </p>
         )}
       </div>
-
-      {/* Map Preview */}
-      {(formData.latitude && formData.longitude) || liveLocation ? (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-gray-900">
-            Address Preview
-          </Label>
-          <div className="rounded-lg overflow-hidden border border-gray-200">
-            <BenjaminMap
-              center={
-                formData.latitude && formData.longitude
-                  ? { lat: formData.latitude, lng: formData.longitude }
-                  : liveLocation || { lat: 25.7617, lng: -80.1918 }
-              }
-              customerPosition={liveLocation || undefined}
-              zoom={15}
-              height="200px"
-            />
-          </div>
-        </div>
-      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="line2">{addAddressCopy.apt}</Label>
@@ -405,6 +507,32 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           </p>
         )}
       </div>
+
+      {/* Map Preview - moved below zip code */}
+      {/* Show map preview if we have coordinates OR if user has entered address info (will geocode) */}
+      {(formData.latitude && formData.longitude) || liveLocation || formData.line1.trim().length > 0 ? (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-900">
+            Address Preview
+          </Label>
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <BenjaminMap
+              center={
+                formData.latitude && formData.longitude
+                  ? { lat: formData.latitude, lng: formData.longitude }
+                  : liveLocation || { lat: 25.7617, lng: -80.1918 }
+              }
+              customerPosition={
+                formData.latitude && formData.longitude
+                  ? { lat: formData.latitude, lng: formData.longitude }
+                  : liveLocation || undefined
+              }
+              zoom={15}
+              height="200px"
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <div className="space-y-1">

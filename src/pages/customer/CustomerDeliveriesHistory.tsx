@@ -41,7 +41,7 @@ function formatDeliveryDateTime(delivery: CustomerDelivery): { date: string; tim
  */
 function DeliveryCardSkeleton() {
   return (
-    <div className="rounded-3xl bg-white shadow-sm border border-slate-100 px-4 py-3 mb-3">
+    <div className="rounded-3xl bg-white shadow-sm border border-slate-100 px-6 py-4 mb-3">
       <div className="flex items-start gap-3">
         <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
         <div className="flex-1 min-w-0">
@@ -79,7 +79,7 @@ function DeliveryCard({ delivery, onClick }: { delivery: CustomerDelivery; onCli
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.2 }}
       onClick={onClick}
-      className="rounded-3xl bg-white shadow-sm border border-slate-100 px-4 py-3 mb-3 cursor-pointer active:scale-[0.99] transition-transform"
+      className="rounded-3xl bg-white shadow-sm border border-slate-100 px-6 py-4 mb-3 cursor-pointer active:scale-[0.99] transition-transform"
     >
       <div className="flex items-start gap-3">
         {/* Avatar */}
@@ -166,7 +166,6 @@ export default function CustomerDeliveriesHistory() {
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </button>
       }
-      map={<div className="flex flex-col h-full bg-[#F5F7FA]" />}
     >
       <motion.div layout className="space-y-0">
         {isLoading && deliveries.length === 0 ? (
@@ -177,8 +176,8 @@ export default function CustomerDeliveriesHistory() {
             ))}
           </div>
         ) : deliveries.length === 0 ? (
-          // Empty state - Container owns padding, content owns layout
-          <div className="w-full px-5 pt-5 pb-5">
+          // Empty state - Standardized spacing: px-6 (24px) horizontal
+          <div className="w-full px-6 py-6">
             <div className="w-full flex flex-col items-center justify-center">
               <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center mb-4">
                 <Package className="w-8 h-8 text-slate-600" />

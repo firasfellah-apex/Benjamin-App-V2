@@ -154,8 +154,8 @@ export function CustomerTopBar() {
 
                   {isCustomer && (
                     <button
-                      onClick={() => handleMenuItemClick("/customer/orders")}
-                      className={getMenuItemClasses("/customer/orders", false)}
+                      onClick={() => handleMenuItemClick("/customer/deliveries")}
+                      className={getMenuItemClasses("/customer/deliveries", false)}
                     >
                       <Package className="h-5 w-5" />
                       <span>My Deliveries</span>

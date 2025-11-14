@@ -20,7 +20,7 @@
  */
 
 import React from 'react';
-import { BenjaminMap, type MapPosition } from './BenjaminMap';
+import { BenjaminMap, type LatLngLiteral } from './BenjaminMap';
 import { MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';

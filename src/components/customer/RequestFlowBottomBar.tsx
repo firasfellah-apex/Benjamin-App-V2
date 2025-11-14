@@ -52,15 +52,15 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
     <nav
       data-request-flow-bottom-bar
       className={cn(
-        useFixedPosition ? "fixed bottom-0 inset-x-0 z-40" : "w-full",
+        useFixedPosition ? "fixed bottom-0 left-0 right-0 z-40" : "w-full",
+        "w-screen max-w-none",
         "bg-white rounded-t-3xl",
         "shadow-[0_-8px_24px_rgba(15,23,42,0.08)]"
       )}
     >
-      {/* Container sets padding: horizontal AND vertical (equal) */}
+      {/* Standardized spacing: px-6 py-6 (24px all around) */}
       {/* Bottom padding includes safe area inset for devices with home indicator */}
-      {/* Full width - fills phone sideways, responsive */}
-      <div className="w-full px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
+      <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
         {/* Stepper (only on steps 1 & 2) */}
       <AnimatePresence>
         {showStepper && (
@@ -112,7 +112,6 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
               type="button"
               onClick={onPrimary}
               disabled={isLoading || primaryDisabled}
-              whileTap={(!isLoading && !primaryDisabled) ? { scale: 0.97 } : {}}
               className={cn(
                 "w-full rounded-full py-4 px-6",
                 "text-base font-semibold",
@@ -170,7 +169,6 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                   type="button"
                   onClick={onSecondary}
                   disabled={isLoading}
-                  whileTap={{ scale: 0.97 }}
                   className={cn(
                     "flex-1 rounded-full py-4 px-6",
                     "border border-gray-300",
@@ -217,7 +215,6 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                 type="button"
                 onClick={onPrimary}
                 disabled={isLoading || primaryDisabled}
-                whileTap={(!isLoading && !primaryDisabled) ? { scale: 0.97 } : {}}
                 className={cn(
                   "flex-[2] rounded-full py-4 px-6",
                   "text-base font-semibold",

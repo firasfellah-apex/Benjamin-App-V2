@@ -76,7 +76,7 @@ export default function Account() {
     } else if (profile?.role.includes('runner')) {
       navigate('/runner/orders');
     } else {
-      navigate('/customer/orders');
+      navigate('/customer/deliveries');
     }
   };
 

@@ -20,7 +20,7 @@ const App = () => {
   return (
     <>
       <Toaster position="top-center" richColors />
-      <RequireAuth whitelist={["/login", "/404", "/debug", "/onboarding/profile"]}>
+      <RequireAuth whitelist={["/login", "/404", "/debug", "/debug/map", "/onboarding/profile"]}>
         <Routes>
           <Route path="/debug" element={<DebugPage />} />
           <Route path="/" element={<RoleBasedRedirect />} />

@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { BenjaminMap } from "@/components/map/BenjaminMap";
+import { BenjaminMap } from "@/components/maps/BenjaminMap";
 
 export interface RequestFlowMapLayerProps {
   lat?: number;

@@ -16,7 +16,7 @@
  * - All navigation and routing unchanged
  */
 import React, { useState, useEffect, useRef } from "react";
-import { X, MapPin } from "lucide-react";
+import { X, MapPin, Plus } from "lucide-react";
 import type { CustomerAddress } from "@/types/types";
 import { AddressForm, type AddressFormRef } from "./AddressForm";
 import { cn } from "@/lib/utils";
@@ -71,25 +71,27 @@ function AddressFormModal({
   }, []);
 
   return (
-    <div 
-      className={cn(
-        "fixed inset-0 z-50 flex items-end justify-center transition-opacity duration-300",
-        isMounted && !isClosing ? "opacity-100" : "opacity-0"
-      )}
-    >
-      {/* Backdrop */}
+    <>
+      {/* Backdrop - must be above header (z-40) but below modal content */}
+      {/* Placed outside modal container to ensure proper stacking context */}
       <div 
         className={cn(
-          "fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
+          "fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 z-[50]",
           isMounted && !isClosing ? "opacity-100" : "opacity-0"
         )}
         onClick={handleClose}
       />
+      <div 
+        className={cn(
+          "fixed inset-0 z-[60] flex items-end justify-center transition-opacity duration-300 pointer-events-none",
+          isMounted && !isClosing ? "opacity-100" : "opacity-0"
+        )}
+      >
       
       {/* Modal Content - Bottom sheet style */}
       <div 
         className={cn(
-          "relative w-full max-w-2xl h-[90vh] bg-white rounded-t-3xl shadow-2xl flex flex-col transition-transform duration-300 ease-in-out",
+          "relative w-full max-w-2xl h-[90vh] bg-white rounded-t-3xl shadow-2xl flex flex-col transition-transform duration-300 ease-in-out pointer-events-auto",
           isMounted && !isClosing ? "translate-y-0" : "translate-y-full"
         )}
       >
@@ -172,7 +174,8 @@ function AddressFormModal({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -183,6 +186,8 @@ interface AddressSelectorProps {
   onEditingChange?: (isEditing: boolean) => void;
   onAddressesCountChange?: (count: number) => void;
   hideManageButton?: boolean;
+  triggerAddAddress?: boolean; // External trigger to open add address form
+  onAddAddressTriggered?: () => void; // Callback when form is opened
 }
 
 export function AddressSelector({ 
@@ -192,6 +197,8 @@ export function AddressSelector({
   onEditingChange,
   onAddressesCountChange,
   hideManageButton = false,
+  triggerAddAddress = false,
+  onAddAddressTriggered,
 }: AddressSelectorProps) {
   const navigate = useNavigate();
   const { addresses, isLoading: loading } = useCustomerAddresses();
@@ -272,6 +279,15 @@ export function AddressSelector({
       document.body.style.overflow = 'unset';
     };
   }, [showForm, onEditingChange]);
+
+  // Handle external trigger to open add address form
+  useEffect(() => {
+    if (triggerAddAddress && !showForm) {
+      setEditingAddress(null);
+      setShowForm(true);
+      onAddAddressTriggered?.();
+    }
+  }, [triggerAddAddress, showForm, onAddAddressTriggered]);
 
   const handleAddressCreated = async (newAddress: CustomerAddress) => {
     // Invalidate query cache - React Query will refetch automatically
@@ -377,8 +393,22 @@ export function AddressSelector({
 
   return (
     <>
-      {/* (A) Address Carousel - Break out to edge-to-edge within topContent */}
-      <div className="flex-shrink-0 -mx-8 w-[calc(100%+4rem)]">
+      {/* (A) Address Carousel - Break out to edge-to-edge only when there are addresses */}
+      {addresses.length > 0 ? (
+        <div className="flex-shrink-0 -mx-8 w-[calc(100%+4rem)]">
+          <AddressCarousel
+            addresses={addresses}
+            selectedAddressId={selectedAddressId}
+            onSelectAddress={onAddressSelect}
+            onAddAddress={() => {
+              setEditingAddress(null);
+              setShowForm(true);
+            }}
+            onEditAddress={handleEdit}
+            onManageAddresses={() => navigate("/customer/addresses")}
+          />
+        </div>
+      ) : (
         <AddressCarousel
           addresses={addresses}
           selectedAddressId={selectedAddressId}
@@ -388,29 +418,30 @@ export function AddressSelector({
             setShowForm(true);
           }}
           onEditAddress={handleEdit}
+          onManageAddresses={() => navigate("/customer/addresses")}
         />
-      </div>
+      )}
 
-      {/* (B) Manage Addresses Button - Standard pill button */}
-      {/* Hide if user has 0 addresses (nothing to manage) */}
-      {!hideManageButton && addresses.length > 0 && (
+      {/* (B) Add Address Button - Standard pill button */}
+      {/* Always show (user can always add addresses) */}
+      {!hideManageButton && (
         <div className="flex-shrink-0 mt-4 w-full">
           <button
             type="button"
-            onClick={() => navigate("/customer/addresses")}
-            disabled={addresses.length === 0}
+            onClick={() => {
+              setEditingAddress(null);
+              setShowForm(true);
+            }}
             className={cn(
               "w-full rounded-[999px] bg-white border border-[#E5E7EB] px-6 py-4",
               "flex items-center justify-center gap-2",
               "text-base font-semibold text-[#020817]",
               "shadow-sm",
-              addresses.length === 0
-                ? "opacity-40 cursor-not-allowed"
-                : "active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
+              "active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
             )}
           >
-            <MapPin className="w-5 h-5" strokeWidth={2.2} />
-            <span>Manage Addresses</span>
+            <Plus className="w-5 h-5" strokeWidth={2.2} />
+            <span>Add Address</span>
           </button>
         </div>
       )}

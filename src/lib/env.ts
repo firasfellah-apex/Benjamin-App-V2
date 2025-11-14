@@ -17,6 +17,7 @@ type EnvBundle = {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   GOOGLE_MAPS_API_KEY: string;
+  MAPBOX_ACCESS_TOKEN: string;
 };
 
 function pickApp(): 'customer' | 'runner' | 'admin' {
@@ -39,11 +40,15 @@ function readRaw(name: string, fallback = ''): string {
 export function getEnv(): EnvBundle {
   const app = pickApp();
   
+  // Mapbox token is shared across all apps (not app-specific)
+  const mapboxToken = readRaw('VITE_MAPBOX_ACCESS_TOKEN');
+  
   if (app === 'runner') {
     return {
       SUPABASE_URL: readRaw('VITE_RUNNER_SUPABASE_URL'),
       SUPABASE_ANON_KEY: readRaw('VITE_RUNNER_SUPABASE_ANON_KEY'),
       GOOGLE_MAPS_API_KEY: readRaw('VITE_RUNNER_GOOGLE_MAPS_API_KEY'),
+      MAPBOX_ACCESS_TOKEN: mapboxToken,
     };
   }
   
@@ -52,6 +57,7 @@ export function getEnv(): EnvBundle {
       SUPABASE_URL: readRaw('VITE_ADMIN_SUPABASE_URL'),
       SUPABASE_ANON_KEY: readRaw('VITE_ADMIN_SUPABASE_ANON_KEY'),
       GOOGLE_MAPS_API_KEY: readRaw('VITE_ADMIN_GOOGLE_MAPS_API_KEY'),
+      MAPBOX_ACCESS_TOKEN: mapboxToken,
     };
   }
   
@@ -60,6 +66,7 @@ export function getEnv(): EnvBundle {
     SUPABASE_URL: readRaw('VITE_CUSTOMER_SUPABASE_URL'),
     SUPABASE_ANON_KEY: readRaw('VITE_CUSTOMER_SUPABASE_ANON_KEY'),
     GOOGLE_MAPS_API_KEY: readRaw('VITE_CUSTOMER_GOOGLE_MAPS_API_KEY'),
+    MAPBOX_ACCESS_TOKEN: mapboxToken,
   };
 }
 

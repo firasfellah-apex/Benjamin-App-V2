@@ -13,8 +13,14 @@ import { cn } from "@/lib/utils";
 import { ActiveDeliverySheet } from "@/components/customer/ActiveDeliverySheet";
 import { canShowLiveLocation } from "@/lib/reveal";
 
-export default function OrderTracking() {
-  const { orderId } = useParams<{ orderId: string }>();
+interface OrderTrackingProps {
+  orderId?: string; // Optional prop, falls back to params
+}
+
+export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingProps = {}) {
+  const params = useParams<{ orderId?: string; deliveryId?: string }>();
+  // Use prop if provided, otherwise try orderId param, then deliveryId param
+  const orderId = orderIdProp || params.orderId || params.deliveryId;
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,7 +196,8 @@ export default function OrderTracking() {
   return (
     <div className="relative h-screen w-full overflow-hidden bg-[#F5F5F7]">
       {/* Back Button - Fixed Top Left */}
-      <div className="absolute top-4 left-4 z-30">
+      {/* Standardized spacing: px-6 (24px) for consistent alignment */}
+      <div className="absolute top-6 left-6 z-30">
         <Button
           variant="outline"
           size="sm"

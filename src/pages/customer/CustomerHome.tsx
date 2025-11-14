@@ -19,6 +19,7 @@ import { getCustomerOrders } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
 import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
 import { Skeleton } from '@/components/common/Skeleton';
+import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
 import type { OrderWithDetails, Order } from '@/types/types';
 
 export default function CustomerHome() {
@@ -88,28 +89,34 @@ export default function CustomerHome() {
   const { hasActiveOrder, lastCompletedOrder } = useMemo(() => {
     const activeStatuses = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
     const activeOrders = orders.filter(order => activeStatuses.includes(order.status));
-    // Only get completed orders (exclude cancelled)
-    const completedOrders = orders.filter(order => 
-      order.status === 'Completed'
+    // Get completed or cancelled orders (most recent order regardless of status)
+    const completedOrCancelledOrders = orders.filter(order => 
+      order.status === 'Completed' || order.status === 'Cancelled'
     );
     
-    // Sort completed orders by completion date (most recent first)
-    const sortedCompleted = completedOrders.sort((a, b) => {
-      const dateA = a.handoff_completed_at ? new Date(a.handoff_completed_at).getTime() : new Date(a.updated_at).getTime();
-      const dateB = b.handoff_completed_at ? new Date(b.handoff_completed_at).getTime() : new Date(b.updated_at).getTime();
+    // Sort by date (most recent first)
+    // For completed: use handoff_completed_at or updated_at
+    // For cancelled: use updated_at (when it was cancelled)
+    const sortedOrders = completedOrCancelledOrders.sort((a, b) => {
+      const dateA = a.status === 'Completed' && a.handoff_completed_at
+        ? new Date(a.handoff_completed_at).getTime()
+        : new Date(a.updated_at).getTime();
+      const dateB = b.status === 'Completed' && b.handoff_completed_at
+        ? new Date(b.handoff_completed_at).getTime()
+        : new Date(b.updated_at).getTime();
       return dateB - dateA;
     });
     
     return {
       hasActiveOrder: activeOrders.length > 0,
-      lastCompletedOrder: sortedCompleted.length > 0 ? sortedCompleted[0] : null,
+      lastCompletedOrder: sortedOrders.length > 0 ? sortedOrders[0] : null,
     };
   }, [orders]);
   
   // Handle rate runner action
   const handleRateRunner = useCallback((orderId: string) => {
     // Navigate to order detail page where rating can be done
-    navigate(`/customer/orders/${orderId}`);
+    navigate(`/customer/deliveries/${orderId}`);
   }, [navigate]);
   
   // Handle view all action
@@ -206,8 +213,9 @@ export default function CustomerHome() {
       );
     }
     
-    // Show actual card if we have a completed order and no active order
-    if (!hasActiveOrder && lastCompletedOrder) {
+    // Show actual card if we have a last delivery (completed or cancelled)
+    // Show it even if there's an active order
+    if (lastCompletedOrder) {
       return (
         <LastDeliveryCard
           order={lastCompletedOrder}
@@ -217,39 +225,47 @@ export default function CustomerHome() {
       );
     }
     
-    // Otherwise, no top content (orders.length === 0 or other cases)
+    // Otherwise, no top content (no completed/cancelled orders)
     return undefined;
-  }, [orders.length, ordersLoading, authLoading, isReady, hasActiveOrder, lastCompletedOrder, handleRateRunner, handleViewAll]);
+  }, [orders.length, ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, handleViewAll]);
 
   // If no user, redirect to landing
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
-  // Combined loading state
-  const loading = authLoading || (user && !isReady) || ordersLoading;
+  // Loading state for greeting/title area - only depends on auth/profile, not orders
+  // Orders loading is handled separately in topContent useMemo
+  const loading = authLoading || (user && !isReady);
   const shelf = useTopShelfTransition();
+  const { setBottomSlot } = useCustomerBottomSlot();
+
+  // Set bottom slot for MobilePageShell
+  // Only depend on setBottomSlot (which is stable from context)
+  // Create the handler inline to avoid shelf dependency
+  useEffect(() => {
+    setBottomSlot(
+      <RequestFlowBottomBar
+        mode="home"
+        onPrimary={() => {
+          shelf.goTo('/customer/request', 'address', 320);
+        }}
+        useFixedPosition={false}
+      />
+    );
+    return () => setBottomSlot(null);
+  }, [setBottomSlot]); // Only setBottomSlot - shelf is stable from hook
 
   return (
     <CustomerScreen
       loading={loading}
       title={!isReady ? undefined : `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`}
       subtitle="Skip the ATM. Request cash in seconds."
-      map={<CustomerMapViewport center={location} />}
-      footer={
-        <RequestFlowBottomBar
-          mode="home"
-          onPrimary={() => shelf.goTo('/customer/request', 'address', 320)}
-          useFixedPosition={true}
-        />
-      }
+      stepKey="home"
+      topContent={topContent}
+      map={<CustomerMapViewport />}
     >
-      {/* Optional top content - no nested white card wrapper */}
-      {topContent && (
-        <div className="space-y-4">
-          {topContent}
-        </div>
-      )}
+      {/* Main content area - map is handled by map prop, content goes here if needed */}
     </CustomerScreen>
   );
 }

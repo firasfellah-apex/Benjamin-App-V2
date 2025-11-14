@@ -6,11 +6,11 @@
  */
 
 import React from "react";
-import { Home, Plus, Trash2, PenLine } from "@/lib/icons";
+import { Home, Plus, Trash2, PenLine, MapPin } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 interface AddressCardProps {
-  mode: "carousel" | "manage" | "add";
+  mode: "carousel" | "manage" | "add" | "manage-carousel"; // "manage-carousel" for the carousel manage card
   label?: string;
   addressLine?: string;
   isDefault?: boolean;
@@ -34,13 +34,18 @@ export function AddressCard({
   onEdit,
   onDelete,
 }: AddressCardProps) {
-  const baseClasses = "w-full rounded-2xl px-4 sm:px-5 py-4 sm:py-5 flex flex-col gap-2";
-  const clickableClasses = onClick && mode === "carousel" ? "cursor-pointer active:scale-[0.98] transition-transform duration-150" : "";
+  // Standardized spacing: px-6 (24px) horizontal, py-6 (24px) vertical
+  const baseClasses = "w-full rounded-2xl px-6 py-6 flex flex-col gap-2";
+  const clickableClasses = onClick && (mode === "carousel" || mode === "manage-carousel") ? "cursor-pointer active:scale-[0.98] transition-transform duration-150" : "";
 
   // Determine variant styles - use tile styling, not panel styling
   const getVariantClasses = () => {
     if (mode === "add") {
       return "bg-slate-50/40 border border-dashed border-slate-200/70";
+    }
+    
+    if (mode === "manage-carousel") {
+      return "bg-slate-50/40 border border-slate-200/70";
     }
     
     if (mode === "carousel") {
@@ -89,6 +94,29 @@ export function AddressCard({
           </div>
           <p className="text-sm text-slate-500">
             {addressLine || "Save another place you'd like cash delivered."}
+          </p>
+        </button>
+      </div>
+    );
+  }
+
+  // Manage addresses carousel variant (replaces the old "add" card in carousel)
+  if (mode === "manage-carousel") {
+    return (
+      <div className={cn(baseClasses, getVariantClasses(), clickableClasses)}>
+        <button
+          type="button"
+          onClick={onClick}
+          className="w-full text-left flex flex-col gap-2"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-[#F4F7FB] text-slate-800 flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <span className="text-[17px] font-semibold text-slate-900">Manage Addresses</span>
+          </div>
+          <p className="text-sm text-slate-500">
+            {addressLine || "View, edit, or remove saved locations."}
           </p>
         </button>
       </div>

@@ -1,87 +1,156 @@
-/**
- * GoogleMapsProvider Component
- * 
- * Singleton provider for Google Maps API using useJsApiLoader.
- * Ensures there is only one script loader to prevent race conditions.
- * All map components should use useGoogleMapsReady() hook to check if Maps is ready.
- * Uses runtime environment selector to get the correct API key per app.
- * 
- * Prevents "LoadScript has been reloaded unintentionally" warning by:
- * - Using stable constants for libraries and script ID
- * - Ensuring libraries array is not recreated on each render
- * - Maintaining a single global script loader
- */
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { getEnv } from "@/lib/env";
 
-import React, { createContext, useContext, useMemo } from 'react';
-import { useJsApiLoader } from '@react-google-maps/api';
-import { getEnv } from '@/lib/env';
+declare global {
+  interface Window {
+    __benjaminGoogleMapsPromise?: Promise<typeof google>;
+  }
+}
 
-// Stable constants outside component to prevent reload warnings
-const GMAPS_LIBS = ['places'] as const;
-const SCRIPT_ID = 'benjamin-gmaps-script';
-
-type GoogleMapsContextValue = { 
+interface GoogleMapsContextValue {
+  googleMaps: typeof google | null;
   isReady: boolean;
-};
+  isError: boolean;
+}
 
-const GoogleMapsContext = createContext<GoogleMapsContextValue>({ 
-  isReady: false 
-});
+const GoogleMapsContext = createContext<GoogleMapsContextValue | undefined>(
+  undefined
+);
 
-export function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
-  // Get API key from runtime env selector (customer/runner/admin)
-  const E = getEnv();
-  const apiKey = E.GOOGLE_MAPS_API_KEY;
+const SCRIPT_ID = "benjamin-google-maps-script";
 
-  // Memoize loader config to prevent unnecessary reloads
-  const loaderConfig = useMemo(() => ({
-    id: SCRIPT_ID,
-    googleMapsApiKey: apiKey || '',
-    libraries: GMAPS_LIBS as unknown as string[],
-  }), [apiKey]);
+async function loadGoogleMaps(apiKey: string): Promise<typeof google> {
+  if (typeof window === "undefined") {
+    throw new Error("loadGoogleMaps only in browser");
+  }
 
-  const { isLoaded } = useJsApiLoader(loaderConfig);
+  if (window.google?.maps) {
+    return window.google as typeof google;
+  }
 
-  const value = useMemo(() => ({ isReady: !!isLoaded }), [isLoaded]);
+  if (window.__benjaminGoogleMapsPromise) {
+    return window.__benjaminGoogleMapsPromise;
+  }
 
-  // If no API key, still provide context but isReady will be false
-  if (!apiKey) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[GoogleMapsProvider] Google Maps API key not found for current app. Maps features will be unavailable.'
-      );
+  window.__benjaminGoogleMapsPromise = new Promise<typeof google>(
+    (resolve, reject) => {
+      const existing = document.getElementById(
+        SCRIPT_ID
+      ) as HTMLScriptElement | null;
+
+      const hookUp = (script: HTMLScriptElement) => {
+        script.onload = () => {
+          script.setAttribute("data-loaded", "true");
+          if ((window as any).google?.maps) {
+            console.log("[GoogleMapsProvider] Maps API loaded (classic loader)");
+            resolve((window as any).google as typeof google);
+          } else {
+            console.error("[GoogleMapsProvider] Maps API loaded but google.maps missing");
+            reject(new Error("google.maps not available after load"));
+          }
+        };
+        script.onerror = () =>
+          reject(new Error("Failed to load Google Maps script"));
+      };
+
+      if (existing) {
+        if (
+          existing.getAttribute("data-loaded") === "true" ||
+          window.google?.maps
+        ) {
+          if (window.google?.maps) {
+            resolve(window.google as typeof google);
+          } else {
+            hookUp(existing);
+          }
+        } else {
+          hookUp(existing);
+        }
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = SCRIPT_ID;
+      script.async = true;
+      script.defer = true;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`;
+
+      hookUp(script);
+      document.head.appendChild(script);
     }
-    return (
-      <GoogleMapsContext.Provider value={{ isReady: false }}>
-        {children}
-      </GoogleMapsContext.Provider>
-    );
-  }
+  );
 
-  // Optional: show a tiny skeleton to avoid layout shift
-  if (!value.isReady) {
-    return (
-      <GoogleMapsContext.Provider value={value}>
-        <div className="w-full h-full bg-slate-50" />
-      </GoogleMapsContext.Provider>
-    );
-  }
-
-  return <GoogleMapsContext.Provider value={value}>{children}</GoogleMapsContext.Provider>;
+  return window.__benjaminGoogleMapsPromise;
 }
 
-/**
- * Hook to check if Google Maps is ready
- * 
- * Returns an object with `isReady` boolean indicating if Google Maps API is loaded.
- * This is a stable hook export that never changes shape to prevent Fast Refresh issues.
- * 
- * Usage:
- * ```tsx
- * const { isReady } = useGoogleMapsReady();
- * if (!isReady) return <Loading />;
- * ```
- */
-export function useGoogleMapsReady(): { isReady: boolean } {
-  return useContext(GoogleMapsContext);
+export function GoogleMapsProvider({ children }: { children: ReactNode }) {
+  const [googleMaps, setGoogleMaps] = useState<typeof google | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Already loaded
+    if (window.google?.maps) {
+      setGoogleMaps(window.google as typeof google);
+      setIsReady(true);
+      setIsError(false);
+      return;
+    }
+
+    const { GOOGLE_MAPS_API_KEY } = getEnv();
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.warn("[GoogleMapsProvider] No GOOGLE_MAPS_API_KEY in env");
+      setGoogleMaps(null);
+      setIsReady(false);
+      setIsError(true);
+      return;
+    }
+
+    loadGoogleMaps(GOOGLE_MAPS_API_KEY)
+      .then((gm) => {
+        setGoogleMaps(gm);
+        setIsReady(true);
+        setIsError(false);
+      })
+      .catch((err) => {
+        console.error("[GoogleMapsProvider] Failed to load:", err);
+        setGoogleMaps(null);
+        setIsReady(false);
+        setIsError(true);
+      });
+  }, []);
+
+  return (
+    <GoogleMapsContext.Provider
+      value={{
+        googleMaps,
+        isReady,
+        isError,
+      }}
+    >
+      {children}
+    </GoogleMapsContext.Provider>
+  );
 }
+
+export function useGoogleMaps(): GoogleMapsContextValue {
+  const ctx = useContext(GoogleMapsContext);
+  if (!ctx) {
+    throw new Error("useGoogleMaps must be used within GoogleMapsProvider");
+  }
+  return ctx;
+}
+
+export function useGoogleMapsReady(): boolean {
+  return useGoogleMaps().isReady;
+}
+
+export default GoogleMapsProvider;

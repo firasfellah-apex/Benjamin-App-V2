@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCustomerOrders } from "@/db/api";
+import { isTerminalStatus } from "@/lib/orderStatus";
 import type { OrderWithDetails } from "@/types/types";
 import type { CustomerDelivery, DeliveryStatus } from "@/types/delivery";
 
@@ -90,8 +91,11 @@ export function useCustomerDeliveries() {
     try {
       const orders = await getCustomerOrders();
       
-      // Transform orders to deliveries
-      const transformed = orders.map(transformOrderToDelivery);
+      // Only keep orders whose status is terminal (Completed or Cancelled)
+      const terminalOrders = orders.filter(order => isTerminalStatus(order.status));
+      
+      // Transform only terminal orders to deliveries
+      const transformed = terminalOrders.map(transformOrderToDelivery);
       
       // Sort by most recent first (deliveredAt or createdAt)
       transformed.sort((a, b) => {

@@ -22,9 +22,10 @@ type AddressCarouselProps = {
   onAddAddress: () => void;
   onEditAddress?: (address: CustomerAddress) => void;
   onDeleteAddress?: (address: CustomerAddress) => void;
+  onManageAddresses?: () => void; // New handler for manage addresses card
 };
 
-type Slide = { type: "address"; address: CustomerAddress } | { type: "add" };
+type Slide = { type: "address"; address: CustomerAddress } | { type: "manage" };
 
 export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   addresses,
@@ -33,11 +34,12 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   onAddAddress,
   onEditAddress,
   onDeleteAddress,
+  onManageAddresses,
 }) => {
   const location = useLocation();
   const slides: Slide[] = useMemo(() => {
     const base = addresses.map((address) => ({ type: "address", address } as Slide));
-    return [...base, { type: "add" } as Slide];
+    return [...base, { type: "manage" } as Slide];
   }, [addresses]);
 
   const initialIndex = useMemo(() => {
@@ -184,10 +186,10 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       return;
     }
     
-    // Don't sync if we're currently on the "Add address" slide
+    // Don't sync if we're currently on the "Manage addresses" slide
     // This allows the user to stay on that slide without being forced back
     const currentSlide = slides[index];
-    if (currentSlide?.type === "add") {
+    if (currentSlide?.type === "manage") {
       return;
     }
     
@@ -233,8 +235,8 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
         // Update the ref even if we don't call onSelectAddress
         prevActiveAddressId.current = currentAddressId;
       }
-    } else if (active?.type === "add") {
-      // When on "Add address" slide, don't try to sync back to an address
+    } else if (active?.type === "manage") {
+      // When on "Manage addresses" slide, don't try to sync back to an address
       // This allows the user to stay on this slide
       isUserInitiatedChange.current = false;
     }
@@ -572,24 +574,25 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   };
 
   // Zero-address state: show icon + short copy + "Add your first address" primary button
-  // Container owns padding, content owns layout
+  // Parent container (CustomerTopShelf) already provides px-6 padding, so we don't add it here
+  // Content fills container and sizes by content
   if (addresses.length === 0) {
     return (
-      <div className="w-full px-5 pt-5 pb-5">
-        <div className="w-full flex flex-col items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center mb-4">
+      <div className="w-full">
+        <div className="w-full flex flex-col items-center justify-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
             <MapPin className="w-8 h-8 text-slate-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2 text-center">
+          <h3 className="text-lg font-semibold text-slate-900 text-center">
             No Address Yet
           </h3>
-          <p className="text-sm text-slate-500 mb-6 text-center">
+          <p className="text-sm text-slate-500 text-center">
             Let's add your first address.
           </p>
           <button
             type="button"
             onClick={onAddAddress}
-            className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2 py-4 px-6"
+            className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
           >
             <Plus className="w-5 h-5" />
             Add Your First Address
@@ -661,12 +664,14 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
               />
             ) : (
               <AddressCard
-                mode="add"
-                addressLine="Save another place you'd like cash delivered."
+                mode="manage-carousel"
+                addressLine="View, edit, or remove saved locations."
                 onClick={() => {
                   isUserInitiatedChange.current = true;
                   snapToIndex(i);
-                  onAddAddress();
+                  if (onManageAddresses) {
+                    onManageAddresses();
+                  }
                 }}
               />
             )}
@@ -692,6 +697,9 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
                     is_default: slides[i].address.is_default || false,
                     source: 'pagination_dot',
                   });
+                } else if (i < slides.length && slides[i]?.type === "manage" && onManageAddresses) {
+                  // Handle manage addresses card click from pagination dot
+                  onManageAddresses();
                 }
               }}
               className={cn(

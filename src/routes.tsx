@@ -7,12 +7,9 @@ import { CustomerLayout } from './components/layout/CustomerLayout';
 import { RoleBasedLayout } from './components/layout/RoleBasedLayout';
 import CustomerHome from './pages/customer/CustomerHome';
 import CashRequest from './pages/customer/CashRequest';
-import MyOrders from './pages/customer/MyOrders';
-import CustomerOrderDetailPage from './pages/customer/CustomerOrderDetailPage';
 import ManageAddresses from './pages/customer/ManageAddresses';
-import History from './pages/customer/History';
 import CustomerDeliveriesHistory from './pages/customer/CustomerDeliveriesHistory';
-import CustomerDeliveryDetail from './pages/customer/CustomerDeliveryDetail';
+import CustomerOrderDetailPage from './pages/customer/CustomerOrderDetailPage';
 
 import { RunnerLayout } from './components/layout/RunnerLayout';
 import Work from './pages/runner/Work';
@@ -31,6 +28,8 @@ import AdminOrderDetail from './pages/admin/AdminOrderDetail';
 import RunnerTraining from './pages/admin/RunnerTraining';
 
 import ProfileOnboarding from './pages/customer/OnboardingProfile';
+import DebugMapPage from './pages/debug/DebugMapPage';
+import { GoogleMapsProvider } from './components/maps/GoogleMapsProvider';
 
 export interface RouteConfig {
   name: string;
@@ -79,27 +78,9 @@ const routes: RouteConfig[] = [
     visible: false
   },
   {
-    name: 'My Orders',
-    path: '/customer/orders',
-    element: <CustomerLayout><MyOrders /></CustomerLayout>,
-    visible: false
-  },
-  {
-    name: 'Order Detail',
-    path: '/customer/orders/:orderId',
-    element: <CustomerLayout><CustomerOrderDetailPage /></CustomerLayout>,
-    visible: false
-  },
-  {
     name: 'Manage Addresses',
     path: '/customer/addresses',
     element: <CustomerLayout><ManageAddresses /></CustomerLayout>,
-    visible: false
-  },
-  {
-    name: 'Order History',
-    path: '/customer/history',
-    element: <CustomerLayout><History /></CustomerLayout>,
     visible: false
   },
   {
@@ -111,7 +92,7 @@ const routes: RouteConfig[] = [
   {
     name: 'Customer Delivery Detail',
     path: '/customer/deliveries/:deliveryId',
-    element: <CustomerLayout><CustomerDeliveryDetail /></CustomerLayout>,
+    element: <CustomerLayout><CustomerOrderDetailPage /></CustomerLayout>,
     visible: false
   },
   {
@@ -209,6 +190,16 @@ const routes: RouteConfig[] = [
     name: 'Runner Training',
     path: '/admin/training',
     element: <RequireAdminAuth><AdminLayout><RunnerTraining /></AdminLayout></RequireAdminAuth>,
+    visible: false
+  },
+  {
+    name: 'Debug Map',
+    path: '/debug/map',
+    element: (
+      <GoogleMapsProvider>
+        <DebugMapPage />
+      </GoogleMapsProvider>
+    ),
     visible: false
   },
   {

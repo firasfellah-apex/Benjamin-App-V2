@@ -1,17 +1,15 @@
 /**
  * CustomerScreen Component
  * 
- * Shared 3-zone layout for customer pages:
- * - Header Bar: persistent header row (logo + menu) - never remounts
- * - Top Shelf: full-width, bottom-rounded, bottom-shadow only - morphs smoothly
- * - Map: flex-1 fills remaining space (with padding-bottom for fixed footer)
- * - Footer: fixed to bottom, hugs content (bottom nav/CTAs)
- * 
- * Header bar stays mounted; only shelf body morphs between routes.
+ * Clean 3-row layout for customer pages:
+ * - Top: header bar + top shelf (auto height, hugs content)
+ * - Middle: map band (fixed height, optional)
+ * - Main: scrollable content area (flex-1, overflow-y-auto)
+ * - Bottom: handled by CustomerLayout via CustomerBottomSlotContext (not rendered here)
  */
 
 import React from "react";
-import { useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import CustomerHeaderBar from "@/components/customer/layout/CustomerHeaderBar";
 import CustomerTopShelf from "@/components/customer/layout/CustomerTopShelf";
 import TopShelfSection from "@/components/customer/layout/TopShelfSection";
@@ -21,13 +19,13 @@ interface CustomerScreenProps {
   subtitle?: React.ReactNode;
   loading?: boolean;              // Loading state for skeletons
   actions?: React.ReactNode;      // Optional action buttons/chips
-  nextKey?: string;               // Optional next route key for pre-measurement
-  nextEstimate?: React.ReactNode; // Optional lightweight estimate of next view
+  stepKey?: string;               // Step key for transition (e.g. "home", "address", "amount")
   headerLeft?: React.ReactNode;   // Optional custom left header (defaults to logo)
   headerRight?: React.ReactNode;  // Optional custom right header (defaults to menu)
-  children?: React.ReactNode;     // Content that goes inside the TopShelf
-  map?: React.ReactNode;          // middle map area
-  footer?: React.ReactNode;       // bottom nav / CTAs (will be fixed to bottom)
+  topContent?: React.ReactNode;   // Content to show in TopShelfSection (e.g. LastDeliveryCard)
+  map?: React.ReactNode;           // Map band (fixed height, sits between header and content)
+  children?: React.ReactNode;      // Main scrollable content (cards, lists, forms, etc.)
+  className?: string;
 }
 
 export function CustomerScreen({ 
@@ -35,45 +33,55 @@ export function CustomerScreen({
   subtitle,
   loading = false,
   actions,
-  nextKey,
-  nextEstimate,
+  stepKey,
   headerLeft,
   headerRight,
+  topContent,
+  map,
   children,
-  map, 
-  footer 
+  className,
 }: CustomerScreenProps) {
-  const location = useLocation();
-  const routeKey = location.pathname;
-
   return (
-    <div className="flex min-h-screen flex-col bg-[#F4F5F7]">
-      {/* Persistent header bar - never remounts, no animations */}
-      <CustomerHeaderBar 
-        headerLeft={headerLeft}
-        headerRight={headerRight}
-      />
+    <div className={cn("flex flex-col flex-1 min-h-0", className)}>
+      {/* TOP: Header bar + top shelf (flex-shrink-0, auto height) */}
+      <div className="flex-shrink-0">
+        <CustomerHeaderBar 
+          headerLeft={headerLeft}
+          headerRight={headerRight}
+        />
+        <div className="relative z-10">
+          <CustomerTopShelf>
+            <TopShelfSection
+              loading={loading}
+              title={title}
+              subtitle={subtitle}
+              actions={actions}
+              stepKey={stepKey}
+            >
+              {topContent}
+            </TopShelfSection>
+          </CustomerTopShelf>
+        </div>
+      </div>
 
-      {/* Full-width shelf - bleeds to edges, morphs smoothly */}
-      <CustomerTopShelf>
-        <TopShelfSection
-          loading={loading}
-          title={title}
-          subtitle={subtitle}
-          actions={actions}
-        >
-          {children}
-        </TopShelfSection>
-      </CustomerTopShelf>
+      {/* MIDDLE: Map band – fixed height, fills the row, sits directly under the header */}
+      {map && (
+        <div className="flex-shrink-0">
+          {/* Let the map bleed edge-to-edge inside the mobile shell */}
+          <div className="-mx-6">
+            <div className="h-[230px] w-full">
+              {map}
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* MIDDLE: flex map / content - full width background, no padding constraints */}
-      <main className="relative z-10 flex-1 min-h-0 w-full">
-        {map}
+      {/* MAIN: Scrollable content area (flex-1, overflow-y-auto) */}
+      {/* This is the ONE scroll container per page */}
+      {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
+      <main className="flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6">
+        {children}
       </main>
-
-      {/* BOTTOM: fixed to bottom, hugging content */}
-      {/* Footer components handle their own fixed positioning */}
-      {footer}
     </div>
   );
 }
