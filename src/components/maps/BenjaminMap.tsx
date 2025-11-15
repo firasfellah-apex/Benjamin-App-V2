@@ -9,14 +9,12 @@ export type LatLngLiteral = { lat: number; lng: number };
 export interface BenjaminMapProps {
   center: LatLngLiteral;
   zoom?: number;
-  height?: string;
   className?: string;
 }
 
 export function BenjaminMap({
   center,
   zoom = 15,
-  height = "220px",
   className,
 }: BenjaminMapProps) {
   const { isReady, isError } = useGoogleMaps();
@@ -24,7 +22,7 @@ export function BenjaminMap({
   const mapInstanceRef = useRef<any>(null);
 
   useEffect(() => {
-    const g = (window as any).google as typeof google | undefined;
+    const g = (window as any).google as any;
 
     console.log("[BenjaminMap DEBUG]", {
       isReady,
@@ -32,7 +30,6 @@ export function BenjaminMap({
       hasWindowGoogle: !!g,
       hasMapsNamespace: !!g?.maps,
       mapCtorType: typeof g?.maps?.Map,
-      height: mapDivRef.current?.offsetHeight,
     });
 
     if (!isReady || !g?.maps || !mapDivRef.current) return;
@@ -61,8 +58,6 @@ export function BenjaminMap({
       mapInstanceRef.current.setZoom(zoom ?? 15);
     }
 
-    // no marker, no extra stuff for now
-
     return () => {
       // let GC take care
     };
@@ -75,13 +70,16 @@ export function BenjaminMap({
 
   return (
     <div
-      className={cn("w-full", className)}
-      style={{ minHeight: height }}
+      className={cn("w-full h-full", className)}
     >
       <div
         ref={mapDivRef}
         className="w-full h-full"
-        style={{ height, background: "#e5e7eb", position: "relative" }}
+        style={{
+          background: "#e5e7eb",
+          position: "relative",
+          overflow: "hidden",
+        }}
       >
         {/* quick label so you know this div is there */}
         <div

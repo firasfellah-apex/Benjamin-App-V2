@@ -10,7 +10,7 @@
  * inside a container that gives it a real height, and it stretches to 100%.
  */
 
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useMemo, useRef } from "react";
 import { BenjaminMap } from "@/components/maps/BenjaminMap";
 import { useCustomerLocation } from "@/hooks/useCustomerLocation";
 import type { CustomerAddress } from "@/types/types";
@@ -37,22 +37,8 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
   selectedAddress,
   className,
 }) => {
-  const { location, isLoading } = useCustomerLocation();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [mapHeight, setMapHeight] = useState<string>("236px"); // Default fallback
-
-  // Measure parent height and convert to pixels for BenjaminMap
-  useEffect(() => {
-    if (containerRef.current) {
-      const parent = containerRef.current.parentElement;
-      if (parent) {
-        const height = parent.getBoundingClientRect().height;
-        if (height > 0) {
-          setMapHeight(`${Math.floor(height)}px`);
-        }
-      }
-    }
-  }, []);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const { location } = useCustomerLocation();
 
   // Support both { latitude, longitude } and { lat, lng }
   const selectedLat =
@@ -78,12 +64,13 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
     return { lat: 25.7617, lng: -80.1918 };
   }, [selectedLat, selectedLng, location]);
 
-  const showAddressMarker = Boolean(selectedLat && selectedLng);
-  const showCustomerMarker = !showAddressMarker && !isLoading && Boolean(location);
+  // Note: Markers are not currently implemented in BenjaminMap
+  // const showAddressMarker = Boolean(selectedLat && selectedLng);
+  // const showCustomerMarker = !showAddressMarker && !isLoading && Boolean(location);
 
   return (
     <div 
-      ref={containerRef}
+      ref={wrapperRef}
       className={cn("w-full h-full", className)}
       style={{ 
         height: "100%",
@@ -93,9 +80,8 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
     >
       <BenjaminMap
         center={center}
-        customerPosition={showAddressMarker || showCustomerMarker ? center : undefined}
         zoom={14}
-        height={mapHeight} // Use measured pixel height, not "100%"
+        height="100%"
       />
     </div>
   );

@@ -15,20 +15,19 @@ interface CustomerMapViewportProps {
 export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
   selectedAddress,
 }) => {
-  // Minimum height fallback for Google Maps to render tiles
-  // On home screen, this will grow to fill available space via flex-1
-  const HEIGHT = 236;
+  // Fixed pixel height for a stable Google Maps container
+  const HEIGHT = 360;
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden rounded-t-3xl rounded-b-3xl"
-      style={{ 
-        minHeight: `${HEIGHT}px`,
-        display: "block", // NOT flex
-      }}
+      className="relative w-full overflow-hidden rounded-t-3xl rounded-b-3xl"
+      style={{ height: `${HEIGHT}px` }}
     >
-      {/* CustomerMap will stretch to fill this container */}
-      <CustomerMap selectedAddress={selectedAddress} className="h-full" />
+      {/* CustomerMap will stretch to fill this fixed-height container */}
+      <CustomerMap
+        selectedAddress={selectedAddress}
+        className="w-full h-full"
+      />
     </div>
   );
 };

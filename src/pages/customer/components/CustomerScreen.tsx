@@ -41,11 +41,13 @@ export function CustomerScreen({
   children,
   className,
 }: CustomerScreenProps) {
-  // Determine if this is a "home screen" case (no children content)
-  const isHomeScreen = !children;
+  // Count actual children (handles fragments, null, etc.)
+  const hasChildren = React.Children.count(children) > 0;
+  // Home screen: has map but no children content
+  const isHomeScreen = !!map && !hasChildren;
 
   return (
-    <div className={cn("flex flex-col flex-1 min-h-0", className)}>
+    <div className={cn("flex flex-col min-h-0 h-full space-y-6", className)}>
       {/* TOP: Header bar + top shelf (flex-shrink-0, auto height) */}
       <div className="flex-shrink-0">
         <CustomerHeaderBar 
@@ -67,19 +69,11 @@ export function CustomerScreen({
         </div>
       </div>
 
-      {/* MIDDLE: Map band – expands to fill space on home screen, fixed height on other screens */}
+      {/* MIDDLE: Map band – fixed-height container from CustomerMapViewport */}
       {map && (
-        <div className={cn(
-          isHomeScreen ? "flex-1 min-h-[230px]" : "flex-shrink-0"
-        )}>
-          {/* Let the map bleed edge-to-edge inside the mobile shell */}
-          <div className="-mx-6 overflow-hidden rounded-t-3xl rounded-b-3xl">
-            <div className={cn(
-              "w-full overflow-hidden",
-              isHomeScreen ? "h-full" : "h-[230px]"
-            )}>
-              {map}
-            </div>
+        <div className="-mx-6 flex-shrink-0">
+          <div className="overflow-hidden rounded-t-3xl rounded-b-3xl">
+            {map}
           </div>
         </div>
       )}
@@ -87,7 +81,7 @@ export function CustomerScreen({
       {/* MAIN: Scrollable content area (flex-1, overflow-y-auto) */}
       {/* This is the ONE scroll container per page */}
       {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
-      {children && (
+      {hasChildren && (
         <main className="flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6">
           {children}
         </main>
