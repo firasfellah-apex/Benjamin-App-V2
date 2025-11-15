@@ -2,7 +2,6 @@ import React from "react";
 import { useLocation } from "react-router-dom";
 import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
 import { Skeleton } from "@/components/common/Skeleton";
-import { TopShelfContentTransition } from "./TopShelfContentTransition";
 
 type Props = {
   loading?: boolean;
@@ -45,7 +44,9 @@ export default function TopShelfSection({
   })();
 
   // Show skeleton during reserve phase or when data is loading
-  const showSkeleton = shelf.phase === "reserve" || (loading && shelf.phase !== "idle" && shelf.phase !== "swap");
+  // Only show skeleton for title if we're in reserve phase OR if loading AND not in idle/swap
+  // But exclude swap phase to prevent flicker when content is transitioning
+  const showSkeleton = shelf.phase === "reserve" || (loading && shelf.phase !== "idle" && shelf.phase !== "swap" && shelf.phase !== "settle");
 
   return (
     <>
@@ -83,23 +84,21 @@ export default function TopShelfSection({
         </div>
       </header>
 
-      {/* Content wrapper we measure - wrapped in global transition */}
+      {/* Content wrapper we measure - no transitions */}
       {/* No space-y-* here - spacing comes from parent space-y-6 in CustomerTopShelf */}
       <div ref={shelf.measureRef}>
-        <TopShelfContentTransition stepKey={currentStepKey}>
-          {shelf.phase === "reserve" ? (
-            // Skeleton placeholder - same height as content
-            <div className="space-y-4" style={{ minHeight: "180px" }}>
-              <div className="h-5 w-2/5 animate-pulse rounded bg-slate-100" />
-              <div className="h-5 w-1/4 animate-pulse rounded bg-slate-100" />
-              <div className="h-12 w-44 animate-pulse rounded-full bg-slate-100" />
-            </div>
-          ) : (
-            <div>
-              {children}
-            </div>
-          )}
-        </TopShelfContentTransition>
+        {shelf.phase === "reserve" ? (
+          // Skeleton placeholder - same height as content
+          <div className="space-y-4" style={{ minHeight: "180px" }}>
+            <div className="h-5 w-2/5 animate-pulse rounded bg-slate-100" />
+            <div className="h-5 w-1/4 animate-pulse rounded bg-slate-100" />
+            <div className="h-12 w-44 animate-pulse rounded-full bg-slate-100" />
+          </div>
+        ) : (
+          <div>
+            {children}
+          </div>
+        )}
       </div>
     </>
   );

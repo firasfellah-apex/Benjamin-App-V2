@@ -47,7 +47,7 @@ export function CustomerScreen({
   const isHomeScreen = !!map && !hasChildren;
 
   return (
-    <div className={cn("flex flex-col min-h-0 h-full space-y-6", className)}>
+    <div className={cn("flex flex-col min-h-0 h-full", className)}>
       {/* TOP: Header bar + top shelf (flex-shrink-0, auto height) */}
       <div className="flex-shrink-0">
         <CustomerHeaderBar 
@@ -69,10 +69,10 @@ export function CustomerScreen({
         </div>
       </div>
 
-      {/* MIDDLE: Map band – fixed-height container from CustomerMapViewport */}
+      {/* MIDDLE: Map band – tucks under top shelf for seamless connection */}
       {map && (
-        <div className="-mx-6 flex-shrink-0">
-          <div className="overflow-hidden rounded-t-3xl rounded-b-3xl">
+        <div className="-mx-6 flex-shrink-0 relative z-0" style={{ marginTop: '-26px' }}>
+          <div className="overflow-hidden rounded-t-none rounded-b-3xl">
             {map}
           </div>
         </div>
@@ -81,11 +81,13 @@ export function CustomerScreen({
       {/* MAIN: Scrollable content area (flex-1, overflow-y-auto) */}
       {/* This is the ONE scroll container per page */}
       {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
-      {hasChildren && (
-        <main className="flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6">
-          {children}
-        </main>
-      )}
+      {/* Always render main to maintain layout structure, even if empty */}
+      <main className={cn(
+        "flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6 mt-6",
+        !hasChildren && "hidden"
+      )}>
+        {children}
+      </main>
     </div>
   );
 }

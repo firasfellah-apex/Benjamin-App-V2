@@ -23,6 +23,7 @@ type AddressCarouselProps = {
   onEditAddress?: (address: CustomerAddress) => void;
   onDeleteAddress?: (address: CustomerAddress) => void;
   onManageAddresses?: () => void; // New handler for manage addresses card
+  hideZeroAddressButton?: boolean; // Hide the "Add Your First Address" button in zero-address state
 };
 
 type Slide = { type: "address"; address: CustomerAddress } | { type: "manage" };
@@ -35,6 +36,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   onEditAddress,
   onDeleteAddress,
   onManageAddresses,
+  hideZeroAddressButton = false,
 }) => {
   const location = useLocation();
   const slides: Slide[] = useMemo(() => {
@@ -574,9 +576,11 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   };
 
   // Zero-address state: show icon + short copy + "Add your first address" primary button
-  // Parent container (CustomerTopShelf) already provides px-6 padding, so we don't add it here
-  // Content fills container and sizes by content
+  // If hideZeroAddressButton is true, don't render anything (UI is shown elsewhere, e.g., in top shelf)
   if (addresses.length === 0) {
+    if (hideZeroAddressButton) {
+      return null;
+    }
     return (
       <div className="w-full">
         <div className="w-full flex flex-col items-center justify-center space-y-4">

@@ -15,15 +15,18 @@ interface CustomerMapViewportProps {
 export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
   selectedAddress,
 }) => {
-  // Fixed pixel height for a stable Google Maps container
-  const HEIGHT = 360;
+  // Tuck amount to pin under bottom nav (same as top tuck: 26px)
+  const TUCK_AMOUNT = 26;
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-t-3xl rounded-b-3xl"
-      style={{ height: `${HEIGHT}px` }}
+      className="relative w-full overflow-hidden rounded-t-none rounded-b-3xl"
+      style={{
+        height: "70vh", // Fixed height for Google Maps stability
+        // Tuck under bottom nav
+        marginBottom: `-${TUCK_AMOUNT}px`,
+      }}
     >
-      {/* CustomerMap will stretch to fill this fixed-height container */}
       <CustomerMap
         selectedAddress={selectedAddress}
         className="w-full h-full"

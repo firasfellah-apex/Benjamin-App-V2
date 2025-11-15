@@ -384,7 +384,7 @@ export function AddressAutocomplete({
     );
   }
 
-  // If Maps not ready yet, show loading state
+  // If Maps not ready yet, allow typing but show loading indicator
   if (!isReady) {
     return (
       <div className="space-y-2">
@@ -393,11 +393,13 @@ export function AddressAutocomplete({
           id={id}
           name={name}
           autoComplete="street-address"
-          placeholder="Loading address autocomplete..."
+          placeholder={placeholder}
           value={query}
-          disabled
-          className={cn(error && "border-[#FF5A5F] bg-[#FFF7F7]", className, "opacity-60")}
+          onChange={handleInputChange}
+          disabled={disabled}
+          className={cn(error && "border-[#FF5A5F] bg-[#FFF7F7]", className)}
         />
+        <p className="text-xs text-gray-500">Loading address autocomplete...</p>
       </div>
     );
   }
@@ -433,7 +435,7 @@ export function AddressAutocomplete({
               }
             }, 200);
           }}
-          disabled={disabled || isLoading}
+          disabled={disabled}
           className={cn(
             error && "border-[#FF5A5F] bg-[#FFF7F7]",
             className

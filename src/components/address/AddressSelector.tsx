@@ -409,17 +409,22 @@ export function AddressSelector({
           />
         </div>
       ) : (
-        <AddressCarousel
-          addresses={addresses}
-          selectedAddressId={selectedAddressId}
-          onSelectAddress={onAddressSelect}
-          onAddAddress={() => {
-            setEditingAddress(null);
-            setShowForm(true);
-          }}
-          onEditAddress={handleEdit}
-          onManageAddresses={() => navigate("/customer/addresses")}
-        />
+        // When there are no addresses and hideZeroAddressButton is true,
+        // AddressCarousel returns null, so we render an empty div to maintain layout
+        <div className="w-full min-h-[1px]">
+          <AddressCarousel
+            addresses={addresses}
+            selectedAddressId={selectedAddressId}
+            onSelectAddress={onAddressSelect}
+            onAddAddress={() => {
+              setEditingAddress(null);
+              setShowForm(true);
+            }}
+            onEditAddress={handleEdit}
+            onManageAddresses={() => navigate("/customer/addresses")}
+            hideZeroAddressButton={true}
+          />
+        </div>
       )}
 
       {/* (B) Add Address Button - Standard pill button */}

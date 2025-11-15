@@ -181,6 +181,13 @@ export default function CustomerHome() {
   // Show skeleton in title slot while loading, but keep layout stable
   const displayName = getUserName();
 
+  // Memoize title separately so it doesn't re-render when orders load
+  // Title should only depend on profile/auth state, not orders
+  const title = useMemo(() => {
+    if (!isReady) return undefined;
+    return `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`;
+  }, [isReady, displayName]);
+
   // Determine what to show in topContent
   // Show skeleton while orders are loading to maintain consistent header height
   // IMPORTANT: This hook must be called before any early returns to follow Rules of Hooks
@@ -236,6 +243,7 @@ export default function CustomerHome() {
 
   // Loading state for greeting/title area - only depends on auth/profile, not orders
   // Orders loading is handled separately in topContent useMemo
+  // IMPORTANT: Never include ordersLoading here - it causes title to flicker when navigating back
   const loading = authLoading || (user && !isReady);
   const shelf = useTopShelfTransition();
   const { setBottomSlot } = useCustomerBottomSlot();
@@ -250,7 +258,7 @@ export default function CustomerHome() {
         onPrimary={() => {
           shelf.goTo('/customer/request', 'address', 320);
         }}
-        useFixedPosition={false}
+        useFixedPosition={true}
       />
     );
     return () => setBottomSlot(null);
@@ -259,7 +267,7 @@ export default function CustomerHome() {
   return (
     <CustomerScreen
       loading={loading}
-      title={!isReady ? undefined : `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`}
+      title={title}
       subtitle="Skip the ATM. Request cash in seconds."
       stepKey="home"
       topContent={topContent}

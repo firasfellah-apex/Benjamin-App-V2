@@ -515,20 +515,15 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           <Label className="text-sm font-medium text-gray-900">
             Address Preview
           </Label>
-          <div className="rounded-lg overflow-hidden border border-gray-200">
+          <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height: "200px" }}>
             <BenjaminMap
               center={
                 formData.latitude && formData.longitude
                   ? { lat: formData.latitude, lng: formData.longitude }
                   : liveLocation || { lat: 25.7617, lng: -80.1918 }
               }
-              customerPosition={
-                formData.latitude && formData.longitude
-                  ? { lat: formData.latitude, lng: formData.longitude }
-                  : liveLocation || undefined
-              }
               zoom={15}
-              height="200px"
+              className="h-full"
             />
           </div>
         </div>

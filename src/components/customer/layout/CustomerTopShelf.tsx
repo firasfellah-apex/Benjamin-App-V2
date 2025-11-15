@@ -1,5 +1,4 @@
 import React from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
 
 /**
@@ -16,25 +15,15 @@ type Props = {
 export default function CustomerTopShelf({ 
   children 
 }: Props) {
-  const prefersReduced = useReducedMotion();
   const shelf = useTopShelfTransition({ minBase: 168, settleDelayMs: 240 });
-  
-  const transition = prefersReduced
-    ? { duration: 0 }
-    : { type: "spring", stiffness: 220, damping: 26, mass: 0.6 };
 
   return (
-    <div className="sticky top-[68px] z-30 bg-white w-full left-0 right-0">
+    <div className="sticky top-[68px] z-[65] bg-white w-full left-0 right-0 rounded-bl-3xl rounded-br-3xl overflow-hidden">
       {/* top offset ~= header height; keep same bg as header */}
-      <motion.section
-        layout
-        transition={transition}
-        // Full width edge-to-edge, rounded only on bottom, bottom-only shadow:
+      <section
+        // Full width edge-to-edge, rounded only on bottom, no shadow:
         // Height hugs content - no minHeight constraint
-        className="w-full rounded-t-none rounded-b-3xl bg-white shadow-[0_14px_32px_rgba(0,0,0,0.08)]"
-        style={{ 
-          willChange: 'height'
-        }}
+        className="w-full bg-white"
         role="region"
         aria-label="Top content"
       >
@@ -44,7 +33,7 @@ export default function CustomerTopShelf({
         <div className="w-full px-6 pt-6 pb-6 space-y-6">
           {children}
         </div>
-      </motion.section>
+      </section>
     </div>
   );
 }

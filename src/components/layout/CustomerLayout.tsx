@@ -19,19 +19,20 @@ function CustomerLayoutContent({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F5F7]">
-      {/* Main content column with bottom slot inside flex column */}
+      {/* Main content column */}
       <MobilePageShell className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 min-h-0 flex flex-col">
           {children}
         </div>
-        {bottomSlot && (
-          <div className="flex-shrink-0 w-full bg-transparent">
-            <MobilePageShell>
-              {bottomSlot}
-            </MobilePageShell>
-          </div>
-        )}
       </MobilePageShell>
+      
+      {/* Bottom slot - RequestFlowBottomBar handles its own fixed positioning */}
+      {/* When useFixedPosition=true, it's fixed to viewport bottom and won't move with content */}
+      {bottomSlot && (
+        <div className="w-full">
+          {bottomSlot}
+        </div>
+      )}
     </div>
   );
 }

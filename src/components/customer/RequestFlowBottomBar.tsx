@@ -52,7 +52,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
     <nav
       data-request-flow-bottom-bar
       className={cn(
-        useFixedPosition ? "fixed bottom-0 left-0 right-0 z-40" : "w-full flex-shrink-0",
+        useFixedPosition ? "fixed bottom-0 left-0 right-0 z-50" : "w-full flex-shrink-0",
         "w-screen max-w-none",
         "bg-white rounded-t-3xl",
         "shadow-[0_-8px_24px_rgba(15,23,42,0.08)]"

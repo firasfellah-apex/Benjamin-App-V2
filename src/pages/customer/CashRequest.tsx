@@ -28,7 +28,6 @@ import { track } from "@/lib/analytics";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
 import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
-import { motion, useReducedMotion } from "framer-motion";
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 
 type Step = 1 | 2;
@@ -111,8 +110,7 @@ export default function CashRequest() {
   };
 
   const shelf = useTopShelfTransition({ currentStep: step });
-  const { hasAnyAddress } = useCustomerAddresses();
-  const prefersReduced = useReducedMotion();
+  const { addresses, hasAnyAddress } = useCustomerAddresses();
   const { setBottomSlot } = useCustomerBottomSlot();
   
   // Use ref to store latest shelf to avoid recreating handlers when shelf changes
@@ -150,7 +148,7 @@ export default function CashRequest() {
   }, []);
   
   const handleBackToHome = useCallback(() => {
-    shelfRef.current.goTo('/customer/home', 'home', 280);
+    shelfRef.current.goTo('/customer/home', 'home', 320);
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -205,40 +203,25 @@ export default function CashRequest() {
   // Memoize the summary section (everything except breakdown) - stable reference
   // MUST be before any conditional returns to follow Rules of Hooks
   const summarySection = useMemo(() => {
-    // Simple transition for numbers - only opacity/Y, no layoutId
-    const numTransition = prefersReduced 
-      ? { duration: 0 } 
-      : { duration: 0.15, ease: "easeOut" };
-
     return (
       <div className="w-full space-y-4">
         <div className="w-full flex justify-between items-center">
           <span className="text-base font-medium text-gray-900">You'll get</span>
-          <motion.span 
-            key={amount} // Key on amount value, not step
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -2 }}
-            transition={numTransition}
+          <span 
             className="text-lg font-bold text-gray-900"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
             ${amount.toFixed(0)}
-          </motion.span>
+          </span>
         </div>
         <div className="w-full flex justify-between items-center">
           <span className="text-base font-medium text-gray-900">You'll pay</span>
-          <motion.span 
-            key={pricing?.total || 0} // Key on pricing value, not step
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -2 }}
-            transition={numTransition}
+          <span 
             className="text-lg font-bold text-gray-900"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
             ${pricing?.total.toFixed(2) || '0.00'}
-          </motion.span>
+          </span>
         </div>
         
         {/* View breakdown link/expander */}
@@ -261,16 +244,9 @@ export default function CashRequest() {
           )}
         </button>
 
-        {/* Fee Breakdown - smooth expand/collapse with proper height transition */}
-        {pricing && (
-          <div
-            className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{
-              maxHeight: showFeeDetails ? '200px' : '0',
-              opacity: showFeeDetails ? 1 : 0,
-              marginTop: showFeeDetails ? '0' : '0',
-            }}
-          >
+        {/* Fee Breakdown */}
+        {pricing && showFeeDetails && (
+          <div className="overflow-hidden">
             <div className="space-y-2 pt-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">Cash amount</span>
@@ -293,17 +269,12 @@ export default function CashRequest() {
         )}
       </div>
     );
-  }, [pricing, amount, showFeeDetails, prefersReduced]);
+  }, [pricing, amount, showFeeDetails]);
 
   // Memoize the entire topContent to prevent remounting
   // MUST be before any conditional returns to follow Rules of Hooks
   // Standardized spacing: space-y-4 (16px) for main content blocks
   const topContent = useMemo(() => {
-    // Simple transition for main amount - only opacity/Y, no layoutId
-    const numTransition = prefersReduced 
-      ? { duration: 0 } 
-      : { duration: 0.15, ease: "easeOut" };
-    
     return (
     <div className="space-y-4" style={{ minHeight: "180px" }}>
       {/* Main Amount Display */}
@@ -311,18 +282,13 @@ export default function CashRequest() {
       {/* Reserve space with minHeight to prevent layout shift */}
       <div className="w-full flex items-center justify-center" style={{ minHeight: '60px' }}>
         {!isEditingAmount ? (
-          <motion.div 
-            key={amount} // Key on amount value, not step
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -2 }}
-            transition={numTransition}
+          <div 
             onClick={() => {
               setIsEditingAmount(true);
               setDraftAmountStr(String(amount)); // seed with current value
               setTimeout(() => amountInputRef.current?.focus(), 0);
             }}
-            className="cursor-text transition-opacity"
+            className="cursor-text"
             style={{ 
               fontSize: 48, 
               fontWeight: 700, 
@@ -332,7 +298,7 @@ export default function CashRequest() {
             }}
           >
             ${amount.toLocaleString()}
-          </motion.div>
+          </div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <input
@@ -429,7 +395,7 @@ export default function CashRequest() {
       </div>
     </div>
   );
-  }, [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr, prefersReduced, pricing]);
+  }, [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr, pricing]);
 
   // Memoize footer to prevent infinite re-renders
   const footer = useMemo(() => {
@@ -469,15 +435,29 @@ export default function CashRequest() {
 
   // Step 1: Address Selection
   if (step === 1) {
-    return (
-      <CustomerScreen
-        loading={false}
-        title="Where should we deliver?"
-        subtitle="Select a location. You can save more than one."
-        stepKey="address"
-        map={<CustomerMapViewport selectedAddress={selectedAddress} />}
-      >
-        {/* Address selector content */}
+    // Top content: zero-address state OR address selector + add button
+    const addressTopContent = addresses.length === 0 ? (
+      <div className="w-full flex flex-col items-center justify-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
+          <MapPin className="w-8 h-8 text-slate-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-900 text-center">
+          No Address Yet
+        </h3>
+        <p className="text-sm text-slate-500 text-center">
+          Let's add your first address.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowAddAddressForm(true)}
+          className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
+        >
+          <Plus className="w-5 h-5" />
+          Add Your First Address
+        </button>
+      </div>
+    ) : (
+      <div className="w-full space-y-4">
         <AddressSelector
           selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
           onAddressSelect={handleAddressSelect}
@@ -500,6 +480,19 @@ export default function CashRequest() {
             Add Address
           </button>
         )}
+      </div>
+    );
+
+    return (
+      <CustomerScreen
+        loading={false}
+        title="Where should we deliver?"
+        subtitle="Select a location. You can save more than one."
+        stepKey="address"
+        topContent={addressTopContent}
+        map={<CustomerMapViewport selectedAddress={selectedAddress} />}
+      >
+        {/* No children - everything is in topContent */}
       </CustomerScreen>
     );
   }
@@ -514,10 +507,10 @@ export default function CashRequest() {
       title="How much cash do you need?"
       subtitle="Choose an amount to have delivered."
       stepKey="amount"
+      topContent={topContent}
       map={<CustomerMapViewport selectedAddress={selectedAddress} />}
     >
-      {/* Amount input, summary, etc. */}
-      {topContent}
+      {/* No children - everything is in topContent */}
     </CustomerScreen>
   );
 }
