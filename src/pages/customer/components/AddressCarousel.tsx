@@ -22,11 +22,10 @@ type AddressCarouselProps = {
   onAddAddress: () => void;
   onEditAddress?: (address: CustomerAddress) => void;
   onDeleteAddress?: (address: CustomerAddress) => void;
-  onManageAddresses?: () => void; // New handler for manage addresses card
   hideZeroAddressButton?: boolean; // Hide the "Add Your First Address" button in zero-address state
 };
 
-type Slide = { type: "address"; address: CustomerAddress } | { type: "manage" };
+type Slide = { type: "address"; address: CustomerAddress };
 
 export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   addresses,
@@ -35,13 +34,11 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   onAddAddress,
   onEditAddress,
   onDeleteAddress,
-  onManageAddresses,
   hideZeroAddressButton = false,
 }) => {
   const location = useLocation();
   const slides: Slide[] = useMemo(() => {
-    const base = addresses.map((address) => ({ type: "address", address } as Slide));
-    return [...base, { type: "manage" } as Slide];
+    return addresses.map((address) => ({ type: "address", address } as Slide));
   }, [addresses]);
 
   const initialIndex = useMemo(() => {
@@ -188,12 +185,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       return;
     }
     
-    // Don't sync if we're currently on the "Manage addresses" slide
-    // This allows the user to stay on that slide without being forced back
-    const currentSlide = slides[index];
-    if (currentSlide?.type === "manage") {
-      return;
-    }
+    // All slides are addresses now, so we can always sync
     
     // Only sync if selectedAddressId actually changed externally
     if (selectedAddressIdChanged && selectedAddressId) {
@@ -237,10 +229,6 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
         // Update the ref even if we don't call onSelectAddress
         prevActiveAddressId.current = currentAddressId;
       }
-    } else if (active?.type === "manage") {
-      // When on "Manage addresses" slide, don't try to sync back to an address
-      // This allows the user to stay on this slide
-      isUserInitiatedChange.current = false;
     }
   }, [active, onSelectAddress, index, addresses.length]);
 
@@ -587,12 +575,14 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
           <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
             <MapPin className="w-8 h-8 text-slate-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 text-center">
-            No Address Yet
-          </h3>
-          <p className="text-sm text-slate-500 text-center">
-            Let's add your first address.
-          </p>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-slate-900">
+              No Saved Addresses
+            </h3>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Let's add your first address.
+            </p>
+          </div>
           <button
             type="button"
             onClick={onAddAddress}
@@ -632,53 +622,37 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
               scrollSnapStop: 'always',
             }}
           >
-            {slide.type === "address" ? (
-              <AddressCard
-                mode="carousel"
-                label={getAddressTitle(slide.address)}
-                addressLine={formatAddress(slide.address)}
-                isDefault={slide.address.is_default}
-                isSelected={i === index}
-                icon={(() => {
-                  const IconComponent = getIconByName(slide.address.icon || 'Home');
-                  return (
-                    <div className="flex items-center justify-center rounded-full bg-[#F4F7FB] text-slate-800 w-10 h-10 shrink-0">
-                      <IconComponent className="w-6 h-6" />
-                    </div>
-                  );
-                })()}
-                onClick={() => {
-                  isUserInitiatedChange.current = true;
-                  snapToIndex(i);
-                  onSelectAddress(slide.address);
-                  track('address_selected', {
-                    address_count: addresses.length,
-                    is_default: slide.address.is_default || false,
-                    source: 'user_click',
-                  });
-                }}
-                onEdit={onEditAddress ? (e) => {
-                  e.stopPropagation();
-                  onEditAddress(slide.address);
-                } : undefined}
-                onDelete={onDeleteAddress ? (e) => {
-                  e.stopPropagation();
-                  onDeleteAddress(slide.address);
-                } : undefined}
-              />
-            ) : (
-              <AddressCard
-                mode="manage-carousel"
-                addressLine="View, edit, or remove saved locations."
-                onClick={() => {
-                  isUserInitiatedChange.current = true;
-                  snapToIndex(i);
-                  if (onManageAddresses) {
-                    onManageAddresses();
-                  }
-                }}
-              />
-            )}
+            <AddressCard
+              mode="carousel"
+              label={getAddressTitle(slide.address)}
+              addressLine={formatAddress(slide.address)}
+              isDefault={slide.address.is_default}
+              isSelected={i === index}
+              icon={(() => {
+                const IconComponent = getIconByName(slide.address.icon || 'Home');
+                return (
+                  <IconComponent className="w-6 h-6 text-slate-800 shrink-0" />
+                );
+              })()}
+              onClick={() => {
+                isUserInitiatedChange.current = true;
+                snapToIndex(i);
+                onSelectAddress(slide.address);
+                track('address_selected', {
+                  address_count: addresses.length,
+                  is_default: slide.address.is_default || false,
+                  source: 'user_click',
+                });
+              }}
+              onEdit={onEditAddress ? (e) => {
+                e.stopPropagation();
+                onEditAddress(slide.address);
+              } : undefined}
+              onDelete={onDeleteAddress ? (e) => {
+                e.stopPropagation();
+                onDeleteAddress(slide.address);
+              } : undefined}
+            />
           </div>
         ))}
       </div>
@@ -693,7 +667,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
               onClick={() => {
                 isUserInitiatedChange.current = true;
                 snapToIndex(i);
-                // Also handle address selection if clicking on an address dot
+                // Handle address selection when clicking on pagination dot
                 if (i < slides.length && slides[i]?.type === "address") {
                   onSelectAddress(slides[i].address);
                   track('address_selected', {
@@ -701,9 +675,6 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
                     is_default: slides[i].address.is_default || false,
                     source: 'pagination_dot',
                   });
-                } else if (i < slides.length && slides[i]?.type === "manage" && onManageAddresses) {
-                  // Handle manage addresses card click from pagination dot
-                  onManageAddresses();
                 }
               }}
               className={cn(

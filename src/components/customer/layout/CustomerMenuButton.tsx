@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { EllipsisVertical, MapPin, Home, User, LogOut, Package } from "@/lib/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,8 @@ export function CustomerMenuButton() {
   };
 
   const getMenuItemClasses = (path: string, exact: boolean = false, isDestructive: boolean = false) => {
-    const baseClasses = "w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors text-left relative";
+    // Mobile-friendly: larger touch targets (py-4 instead of py-3), better spacing
+    const baseClasses = "w-full flex items-center gap-3 px-4 py-4 text-base font-medium rounded-lg transition-colors text-left relative active:bg-accent/50";
     const active = isActive(path, exact);
     
     if (isDestructive) {
@@ -80,12 +81,17 @@ export function CustomerMenuButton() {
     <>
       <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2 hover:bg-transparent hover:text-current">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 hover:bg-transparent hover:text-current p-2 min-w-[44px] min-h-[44px] touch-manipulation"
+            aria-label="Open menu"
+          >
             <EllipsisVertical className="h-5 w-5" />
             <span className="sr-only">Open menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="w-80">
+        <SheetContent side="right" className="w-[85vw] max-w-sm">
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
             <SheetDescription asChild>

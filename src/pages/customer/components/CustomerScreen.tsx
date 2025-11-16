@@ -90,7 +90,7 @@ export function CustomerScreen({
       {/* Always render main to maintain layout structure, even if empty */}
       <main className={cn(
         "flex-1 min-h-0 px-6 space-y-6 pb-6 mt-6",
-        fillViewport ? "overflow-hidden" : "overflow-y-auto",
+        fillViewport ? "overflow-y-auto" : "overflow-y-auto",
         !hasChildren && "hidden"
       )}>
         {children}

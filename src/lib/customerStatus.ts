@@ -121,9 +121,9 @@ export function getCustomerFacingStatus(
     
     case 'Completed':
       return {
-        label: 'Completed',
+        label: 'OTP verified · Delivered',
         step: 'COMPLETED',
-        description: 'All set. Thanks for trusting Benjamin.'
+        description: 'Your one-time code was verified and the envelope was handed off at the selected address.'
       };
     
     case 'Cancelled':
@@ -203,7 +203,7 @@ export const CUSTOMER_TIMELINE_STEPS = [
   },
   {
     step: 'COMPLETED' as CustomerFacingStep,
-    label: 'Completed',
-    description: 'Delivered safely'
+    label: 'OTP verified · Delivered',
+    description: 'Your one-time code was verified and the envelope was handed off at the selected address.'
   }
 ];

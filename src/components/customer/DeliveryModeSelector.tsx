@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Zap, ShieldCheck } from "lucide-react";
 
 export type DeliveryMode = "quick_handoff" | "count_confirm";
 
@@ -8,58 +9,66 @@ interface DeliveryModeSelectorProps {
   className?: string;
 }
 
+const modes = [
+  {
+    value: "quick_handoff" as DeliveryMode,
+    title: "Quick Handoff",
+    subtitle: "Our runner verifies your one-time code and hands you a sealed envelope. Fast and discreet — no need to count on the spot.",
+    Icon: Zap,
+  },
+  {
+    value: "count_confirm" as DeliveryMode,
+    title: "Count Together",
+    subtitle: "You open the envelope with the runner present and count the bills before you confirm. Extra peace of mind if you prefer to double-check.",
+    Icon: ShieldCheck,
+  },
+];
+
 export function DeliveryModeSelector({
   value,
   onChange,
   className,
 }: DeliveryModeSelectorProps) {
   return (
-    <div className={cn("space-y-3", className)}>
-      <label className="text-sm font-medium text-gray-700">
-        Delivery Style
-      </label>
-      
-      <div className="space-y-2">
-        {/* Quick Handoff */}
-        <label className="flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors hover:bg-gray-50">
-          <input
-            type="radio"
-            name="delivery-mode"
-            value="quick_handoff"
-            checked={value === "quick_handoff"}
-            onChange={() => onChange("quick_handoff")}
-            className="mt-0.5 h-4 w-4 text-black border-gray-300 focus:ring-black"
-          />
-          <div className="flex-1">
-            <div className="text-base font-semibold text-gray-900">
-              Quick Handoff
-            </div>
-            <div className="text-sm text-gray-600 mt-0.5">
-              Fast exchange, no counting required
-            </div>
-          </div>
-        </label>
+    <div className={cn("space-y-2", className)}>
+      {modes.map((mode) => {
+        const selected = mode.value === value;
+        const Icon = mode.Icon;
 
-        {/* Count & Confirm */}
-        <label className="flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors hover:bg-gray-50">
-          <input
-            type="radio"
-            name="delivery-mode"
-            value="count_confirm"
-            checked={value === "count_confirm"}
-            onChange={() => onChange("count_confirm")}
-            className="mt-0.5 h-4 w-4 text-black border-gray-300 focus:ring-black"
-          />
-          <div className="flex-1">
-            <div className="text-base font-semibold text-gray-900">
-              Count & Confirm
+        return (
+          <button
+            key={mode.value}
+            type="button"
+            onClick={() => onChange(mode.value)}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all",
+              selected
+                ? "border-emerald-400 bg-emerald-50/70 shadow-sm"
+                : "border-slate-200 bg-white hover:border-slate-300"
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-full border shrink-0",
+                selected
+                  ? "border-emerald-400 bg-white text-emerald-500"
+                  : "border-slate-200 bg-slate-50 text-slate-400"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+            </span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-900">{mode.title}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{mode.subtitle}</p>
             </div>
-            <div className="text-sm text-gray-600 mt-0.5">
-              Runner counts cash with you before handoff
-            </div>
-          </div>
-        </label>
-      </div>
+          </button>
+        );
+      })}
+      
+      <p className="mt-2 text-[11px] leading-snug text-slate-500">
+        Anyone with your one-time code can receive your envelope.
+        You're responsible for who uses it.
+      </p>
     </div>
   );
 }

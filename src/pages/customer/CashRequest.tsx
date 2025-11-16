@@ -441,12 +441,14 @@ export default function CashRequest() {
         <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
           <MapPin className="w-8 h-8 text-slate-600" />
         </div>
-        <h3 className="text-lg font-semibold text-slate-900 text-center">
-          No Address Yet
-        </h3>
-        <p className="text-sm text-slate-500 text-center">
-          Let's add your first address.
-        </p>
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-slate-900">
+            No Saved Addresses
+          </h3>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Let's add your first address.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setShowAddAddressForm(true)}

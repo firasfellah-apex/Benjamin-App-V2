@@ -60,6 +60,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
     >
       {/* Standardized spacing: px-6 py-6 (24px all around) */}
       {/* Bottom padding includes safe area inset for devices with home indicator */}
+      {/* Content has safe-area padding so it doesn't get hidden behind home indicator */}
       <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
         {/* Stepper (only on steps 1 & 2) */}
       <AnimatePresence>

@@ -30,6 +30,7 @@ export default function CashAmountInput({
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showPulse, setShowPulse] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync input with value prop when not editing
@@ -140,6 +141,7 @@ export default function CashAmountInput({
     onChange(clamped);
     setError("");
     setIsEditing(false);
+    setHasInteracted(true); // Mark that user has interacted with presets
   };
 
   // Handle display click to edit
@@ -193,21 +195,26 @@ export default function CashAmountInput({
 
       {/* Amount Buttons */}
       <div className="flex justify-center gap-2 flex-wrap" style={{ marginBottom: '16px' }}>
-        {[100, 200, 500, 1000].map((amt) => (
-          <button
-            key={amt}
-            type="button"
-            onClick={() => handleQuickPick(amt)}
-            className={cn(
-              "px-4 py-2 rounded-lg border text-sm font-medium transition-colors touch-manipulation",
-              value === amt
-                ? "bg-black text-white border-black"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100"
-            )}
-          >
-            ${amt.toLocaleString()}
-          </button>
-        ))}
+        {[100, 200, 500, 1000].map((amt) => {
+          // Show selected state only if value matches AND (user has interacted OR it's not the default $100)
+          // This prevents $100 from appearing pre-selected, but allows it to show as selected if user clicks it
+          const isSelected = value === amt && (hasInteracted || amt !== min);
+          return (
+            <button
+              key={amt}
+              type="button"
+              onClick={() => handleQuickPick(amt)}
+              className={cn(
+                "px-4 py-2 rounded-lg border text-sm font-medium transition-colors touch-manipulation",
+                isSelected
+                  ? "border-emerald-400 bg-emerald-50/70 text-slate-900 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100"
+              )}
+            >
+              ${amt.toLocaleString()}
+            </button>
+          );
+        })}
       </div>
 
       {/* Slider - Premium Benjamin Design */}

@@ -28,14 +28,12 @@ const CustomerHeaderBar = React.memo(function CustomerHeaderBar({
 
   return (
     <div
-      className="w-full bg-white sticky top-0 z-[70] pt-safe-top"
-      // Safe-area top padding ensures header sits below status bar (time, network, battery)
-      // Uses max(44px, env(safe-area-inset-top)) for universal device support
+      className="w-full bg-white fixed top-0 left-0 right-0 z-[70]"
+      // Header pinned to absolute top of screen
       aria-label="App header"
     >
-      {/* Container sets padding: px-6 (24px) horizontal, no vertical padding */}
-      {/* Vertical spacing comes from CustomerTopShelf's space-y-6 */}
-      <div className="flex items-center justify-between px-6">
+      {/* Container with safe-area padding for content (logo/menu) so they don't get hidden behind status bar */}
+      <div className="flex items-center justify-between px-6 pt-safe-top pb-3">
         <div className="flex items-center">{headerLeft || defaultHeaderLeft}</div>
         <div className="flex items-center">{headerRight || defaultHeaderRight}</div>
       </div>

@@ -15,8 +15,7 @@ export function MobilePageShell({
   return (
     <div
       className={cn(
-        "w-full",
-        "pt-safe-top",
+        "w-full min-h-screen",
         className
       )}
     >

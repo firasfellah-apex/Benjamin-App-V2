@@ -50,8 +50,8 @@ export function AddressCard({
     
     if (mode === "carousel") {
       if (isSelected) {
-        // Selected: green stroke + light green gradient
-        return "bg-gradient-to-br from-green-50/80 to-emerald-50/60 border-2 border-green-500/60";
+        // Selected: emerald border + background matching DeliveryModeSelector
+        return "border border-emerald-400 bg-emerald-50/70 shadow-sm";
       }
       return "bg-slate-50/40 border border-slate-200/70";
     }
@@ -130,9 +130,7 @@ export function AddressCard({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {icon || (
-              <div className="w-10 h-10 rounded-full bg-[#F4F7FB] flex items-center justify-center text-slate-800 shrink-0">
-                <Home className="w-5 h-5" />
-              </div>
+              <Home className="w-5 h-5 text-slate-800 shrink-0" />
             )}
             <div className="flex flex-col flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -205,9 +203,7 @@ export function AddressCard({
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {icon || (
-            <div className="flex items-center justify-center rounded-full bg-[#F4F7FB] text-slate-800 w-10 h-10 shrink-0">
-              <Home className="w-6 h-6" />
-            </div>
+            <Home className="w-6 h-6 text-slate-800 shrink-0" />
           )}
           <span className="text-[17px] font-semibold text-slate-900 truncate">
             {label || "Saved address"}

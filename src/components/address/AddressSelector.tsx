@@ -16,15 +16,17 @@
  * - All navigation and routing unchanged
  */
 import React, { useState, useEffect, useRef } from "react";
-import { X, MapPin, Plus } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import type { CustomerAddress } from "@/types/types";
 import { AddressForm, type AddressFormRef } from "./AddressForm";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
 import { addAddressCopy } from "@/lib/copy/addAddress";
 import { AddressCarousel } from "@/pages/customer/components/AddressCarousel";
+import { AddressCard } from "@/pages/customer/components/AddressCard";
 import { track } from "@/lib/analytics";
 import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { formatAddress } from "@/db/api";
+import { getIconByName } from "./IconPicker";
 
 function AddressFormModal({
   editingAddress,
@@ -200,7 +202,6 @@ export function AddressSelector({
   triggerAddAddress = false,
   onAddAddressTriggered,
 }: AddressSelectorProps) {
-  const navigate = useNavigate();
   const { addresses, isLoading: loading } = useCustomerAddresses();
   const invalidateAddresses = useInvalidateAddresses();
   const [showForm, setShowForm] = useState(false);
@@ -393,8 +394,38 @@ export function AddressSelector({
 
   return (
     <>
-      {/* (A) Address Carousel - Break out to edge-to-edge only when there are addresses */}
-      {addresses.length > 0 ? (
+      {/* (A) Address Display - Single card for 1 address, carousel for 2+ addresses */}
+      {addresses.length === 1 ? (
+        // Single address: render as a single card (no carousel) - fits within parent padding
+        <div className="flex-shrink-0 w-full">
+          <AddressCard
+            mode="carousel"
+            label={addresses[0].label || addresses[0].line1?.split(',')[0] || 'Address'}
+            addressLine={formatAddress(addresses[0])}
+            isDefault={addresses[0].is_default}
+            isSelected={selectedAddressId === addresses[0].id}
+            icon={(() => {
+              const IconComponent = getIconByName(addresses[0].icon || 'Home');
+              return (
+                <IconComponent className="w-6 h-6 text-slate-800 shrink-0" />
+              );
+            })()}
+            onClick={() => {
+              onAddressSelect(addresses[0]);
+              track('address_selected', {
+                address_count: addresses.length,
+                is_default: addresses[0].is_default || false,
+                source: 'single_card',
+              });
+            }}
+            onEdit={handleEdit ? (e) => {
+              e.stopPropagation();
+              handleEdit(addresses[0]);
+            } : undefined}
+          />
+        </div>
+      ) : addresses.length > 1 ? (
+        // Multiple addresses: render carousel
         <div className="flex-shrink-0 -mx-8 w-[calc(100%+4rem)]">
           <AddressCarousel
             addresses={addresses}
@@ -405,27 +436,9 @@ export function AddressSelector({
               setShowForm(true);
             }}
             onEditAddress={handleEdit}
-            onManageAddresses={() => navigate("/customer/addresses")}
           />
         </div>
-      ) : (
-        // When there are no addresses and hideZeroAddressButton is true,
-        // AddressCarousel returns null, so we render an empty div to maintain layout
-        <div className="w-full min-h-[1px]">
-          <AddressCarousel
-            addresses={addresses}
-            selectedAddressId={selectedAddressId}
-            onSelectAddress={onAddressSelect}
-            onAddAddress={() => {
-              setEditingAddress(null);
-              setShowForm(true);
-            }}
-            onEditAddress={handleEdit}
-            onManageAddresses={() => navigate("/customer/addresses")}
-            hideZeroAddressButton={true}
-          />
-        </div>
-      )}
+      ) : null}
 
       {/* (B) Add Address Button - Standard pill button */}
       {/* Always show (user can always add addresses) */}
