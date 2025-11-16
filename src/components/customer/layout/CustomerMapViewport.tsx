@@ -10,13 +10,29 @@ interface CustomerMapViewportProps {
     longitude?: number;
     label?: string;
   } | null;
+  variant?: "fullscreen" | "mini";
+  children?: React.ReactNode; // For overlay content (e.g., MapSummaryOverlay)
 }
 
 export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
   selectedAddress,
+  variant = "fullscreen",
+  children,
 }) => {
   // Tuck amount to pin under bottom nav (same as top tuck: 26px)
   const TUCK_AMOUNT = 26;
+
+  if (variant === "mini") {
+    return (
+      <div className="relative w-full overflow-hidden rounded-lg" style={{ height: "200px" }}>
+        <CustomerMap
+          selectedAddress={selectedAddress}
+          className="w-full h-full"
+        />
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -31,6 +47,7 @@ export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
         selectedAddress={selectedAddress}
         className="w-full h-full"
       />
+      {children}
     </div>
   );
 };

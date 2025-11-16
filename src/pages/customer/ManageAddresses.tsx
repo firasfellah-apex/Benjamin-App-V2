@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trash2, Plus, X, PenLine, ArrowLeft } from "@/lib/icons";
+import { Trash2, Plus, X, PenLine, ArrowLeft, MapPin } from "@/lib/icons";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { deleteAddress, formatAddress } from "@/db/api";
@@ -8,9 +8,9 @@ import type { CustomerAddress } from "@/types/types";
 import { getIconByName } from "@/components/address/IconPicker";
 import { AddressForm } from "@/components/address/AddressForm";
 import { cn } from "@/lib/utils";
-import { AddressCarousel } from "@/pages/customer/components/AddressCarousel";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { AddressCard } from "@/pages/customer/components/AddressCard";
 
 export default function ManageAddresses() {
   const navigate = useNavigate();
@@ -112,24 +112,64 @@ export default function ManageAddresses() {
           <div className="flex flex-col h-full bg-[#F5F7FA]" />
         }
         topContent={
-          <div className="space-y-6">
-            {/* Address carousel - inside top shelf */}
-            <AddressCarousel
-              addresses={addresses}
-              selectedAddressId={null}
-              onSelectAddress={() => {}}
-              onAddAddress={handleAddNew}
-              onEditAddress={handleEdit}
-              onDeleteAddress={handleDelete}
-            />
-            {/* Add Address button - below carousel */}
-            <button
-              onClick={handleAddNew}
-              className="w-full rounded-full border border-slate-200 bg-white py-4 px-6 text-base font-semibold text-slate-900 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
-            >
-              <Plus className="w-5 h-5" />
-              Add Address
-            </button>
+          <div className="space-y-4">
+            {/* Vertical list of addresses */}
+            {addresses.length > 0 ? (
+              <>
+                {addresses.map((address) => (
+                  <AddressCard
+                    key={address.id}
+                    mode="manage"
+                    label={address.label || address.line1?.split(',')[0] || 'Address'}
+                    addressLine={formatAddress(address)}
+                    isDefault={address.is_default}
+                    icon={(() => {
+                      const IconComponent = getIconByName(address.icon || 'Home');
+                      return (
+                        <div className="flex items-center justify-center rounded-full bg-[#F4F7FB] text-slate-800 w-10 h-10 shrink-0">
+                          <IconComponent className="w-6 h-6" />
+                        </div>
+                      );
+                    })()}
+                    onEdit={(e) => {
+                      e.stopPropagation();
+                      handleEdit(address);
+                    }}
+                    onDelete={(e) => {
+                      e.stopPropagation();
+                      handleDelete(address);
+                    }}
+                  />
+                ))}
+                {/* Add Address button - below address list */}
+                <button
+                  onClick={handleAddNew}
+                  className="w-full rounded-full border border-slate-200 bg-white py-4 px-6 text-base font-semibold text-slate-900 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Address
+                </button>
+              </>
+            ) : (
+              <div className="w-full flex flex-col items-center justify-center space-y-4 py-8">
+                <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
+                  <MapPin className="w-8 h-8 text-slate-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 text-center">
+                  No Address Yet
+                </h3>
+                <p className="text-sm text-slate-500 text-center">
+                  Let's add your first address.
+                </p>
+                <button
+                  onClick={handleAddNew}
+                  className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Your First Address
+                </button>
+              </div>
+            )}
           </div>
         }
       >

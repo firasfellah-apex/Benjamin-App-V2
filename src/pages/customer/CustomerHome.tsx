@@ -1,8 +1,12 @@
 /**
- * Customer Home Dashboard
+ * Customer Home - Request Builder
  * 
- * Main landing page for authenticated customers.
- * Uses CustomerScreen with 3-zone layout: header, map, footer.
+ * Single-page progressive request builder with:
+ * 1. Address selection
+ * 2. Cash amount selection
+ * 3. Delivery style selection
+ * 4. Mini-map summary card
+ * 5. Bottom fixed CTA: "Request Cash"
  */
 
 import { Navigate } from 'react-router-dom';
@@ -13,160 +17,137 @@ import { useProfile } from '@/hooks/useProfile';
 import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
 import { CustomerMapViewport } from '@/components/customer/layout/CustomerMapViewport';
 import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar';
-import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
-import { useLocation } from '@/contexts/LocationContext';
-import { getCustomerOrders } from '@/db/api';
-import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
-import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
-import { Skeleton } from '@/components/common/Skeleton';
+import { AddressSelector } from '@/components/address/AddressSelector';
+import CashAmountInput from '@/components/customer/CashAmountInput';
+import { DeliveryModeSelector, type DeliveryMode } from '@/components/customer/DeliveryModeSelector';
+import { MapSummaryOverlay } from '@/components/customer/MapSummaryOverlay';
+import { useCustomerAddresses } from '@/features/address/hooks/useCustomerAddresses';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
-import type { OrderWithDetails, Order } from '@/types/types';
+import type { CustomerAddress } from '@/types/types';
+import { MapPin } from '@/lib/icons';
+import { toast } from 'sonner';
+import { createOrder, formatAddress } from '@/db/api';
+import { calculatePricing } from '@/lib/pricing';
+import { track } from '@/lib/analytics';
+
+const MIN_AMOUNT = 100;
+const MAX_AMOUNT = 1000;
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
   const { profile, isReady } = useProfile(user?.id);
   const navigate = useNavigate();
-  const { location } = useLocation();
-  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  
-  // Load orders function
-  const loadOrders = useCallback(async () => {
-    if (!user) {
-      setOrdersLoading(false);
+  const { addresses, isLoading: addressesLoading } = useCustomerAddresses();
+  const { setBottomSlot } = useCustomerBottomSlot();
+
+  // Request builder state
+  const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
+  const [amount, setAmount] = useState<number | null>(null);
+  const [mode, setMode] = useState<DeliveryMode | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [triggerAddAddress, setTriggerAddAddress] = useState(false);
+
+  // Auto-select first address when addresses load
+  useEffect(() => {
+    if (addresses.length > 0 && !selectedAddress) {
+      const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
+      if (defaultAddr) {
+        setSelectedAddress(defaultAddr);
+      }
+    }
+  }, [addresses, selectedAddress]);
+
+  // Calculate pricing
+  const pricing = useMemo(() => {
+    if (!selectedAddress || amount === null) return null;
+    return calculatePricing({
+      amount,
+      customerAddress: {
+        lat: selectedAddress.latitude || 0,
+        lng: selectedAddress.longitude || 0,
+      },
+    });
+  }, [selectedAddress, amount]);
+
+  // Handle address selection
+  const handleAddressSelect = useCallback((address: CustomerAddress) => {
+    setSelectedAddress(address);
+  }, []);
+
+  // Handle amount change
+  const handleAmountChange = useCallback((newAmount: number) => {
+    setAmount(newAmount);
+    track('cash_amount_changed', {
+      amount: newAmount,
+      amount_range: newAmount < 200 ? 'low' : newAmount < 500 ? 'medium' : 'high',
+    });
+  }, []);
+
+  // Handle mode change
+  const handleModeChange = useCallback((newMode: DeliveryMode) => {
+    setMode(newMode);
+    track('delivery_mode_selected', { mode: newMode });
+  }, []);
+
+  // Handle submit
+  const handleSubmit = useCallback(async () => {
+    if (!selectedAddress || amount === null || !mode) {
+      toast.error("Please complete all fields");
       return;
     }
-    
-    setOrdersLoading(true);
+
+    if (!pricing) {
+      toast.error("Unable to calculate pricing");
+      return;
+    }
+
+    if (profile && profile.daily_usage + pricing.total > profile.daily_limit) {
+      toast.error(`Daily limit exceeded. Remaining: $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
+      return;
+    }
+
+    track('order_submitted', {
+      amount: amount,
+      total_cost: pricing.total,
+      platform_fee: pricing.platformFee,
+      compliance_fee: pricing.complianceFee,
+      delivery_fee: pricing.deliveryFee,
+      delivery_mode: mode,
+      has_delivery_notes: !!selectedAddress.delivery_notes,
+    });
+
+    setIsSubmitting(true);
     try {
-      const data = await getCustomerOrders();
-      setOrders(data);
-    } catch (error) {
-      console.error('Error loading orders:', error);
-      setOrders([]);
+      const deliveryNotes = selectedAddress.delivery_notes || "";
+      const order = await createOrder(
+        amount,
+        formatAddress(selectedAddress),
+        deliveryNotes,
+        selectedAddress.id
+      );
+      if (order) {
+        toast.success("Order placed successfully!");
+        navigate(`/customer/deliveries/${order.id}`);
+      }
+    } catch (error: any) {
+      console.error("Error creating order:", error);
+      const errorMessage = error?.message || error?.error?.message || "Something went wrong. Please try again.";
+      toast.error(errorMessage);
     } finally {
-      setOrdersLoading(false);
+      setIsSubmitting(false);
     }
-  }, [user]);
-  
-  // Fetch orders on mount
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  }, [selectedAddress, amount, mode, pricing, profile, navigate]);
 
-  // Handle realtime order updates
-  const handleOrderUpdate = useCallback((updatedOrder: Order) => {
-    console.log('[CustomerHome] Order update received:', updatedOrder.id, updatedOrder.status);
-    
-    // Update the order in the list
-    setOrders((prev) => {
-      const existingIndex = prev.findIndex((o) => o.id === updatedOrder.id);
-      
-      if (existingIndex >= 0) {
-        // Update existing order
-        return prev.map((o) => 
-          o.id === updatedOrder.id 
-            ? { ...o, ...updatedOrder } as OrderWithDetails
-            : o
-        );
-      } else {
-        // New order, reload to get full details
-        loadOrders();
-        return prev;
-      }
-    });
-  }, [loadOrders]);
-
-  // Subscribe to realtime updates for customer orders
-  useOrdersRealtime({
-    filter: { mode: 'customer', customerId: user?.id || '' },
-    onUpdate: handleOrderUpdate,
-    onInsert: handleOrderUpdate,
-    enabled: !!user?.id,
-  });
-  
-  // Determine order states
-  const { hasActiveOrder, lastCompletedOrder } = useMemo(() => {
-    const activeStatuses = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
-    const activeOrders = orders.filter(order => activeStatuses.includes(order.status));
-    // Get completed or cancelled orders (most recent order regardless of status)
-    const completedOrCancelledOrders = orders.filter(order => 
-      order.status === 'Completed' || order.status === 'Cancelled'
-    );
-    
-    // Sort by date (most recent first)
-    // For completed: use handoff_completed_at or updated_at
-    // For cancelled: use updated_at (when it was cancelled)
-    const sortedOrders = completedOrCancelledOrders.sort((a, b) => {
-      const dateA = a.status === 'Completed' && a.handoff_completed_at
-        ? new Date(a.handoff_completed_at).getTime()
-        : new Date(a.updated_at).getTime();
-      const dateB = b.status === 'Completed' && b.handoff_completed_at
-        ? new Date(b.handoff_completed_at).getTime()
-        : new Date(b.updated_at).getTime();
-      return dateB - dateA;
-    });
-    
-    return {
-      hasActiveOrder: activeOrders.length > 0,
-      lastCompletedOrder: sortedOrders.length > 0 ? sortedOrders[0] : null,
-    };
-  }, [orders]);
-  
-  // Handle rate runner action
-  const handleRateRunner = useCallback((orderId: string) => {
-    // Navigate to order detail page where rating can be done
-    navigate(`/customer/deliveries/${orderId}`);
-  }, [navigate]);
-  
-  // Handle view all action
-  const handleViewAll = useCallback(() => {
-    navigate('/customer/deliveries');
-  }, [navigate]);
-
-  /**
-   * Format and capitalize a name, filtering out invalid IDs
-   * @param name - The name to format (first_name, full_name, or email prefix)
-   * @returns Formatted name or empty string if invalid
-   */
-  const formatName = (name?: string | null): string => {
-    if (!name) return "";
-
-    const clean = name.trim();
-    if (!/^[a-zA-Z]/.test(clean)) return "";
-
-    return clean
-      .split(" ")
-      .map(
-        (part) =>
-          part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-      )
-      .join(" ");
-  };
-
-  /**
-   * Get user's display name with proper formatting
-   * Uses cached profile data to prevent flicker
-   * @returns Formatted name or empty string if not available/invalid
-   */
+  // Get user's display name
   const getUserName = (): string => {
-    // Use profile data (cached from localStorage initially)
     if (profile?.first_name) {
-      const formatted = formatName(profile.first_name);
-      if (formatted) return formatted;
+      const formatted = profile.first_name
+        .split(" ")
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(" ");
+      if (formatted && /^[a-zA-Z]/.test(formatted)) return formatted;
     }
-    
-    // Fallback: construct name from first_name and last_name
-    if (profile?.first_name || profile?.last_name) {
-      const parts = [profile.first_name, profile.last_name].filter(Boolean);
-      if (parts.length > 0) {
-        const fullName = parts.join(' ');
-        const formatted = formatName(fullName);
-        if (formatted) return formatted;
-      }
-    }
-
-    // Return empty string if profile not loaded yet
     return "";
   };
 
@@ -177,103 +158,147 @@ export default function CustomerHome() {
     return "evening";
   };
 
-  // Reserve header height to prevent layout shift
-  // Show skeleton in title slot while loading, but keep layout stable
   const displayName = getUserName();
-
-  // Memoize title separately so it doesn't re-render when orders load
-  // Title should only depend on profile/auth state, not orders
   const title = useMemo(() => {
     if (!isReady) return undefined;
     return `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`;
   }, [isReady, displayName]);
 
-  // Determine what to show in topContent
-  // Show skeleton while orders are loading to maintain consistent header height
-  // IMPORTANT: This hook must be called before any early returns to follow Rules of Hooks
-  const topContent = useMemo(() => {
-    const hasOrders = orders.length > 0;
-    
-    // If user has >= 1 order, show skeleton while loading (but not during initial auth/profile load)
-    // If orders.length === 0, show nothing (keep current logic - don't change)
-    if (hasOrders && ordersLoading && !authLoading && isReady) {
-      return (
-        <div className="space-y-3">
-          {/* Header skeleton - matches LastDeliveryCard structure */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-              <Skeleton className="h-[11px] w-24" />
-              <Skeleton className="h-[15px] w-48" />
-              <Skeleton className="h-[11px] w-32" />
-            </div>
-            {/* Status pill skeleton */}
-            <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
-          </div>
-          {/* Divider skeleton */}
-          <div className="border-t border-slate-200" />
-          {/* Actions skeleton */}
-          <div className="flex items-center justify-between gap-3">
-            <Skeleton className="h-10 w-32 rounded-full" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-        </div>
-      );
+  // Progressive visibility logic
+  const hasAddresses = addresses.length > 0;
+  const showAmountSection = hasAddresses && selectedAddress !== null;
+  const showModeSection = showAmountSection && amount !== null;
+  const showMapCard = showModeSection && mode !== null;
+  const canSubmit = selectedAddress !== null && amount !== null && mode !== null;
+
+  // Handle primary action: submit if ready, or trigger add address if no addresses
+  const handlePrimaryAction = useCallback(() => {
+    if (!hasAddresses) {
+      // Trigger add address form
+      setTriggerAddAddress(true);
+      return;
     }
-    
-    // Show actual card if we have a last delivery (completed or cancelled)
-    // Show it even if there's an active order
-    if (lastCompletedOrder) {
-      return (
-        <LastDeliveryCard
-          order={lastCompletedOrder}
-          onRateRunner={handleRateRunner}
-          onViewAll={handleViewAll}
-        />
-      );
-    }
-    
-    // Otherwise, no top content (no completed/cancelled orders)
-    return undefined;
-  }, [orders.length, ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, handleViewAll]);
+    handleSubmit();
+  }, [hasAddresses, handleSubmit]);
+
+  // Set bottom slot
+  useEffect(() => {
+    setBottomSlot(
+      <RequestFlowBottomBar
+        mode="home"
+        onPrimary={handlePrimaryAction}
+        isLoading={isSubmitting}
+        primaryDisabled={hasAddresses ? !canSubmit : false}
+        primaryLabel={hasAddresses ? "Request Cash" : "Add Your First Address"}
+        useFixedPosition={true}
+      />
+    );
+    return () => setBottomSlot(null);
+  }, [setBottomSlot, handlePrimaryAction, isSubmitting, canSubmit, hasAddresses]);
 
   // If no user, redirect to landing
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
-  // Loading state for greeting/title area - only depends on auth/profile, not orders
-  // Orders loading is handled separately in topContent useMemo
-  // IMPORTANT: Never include ordersLoading here - it causes title to flicker when navigating back
-  const loading = authLoading || (user && !isReady);
-  const shelf = useTopShelfTransition();
-  const { setBottomSlot } = useCustomerBottomSlot();
-
-  // Set bottom slot for MobilePageShell
-  // Only depend on setBottomSlot (which is stable from context)
-  // Create the handler inline to avoid shelf dependency
-  useEffect(() => {
-    setBottomSlot(
-      <RequestFlowBottomBar
-        mode="home"
-        onPrimary={() => {
-          shelf.goTo('/customer/request', 'address', 320);
-        }}
-        useFixedPosition={true}
-      />
-    );
-    return () => setBottomSlot(null);
-  }, [setBottomSlot]); // Only setBottomSlot - shelf is stable from hook
+  const loading = authLoading || (user && !isReady) || addressesLoading;
 
   return (
     <CustomerScreen
       loading={loading}
       title={title}
-      subtitle="Skip the ATM. Request cash in seconds."
+      subtitle="Ready when you are."
       stepKey="home"
-      topContent={topContent}
-      map={<CustomerMapViewport />}
+      fillViewport={true}
     >
-      {/* Main content area - map is handled by map prop, content goes here if needed */}
+      <div className="space-y-6">
+        {/* Address Section */}
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Delivering to</h2>
+            {hasAddresses && (
+              <p className="text-sm text-gray-600 mt-0.5">
+                Select an address or add a new one
+              </p>
+            )}
+          </div>
+
+          <AddressSelector
+            selectedAddressId={selectedAddress?.id || null}
+            onAddressSelect={handleAddressSelect}
+            onAddressChange={() => {
+              // Refresh addresses after add/edit
+              if (addresses.length === 0) {
+                // If we just added first address, it will auto-select via useEffect
+              }
+            }}
+            onEditingChange={setIsEditingAddress}
+            hideManageButton={true}
+            triggerAddAddress={triggerAddAddress}
+            onAddAddressTriggered={() => setTriggerAddAddress(false)}
+          />
+          
+          {!hasAddresses && (
+            // Zero-address helper text
+            <p className="text-sm text-slate-500 text-center mt-2">
+              You don't have any saved addresses yet.
+            </p>
+          )}
+        </div>
+
+        {/* Amount Section - Only show if address selected */}
+        {showAmountSection && (
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                How much cash do you need?
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Choose an amount between ${MIN_AMOUNT.toLocaleString()} and ${MAX_AMOUNT.toLocaleString()}
+              </p>
+            </div>
+            <CashAmountInput
+              value={amount || MIN_AMOUNT}
+              onChange={handleAmountChange}
+              min={MIN_AMOUNT}
+              max={MAX_AMOUNT}
+              step={20}
+            />
+          </div>
+        )}
+
+        {/* Mode Section - Only show if amount selected */}
+        {showModeSection && (
+          <div className="space-y-3">
+            <DeliveryModeSelector
+              value={mode}
+              onChange={handleModeChange}
+            />
+          </div>
+        )}
+
+        {/* Mini-map Summary Card - Only show if mode selected */}
+        {showMapCard && (
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Delivery Summary</h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Review your delivery details
+              </p>
+            </div>
+            <CustomerMapViewport
+              variant="mini"
+              selectedAddress={selectedAddress}
+            >
+              <MapSummaryOverlay
+                address={selectedAddress}
+                amount={amount}
+                mode={mode}
+              />
+            </CustomerMapViewport>
+          </div>
+        )}
+      </div>
     </CustomerScreen>
   );
 }

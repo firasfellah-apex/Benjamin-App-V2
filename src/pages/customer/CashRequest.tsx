@@ -491,6 +491,7 @@ export default function CashRequest() {
         stepKey="address"
         topContent={addressTopContent}
         map={<CustomerMapViewport selectedAddress={selectedAddress} />}
+        fillViewport={true}
       >
         {/* No children - everything is in topContent */}
       </CustomerScreen>
@@ -509,6 +510,7 @@ export default function CashRequest() {
       stepKey="amount"
       topContent={topContent}
       map={<CustomerMapViewport selectedAddress={selectedAddress} />}
+      fillViewport={true}
     >
       {/* No children - everything is in topContent */}
     </CustomerScreen>

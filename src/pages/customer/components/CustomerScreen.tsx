@@ -26,6 +26,7 @@ interface CustomerScreenProps {
   map?: React.ReactNode;           // Map band (fixed height, sits between header and content)
   children?: React.ReactNode;      // Main scrollable content (cards, lists, forms, etc.)
   className?: string;
+  fillViewport?: boolean;          // If true, fills viewport height with no scrolling (for home/request pages)
 }
 
 export function CustomerScreen({ 
@@ -40,6 +41,7 @@ export function CustomerScreen({
   map,
   children,
   className,
+  fillViewport = false,
 }: CustomerScreenProps) {
   // Count actual children (handles fragments, null, etc.)
   const hasChildren = React.Children.count(children) > 0;
@@ -47,7 +49,11 @@ export function CustomerScreen({
   const isHomeScreen = !!map && !hasChildren;
 
   return (
-    <div className={cn("flex flex-col min-h-0 h-full", className)}>
+    <div className={cn(
+      "flex flex-col",
+      fillViewport ? "h-screen overflow-hidden" : "min-h-0 h-full",
+      className
+    )}>
       {/* TOP: Header bar + top shelf (flex-shrink-0, auto height) */}
       <div className="flex-shrink-0">
         <CustomerHeaderBar 
@@ -83,7 +89,8 @@ export function CustomerScreen({
       {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
       {/* Always render main to maintain layout structure, even if empty */}
       <main className={cn(
-        "flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6 mt-6",
+        "flex-1 min-h-0 px-6 space-y-6 pb-6 mt-6",
+        fillViewport ? "overflow-hidden" : "overflow-y-auto",
         !hasChildren && "hidden"
       )}>
         {children}
