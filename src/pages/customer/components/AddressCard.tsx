@@ -90,7 +90,7 @@ export function AddressCard({
             <div className="w-12 h-12 rounded-full bg-[#020816] text-white flex items-center justify-center shrink-0">
               <Plus className="w-5 h-5" />
             </div>
-            <span className="text-[17px] font-semibold text-slate-900">Add address</span>
+            <span className="text-base font-semibold text-slate-900">Add address</span>
           </div>
           <p className="text-sm text-slate-500">
             {addressLine || "Save another place you'd like cash delivered."}
@@ -113,7 +113,7 @@ export function AddressCard({
             <div className="w-12 h-12 rounded-full bg-[#F4F7FB] text-slate-800 flex items-center justify-center shrink-0">
               <MapPin className="w-5 h-5" />
             </div>
-            <span className="text-[17px] font-semibold text-slate-900">Manage Addresses</span>
+            <span className="text-base font-semibold text-slate-900">Manage Addresses</span>
           </div>
           <p className="text-sm text-slate-500">
             {addressLine || "View, edit, or remove saved locations."}
@@ -136,7 +136,7 @@ export function AddressCard({
             )}
             <div className="flex flex-col flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[17px] font-semibold text-slate-900 truncate">
+                <span className="text-base font-semibold text-slate-900 truncate">
                   {label || 'Address'}
                 </span>
                 {isDefault && (
@@ -209,7 +209,7 @@ export function AddressCard({
               <Home className="w-6 h-6" />
             </div>
           )}
-          <span className="text-[17px] font-semibold text-slate-900 truncate">
+          <span className="text-base font-semibold text-slate-900 truncate">
             {label || "Saved address"}
           </span>
           {isDefault && (

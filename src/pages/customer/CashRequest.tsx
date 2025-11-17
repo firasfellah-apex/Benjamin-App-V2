@@ -215,18 +215,18 @@ export default function CashRequest() {
     return (
       <div className="w-full space-y-4">
         <div className="w-full flex justify-between items-center">
-          <span className="text-base font-medium text-gray-900">You'll get</span>
+          <span className="text-sm font-medium text-slate-900">You'll get</span>
           <span 
-            className="text-lg font-bold text-gray-900"
+            className="text-lg font-bold text-slate-900"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
             ${amount.toFixed(0)}
           </span>
         </div>
         <div className="w-full flex justify-between items-center">
-          <span className="text-base font-medium text-gray-900">You'll pay</span>
+          <span className="text-sm font-medium text-slate-900">You'll pay</span>
           <span 
-            className="text-lg font-bold text-gray-900"
+            className="text-lg font-bold text-slate-900"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
             ${pricing?.total.toFixed(2) || '0.00'}
@@ -243,13 +243,13 @@ export default function CashRequest() {
               is_expanded: newState,
             });
           }}
-          className="w-full flex items-center justify-between transition-opacity pt-4 border-t border-gray-200"
+          className="w-full flex items-center justify-between transition-opacity pt-4 border-t border-slate-200"
         >
-          <span className="text-sm font-medium text-gray-600">View breakdown</span>
+          <span className="text-sm font-medium text-slate-600">View breakdown</span>
           {showFeeDetails ? (
-            <ChevronUp className="h-4 w-4 text-gray-600" />
+            <ChevronUp className="h-4 w-4 text-slate-600" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-600" />
+            <ChevronDown className="h-4 w-4 text-slate-600" />
           )}
         </button>
 
@@ -270,20 +270,20 @@ export default function CashRequest() {
             >
               <div className="space-y-2" style={{ paddingTop: "12px" }}>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Cash amount</span>
-                  <span className="text-gray-900 font-medium">${amount.toFixed(2)}</span>
+                  <span className="text-slate-600">Cash amount</span>
+                  <span className="text-slate-900 font-medium">${amount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Platform fee</span>
-                  <span className="text-gray-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
+                  <span className="text-slate-600">Platform fee</span>
+                  <span className="text-slate-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Compliance fee</span>
-                  <span className="text-gray-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
+                  <span className="text-slate-600">Compliance fee</span>
+                  <span className="text-slate-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Delivery fee</span>
-                  <span className="text-gray-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
+                  <span className="text-slate-600">Delivery fee</span>
+                  <span className="text-slate-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
                 </div>
               </div>
             </motion.div>
@@ -378,7 +378,7 @@ export default function CashRequest() {
       {/* Range Helper Text */}
       {/* Element fills container and sizes by content */}
       <div className="w-full text-center">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-600">
           ${MIN_AMOUNT.toLocaleString()}–${MAX_AMOUNT.toLocaleString()} range
         </p>
       </div>
@@ -407,10 +407,10 @@ export default function CashRequest() {
       {/* Element fills container and sizes by content */}
       <div className="w-full pt-6">
         <div className="mb-4">
-          <h2 className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-tight text-slate-900">
+          <h2 className="text-lg font-semibold text-slate-900">
             How should we deliver?
           </h2>
-          <p className="text-[16px] sm:text-[17px] text-slate-500 leading-snug mt-0.5">
+          <p className="text-sm text-slate-500 mt-0.5">
             Choose what matters most this time.
           </p>
         </div>
@@ -427,7 +427,7 @@ export default function CashRequest() {
   // Memoize terms content for footer
   const termsContent = useMemo(() => {
     return (
-      <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600">
+      <div className="flex items-center justify-center gap-1.5 text-xs text-slate-600">
         <span>By confirming, you agree to Benjamin's terms</span>
         <InfoTooltip
           label="Order cancellation policy"
@@ -487,7 +487,7 @@ export default function CashRequest() {
           <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
             <MapPin className="w-8 h-8 text-slate-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 text-center">
+          <h3 className="text-base font-semibold text-slate-900 text-center">
             No Address Yet
           </h3>
           <p className="text-sm text-slate-500 text-center">

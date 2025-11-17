@@ -46,12 +46,17 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
   const selectedLng =
     (selectedAddress as any)?.longitude ?? (selectedAddress as any)?.lng;
 
+  // Show marker if we have selected address coordinates
+  const markerPosition = selectedLat && selectedLng 
+    ? { lat: selectedLat, lng: selectedLng }
+    : null;
+
   const center = useMemo(() => {
-    // 1) Selected address coordinates
-    if (selectedLat && selectedLng) {
+    // 1) If we have a marker, center exactly on it
+    if (markerPosition) {
       return {
-        lat: selectedLat,
-        lng: selectedLng,
+        lat: markerPosition.lat,
+        lng: markerPosition.lng,
       };
     }
 
@@ -62,11 +67,7 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
 
     // 3) Fallback to Miami
     return { lat: 25.7617, lng: -80.1918 };
-  }, [selectedLat, selectedLng, location]);
-
-  // Note: Markers are not currently implemented in BenjaminMap
-  // const showAddressMarker = Boolean(selectedLat && selectedLng);
-  // const showCustomerMarker = !showAddressMarker && !isLoading && Boolean(location);
+  }, [markerPosition, location]);
 
   return (
     <div 
@@ -81,7 +82,7 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
       <BenjaminMap
         center={center}
         zoom={14}
-        height="100%"
+        marker={markerPosition}
       />
     </div>
   );

@@ -132,7 +132,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
             <div className="text-[11px] font-medium uppercase tracking-[0.05em] text-slate-500">
               Latest delivery
             </div>
-            <div className="text-[15px] font-medium text-slate-900">
+            <div className="text-base font-semibold text-slate-900">
               ${amount.toFixed(0)} {isCancelled ? 'requested' : 'delivered'} to {addressLabel}
             </div>
             <div className="text-[11px] text-slate-500">
@@ -161,7 +161,7 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
             <button
               type="button"
               onClick={handleRateClick}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-gray-900 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-slate-900 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
             >
               <span className="text-base leading-[0]">★</span>
               <span>Rate runner</span>

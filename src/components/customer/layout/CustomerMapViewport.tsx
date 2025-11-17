@@ -15,17 +15,9 @@ interface CustomerMapViewportProps {
 export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
   selectedAddress,
 }) => {
-  // Tuck amount to pin under bottom nav (same as top tuck: 26px)
-  const TUCK_AMOUNT = 26;
-
   return (
     <div
-      className="relative w-full overflow-hidden rounded-t-none rounded-b-3xl"
-      style={{
-        height: "70vh", // Fixed height for Google Maps stability
-        // Tuck under bottom nav
-        marginBottom: `-${TUCK_AMOUNT}px`,
-      }}
+      className="relative w-full h-full overflow-hidden rounded-t-none rounded-b-3xl"
     >
       <CustomerMap
         selectedAddress={selectedAddress}

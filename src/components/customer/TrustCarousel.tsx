@@ -167,7 +167,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
               >
                   <div className="w-full flex flex-col md:flex-row">
                   {/* Image half */}
-                  <div className="w-full md:w-1/2 h-48 md:h-auto flex items-center justify-center p-6" style={{ backgroundColor: '#2A2A2A' }}>
+                  <div className="w-full md:w-1/2 h-48 md:h-auto flex items-center justify-center p-6 bg-black">
                     {card.image ? (
                       <img
                         src={card.image}

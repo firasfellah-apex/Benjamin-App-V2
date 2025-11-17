@@ -160,7 +160,7 @@ export default function CashAmountInput({
           {!isEditing ? (
             <div 
               onClick={onEditClick || handleDisplayClick}
-              className="text-5xl font-bold text-gray-900 text-center cursor-text hover:opacity-70 transition-opacity touch-manipulation"
+              className="text-5xl font-bold text-slate-900 text-center cursor-text hover:opacity-70 transition-opacity touch-manipulation"
             >
               ${formatWithCommas(value)}
             </div>
@@ -175,7 +175,7 @@ export default function CashAmountInput({
                 onChange={handleInputChange}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                className="text-5xl font-bold text-gray-900 text-center w-48 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-2 bg-transparent"
+                className="text-5xl font-bold text-slate-900 text-center w-48 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-2 bg-transparent"
                 aria-label="Cash amount"
                 autoFocus
               />
@@ -186,7 +186,7 @@ export default function CashAmountInput({
 
       {/* Secondary Text - Range helper (only if not hidden) */}
       {!hideRangeText && (
-        <p className="text-sm text-gray-500 text-center">
+        <p className="text-sm text-slate-500 text-center">
           ${min.toLocaleString()}–${max.toLocaleString()} range
         </p>
       )}
@@ -202,7 +202,7 @@ export default function CashAmountInput({
               "px-4 py-2 rounded-lg border text-sm font-medium transition-colors touch-manipulation",
               value === amt
                 ? "bg-black border-black text-white"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+                : "border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100"
             )}
           >
             ${amt.toLocaleString()}

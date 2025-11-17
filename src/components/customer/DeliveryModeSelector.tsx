@@ -112,7 +112,7 @@ export function DeliveryModeSelector({
       >
         {value && (
           <div className="pt-3">
-            <p className="text-sm leading-relaxed text-slate-900">
+            <p className="text-sm text-slate-600 leading-relaxed">
               {modes.find(m => m.value === value)?.subtitle}
             </p>
           </div>

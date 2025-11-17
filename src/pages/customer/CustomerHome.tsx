@@ -202,15 +202,47 @@ export default function CustomerHome() {
     return `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`;
   }, [isReady, displayName]);
 
+  // Trust carousel data
+  const trustCards = [
+    {
+      id: 'bank-linked',
+      image: bankIllustration,
+      title: 'Bank-linked, OTP protected',
+      bullets: [
+        { text: 'Secure, bank-level encryption', icon: ShieldCheckIcon },
+        { text: 'One-time verification codes for handoff', icon: KeyIcon },
+        { text: 'Your cash stays protected end-to-end', icon: LockClosedIcon },
+      ],
+    },
+    {
+      id: 'no-atm-runs',
+      image: atmIllustration,
+      title: 'No ATM runs. No borrowing.',
+      bullets: [
+        { text: 'Skip the line and the walk', icon: BoltIcon },
+        { text: 'Discreet, private cash delivery', icon: EyeSlashIcon },
+        { text: 'Get cash exactly when you need it', icon: ClockIcon },
+      ],
+    },
+    {
+      id: 'background-checked',
+      image: runnersIllustration,
+      title: 'Background-checked runners',
+      bullets: [
+        { text: 'Every runner is vetted and verified', icon: CheckBadgeIcon },
+        { text: 'Identity tracked from pickup to delivery', icon: MapPinIcon },
+        { text: 'Safe, reliable handoff at your door', icon: HomeIcon },
+      ],
+    },
+  ];
+
   // Determine what to show in topContent
   // Show skeleton while orders are loading to maintain consistent header height
   // IMPORTANT: This hook must be called before any early returns to follow Rules of Hooks
   const topContent = useMemo(() => {
-    const hasOrders = orders.length > 0;
-    
-    // If user has >= 1 order, show skeleton while loading (but not during initial auth/profile load)
-    // If orders.length === 0, show nothing (keep current logic - don't change)
-    if (hasOrders && ordersLoading && !authLoading && isReady) {
+    // Show skeleton while orders are loading (but not during initial auth/profile load)
+    // This prevents flash of TrustCarousel when orders are still loading
+    if (ordersLoading && !authLoading && isReady) {
       return (
         <div className="space-y-3">
           {/* Header skeleton - matches LastDeliveryCard structure */}
@@ -246,9 +278,9 @@ export default function CustomerHome() {
       );
     }
     
-    // Otherwise, no top content (no completed/cancelled orders)
-    return undefined;
-  }, [orders.length, ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, handleViewAll]);
+    // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
+    return <TrustCarousel cards={trustCards} />;
+  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, handleViewAll, trustCards]);
 
   // If no user, redirect to landing
   if (!user) {
@@ -278,40 +310,6 @@ export default function CustomerHome() {
     return () => setBottomSlot(null);
   }, [setBottomSlot]); // Only setBottomSlot - shelf is stable from hook
 
-  // Trust carousel data
-  const trustCards = [
-    {
-      id: 'bank-linked',
-      image: bankIllustration,
-      title: 'Bank-linked, OTP protected',
-      bullets: [
-        { text: 'Secure, bank-level encryption', icon: ShieldCheckIcon },
-        { text: 'One-time verification codes for handoff', icon: KeyIcon },
-        { text: 'Your cash stays protected end-to-end', icon: LockClosedIcon },
-      ],
-    },
-    {
-      id: 'no-atm-runs',
-      image: atmIllustration,
-      title: 'No ATM runs. No borrowing.',
-      bullets: [
-        { text: 'Skip the line and the walk', icon: BoltIcon },
-        { text: 'Discreet, private cash delivery', icon: EyeSlashIcon },
-        { text: 'Get cash exactly when you need it', icon: ClockIcon },
-      ],
-    },
-    {
-      id: 'background-checked',
-      image: runnersIllustration,
-      title: 'Background-checked runners',
-      bullets: [
-        { text: 'Every runner is vetted and verified', icon: CheckBadgeIcon },
-        { text: 'Identity tracked from pickup to delivery', icon: MapPinIcon },
-        { text: 'Safe, reliable handoff at your door', icon: HomeIcon },
-      ],
-    },
-  ];
-
   return (
     <CustomerScreen
       loading={loading}
@@ -320,10 +318,7 @@ export default function CustomerHome() {
       stepKey="home"
       topContent={topContent}
     >
-      {/* Trust carousels */}
-      <div className="space-y-6">
-        <TrustCarousel cards={trustCards} />
-      </div>
+      {/* No children - TrustCarousel is in topContent when no last delivery */}
     </CustomerScreen>
   );
 }

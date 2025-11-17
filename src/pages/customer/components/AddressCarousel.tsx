@@ -587,7 +587,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
           <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
             <MapPin className="w-8 h-8 text-slate-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 text-center">
+          <h3 className="text-base font-semibold text-slate-900 text-center">
             No Address Yet
           </h3>
           <p className="text-sm text-slate-500 text-center">

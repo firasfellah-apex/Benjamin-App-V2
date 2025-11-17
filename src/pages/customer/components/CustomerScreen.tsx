@@ -47,32 +47,44 @@ export function CustomerScreen({
   const isHomeScreen = !!map && !hasChildren;
 
   return (
-    <div className={cn("flex flex-col min-h-0 h-full", className)}>
-      {/* TOP: Header bar + top shelf (flex-shrink-0, auto height) */}
-      <div className="flex-shrink-0">
-        <CustomerHeaderBar 
-          headerLeft={headerLeft}
-          headerRight={headerRight}
-        />
-        <div className="relative z-10">
-          <CustomerTopShelf>
-            <TopShelfSection
-              loading={loading}
-              title={title}
-              subtitle={subtitle}
-              actions={actions}
-              stepKey={stepKey}
-            >
-              {topContent}
-            </TopShelfSection>
-          </CustomerTopShelf>
-        </div>
-      </div>
+    <div className={cn("flex flex-col h-screen overflow-hidden", className)}>
+      {/* TOP: Header bar + top shelf (fixed, pinned to top) */}
+      <CustomerHeaderBar 
+        headerLeft={headerLeft}
+        headerRight={headerRight}
+      />
+      <CustomerTopShelf extendToBottom={stepKey === "amount"}>
+        <TopShelfSection
+          loading={loading}
+          title={title}
+          subtitle={subtitle}
+          actions={actions}
+          stepKey={stepKey}
+        >
+          {topContent}
+        </TopShelfSection>
+      </CustomerTopShelf>
+      
+      {/* Spacer to push content below fixed header + top shelf */}
+      {/* Uses CSS variable set by CustomerTopShelf for dynamic height */}
+      {/* Header: safe area + 40px (logo + padding) */}
+      <div 
+        className="flex-shrink-0"
+        style={{ 
+          height: `calc(max(44px, env(safe-area-inset-top)) + 40px + var(--top-shelf-height, 200px))`
+        }}
+      />
 
-      {/* MIDDLE: Map band – tucks under top shelf for seamless connection */}
+      {/* MIDDLE: Map band – tucks under top shelf and bottom nav equally */}
       {map && (
-        <div className="-mx-6 flex-shrink-0 relative z-0" style={{ marginTop: '-26px' }}>
-          <div className="overflow-hidden rounded-t-none rounded-b-3xl">
+        <div 
+          className="-mx-6 flex-1 min-h-0 relative z-0 flex flex-col" 
+          style={{ 
+            marginTop: '-26px',
+            marginBottom: '-26px',
+          }}
+        >
+          <div className="flex-1 min-h-0 overflow-hidden rounded-t-none rounded-b-3xl">
             {map}
           </div>
         </div>
@@ -82,10 +94,15 @@ export function CustomerScreen({
       {/* This is the ONE scroll container per page */}
       {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
       {/* Always render main to maintain layout structure, even if empty */}
+      {/* Bottom padding accounts for fixed bottom nav (~150px) + safe area */}
+      {/* z-index lower than bottom nav to ensure nav stays on top */}
       <main className={cn(
-        "flex-1 min-h-0 overflow-y-auto px-6 space-y-6 pb-6 mt-6",
+        "flex-1 min-h-0 overflow-y-auto px-6 space-y-6 mt-6 relative z-10",
         !hasChildren && "hidden"
-      )}>
+      )}
+      style={{
+        paddingBottom: 'calc(150px + max(24px, env(safe-area-inset-bottom)))'
+      }}>
         {children}
       </main>
     </div>

@@ -28,14 +28,13 @@ const CustomerHeaderBar = React.memo(function CustomerHeaderBar({
 
   return (
     <div
-      className="w-full bg-white sticky top-0 z-[60]"
-      // Safe-area top padding is handled by MobilePageShell via pt-safe-top
+      className="w-full bg-white fixed top-0 left-0 right-0 z-[60]"
+      style={{ paddingTop: 'max(44px, env(safe-area-inset-top))' }}
       // z-[60] ensures it stays below modal backdrop (z-[80]) and modal content (z-[90])
       aria-label="App header"
     >
-      {/* Container sets padding: px-6 (24px) horizontal, no vertical padding */}
-      {/* Vertical spacing comes from CustomerTopShelf's space-y-6 */}
-      <div className="flex items-center justify-between px-6">
+      {/* Container sets padding: px-6 (24px) horizontal, pb-3 for spacing */}
+      <div className="flex items-center justify-between px-6 pb-3">
         <div className="flex items-center">{headerLeft || defaultHeaderLeft}</div>
         <div className="flex items-center">{headerRight || defaultHeaderRight}</div>
       </div>

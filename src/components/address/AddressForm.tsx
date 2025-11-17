@@ -545,6 +545,12 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               }
               zoom={15}
               className="h-full"
+              marker={
+                formData.latitude && formData.longitude
+                  ? { lat: formData.latitude, lng: formData.longitude }
+                  : null
+              }
+              minimal={true}
             />
           </div>
         </div>

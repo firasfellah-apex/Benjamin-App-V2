@@ -87,7 +87,10 @@ export function CustomerMenuButton() {
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-[85vw] max-w-sm p-0 flex flex-col">
-          <div className="px-6 pt-6 pb-4 border-b border-slate-200">
+          <div 
+            className="px-6 pb-4 border-b border-slate-200"
+            style={{ paddingTop: 'calc(max(44px, env(safe-area-inset-top)) + 24px)' }}
+          >
             <SheetHeader>
               <SheetTitle className="text-lg font-semibold text-slate-900">Menu</SheetTitle>
               <SheetDescription asChild>
