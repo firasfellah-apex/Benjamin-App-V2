@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronUp, ChevronDown, MessageCircle, Phone, MapPin, HelpCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronUp, MessageCircle, Phone, MapPin, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails, OrderStatus } from '@/types/types';
@@ -218,14 +219,37 @@ export function ActiveDeliverySheet({
         <div className="w-12 h-1.5 bg-neutral-300 rounded-full" />
       </button>
 
-      {/* Sheet Content */}
-      <div className={cn(
-        "px-6 pb-6",
-        isExpanded ? "h-[calc(85vh-3rem)] overflow-y-auto" : "max-h-[calc(100vh-20rem)]"
-      )}>
-        {!isExpanded ? (
-          /* COLLAPSED STATE */
-          <div className="space-y-4">
+      {/* Sheet Content - iOS-style spring expand/collapse */}
+      <motion.div
+        layout
+        className={cn("px-6 pb-6", isExpanded ? "overflow-y-auto" : "")}
+        animate={{
+          height: isExpanded ? "calc(85vh - 3rem)" : "auto",
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+          mass: 0.5,
+        }}
+        style={{ overflow: isExpanded ? "auto" : "hidden" }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          {!isExpanded ? (
+            /* COLLAPSED STATE */
+            <motion.div
+              key="collapsed"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                mass: 0.5,
+              }}
+              className="space-y-4"
+            >
             {/* Status Line */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -312,10 +336,22 @@ export function ActiveDeliverySheet({
                 </button>
               </div>
             )}
-          </div>
-        ) : (
-          /* EXPANDED STATE */
-          <div className="space-y-6">
+            </motion.div>
+          ) : (
+            /* EXPANDED STATE */
+            <motion.div
+              key="expanded"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                mass: 0.5,
+              }}
+              className="space-y-6"
+            >
             {/* Header Summary */}
             <div className="space-y-2">
               <h2 className="text-xl font-semibold text-slate-900">{customerStatus.label}</h2>
@@ -473,9 +509,10 @@ export function ActiveDeliverySheet({
                 Order #{order.id.slice(0, 8).toUpperCase()}
               </p>
             </div>
-          </div>
-        )}
-      </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 }

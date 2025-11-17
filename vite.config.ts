@@ -41,10 +41,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src')
-      }
+      },
+      dedupe: ['react', 'react-dom']
     },
     optimizeDeps: {
-      include: ['@radix-ui/react-switch']
+      include: ['@radix-ui/react-switch', 'react', 'react-dom']
     },
     // Expose VITE_APP_TARGET to the app
     define: {

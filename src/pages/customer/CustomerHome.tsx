@@ -11,8 +11,8 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
-import { CustomerMapViewport } from '@/components/customer/layout/CustomerMapViewport';
 import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar';
+import { TrustCarousel } from '@/components/customer/TrustCarousel';
 import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
 import { useLocation } from '@/contexts/LocationContext';
 import { getCustomerOrders } from '@/db/api';
@@ -21,6 +21,20 @@ import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
 import type { OrderWithDetails, Order } from '@/types/types';
+import bankIllustration from '@/assets/illustrations/bank.png';
+import atmIllustration from '@/assets/illustrations/atm.png';
+import runnersIllustration from '@/assets/illustrations/runners.png';
+import {
+  ShieldCheckIcon,
+  KeyIcon,
+  LockClosedIcon,
+  BoltIcon,
+  EyeSlashIcon,
+  ClockIcon,
+  CheckBadgeIcon,
+  MapPinIcon,
+  HomeIcon,
+} from '@heroicons/react/24/solid';
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
@@ -264,6 +278,40 @@ export default function CustomerHome() {
     return () => setBottomSlot(null);
   }, [setBottomSlot]); // Only setBottomSlot - shelf is stable from hook
 
+  // Trust carousel data
+  const trustCards = [
+    {
+      id: 'bank-linked',
+      image: bankIllustration,
+      title: 'Bank-linked, OTP protected',
+      bullets: [
+        { text: 'Secure, bank-level encryption', icon: ShieldCheckIcon },
+        { text: 'One-time verification codes for handoff', icon: KeyIcon },
+        { text: 'Your cash stays protected end-to-end', icon: LockClosedIcon },
+      ],
+    },
+    {
+      id: 'no-atm-runs',
+      image: atmIllustration,
+      title: 'No ATM runs. No borrowing.',
+      bullets: [
+        { text: 'Skip the line and the walk', icon: BoltIcon },
+        { text: 'Discreet, private cash delivery', icon: EyeSlashIcon },
+        { text: 'Get cash exactly when you need it', icon: ClockIcon },
+      ],
+    },
+    {
+      id: 'background-checked',
+      image: runnersIllustration,
+      title: 'Background-checked runners',
+      bullets: [
+        { text: 'Every runner is vetted and verified', icon: CheckBadgeIcon },
+        { text: 'Identity tracked from pickup to delivery', icon: MapPinIcon },
+        { text: 'Safe, reliable handoff at your door', icon: HomeIcon },
+      ],
+    },
+  ];
+
   return (
     <CustomerScreen
       loading={loading}
@@ -271,9 +319,11 @@ export default function CustomerHome() {
       subtitle="Skip the ATM. Request cash in seconds."
       stepKey="home"
       topContent={topContent}
-      map={<CustomerMapViewport />}
     >
-      {/* Main content area - map is handled by map prop, content goes here if needed */}
+      {/* Trust carousels */}
+      <div className="space-y-6">
+        <TrustCarousel cards={trustCards} />
+      </div>
     </CustomerScreen>
   );
 }

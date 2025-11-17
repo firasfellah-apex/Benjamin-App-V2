@@ -15,6 +15,7 @@ interface CustomerOrderFlowFooterProps {
   onSecondary?: () => void;
   isLoading?: boolean;
   primaryDisabled?: boolean;
+  termsContent?: React.ReactNode;
 }
 
 export function CustomerOrderFlowFooter({
@@ -23,6 +24,7 @@ export function CustomerOrderFlowFooter({
   onSecondary,
   isLoading = false,
   primaryDisabled = false,
+  termsContent,
 }: CustomerOrderFlowFooterProps) {
   return (
     <RequestFlowBottomBar
@@ -32,6 +34,7 @@ export function CustomerOrderFlowFooter({
       isLoading={isLoading}
       primaryDisabled={primaryDisabled}
       useFixedPosition={true}
+      termsContent={termsContent}
     />
   );
 }

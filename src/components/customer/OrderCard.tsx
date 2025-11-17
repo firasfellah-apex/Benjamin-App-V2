@@ -7,6 +7,7 @@
  */
 
 import { MapPin, DollarSign, Flag, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { getOrderDuration, formatDate } from '@/lib/utils';
 import type { OrderWithDetails } from '@/types/types';
@@ -189,9 +190,23 @@ export function OrderCard({ order, onReorder, onRate, isExpanded, onToggle }: Or
           </div>
         </div>
 
-        {/* Expanded Content: Only show for non-completed orders */}
-        {!order.status.includes('Completed') && isExpandedState && (
-          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        {/* Expanded Content: Only show for non-completed orders - iOS-style spring transition */}
+        <AnimatePresence initial={false}>
+          {!order.status.includes('Completed') && isExpandedState && (
+            <motion.div
+              layout
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                mass: 0.5,
+              }}
+              style={{ overflow: "hidden" }}
+              className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 space-y-4"
+            >
             {/* Fee Breakdown */}
             <div>
               <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 flex items-center gap-2">
@@ -343,8 +358,9 @@ export function OrderCard({ order, onReorder, onRate, isExpanded, onToggle }: Or
                 </p>
               </div>
             )}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

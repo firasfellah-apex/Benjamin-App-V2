@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp } from "@/lib/icons";
 import { toast } from "sonner";
 import { createOrder, formatAddress } from "@/db/api";
@@ -29,6 +30,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
 import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
+import { DeliveryModeSelector, type DeliveryMode } from "@/components/customer/DeliveryModeSelector";
 
 type Step = 1 | 2;
 
@@ -45,7 +47,8 @@ export default function CashRequest() {
   // Wizard state
   const [step, setStep] = useState<Step>(1);
   const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
-  const [amount, setAmount] = useState(100);
+  const [amount, setAmount] = useState(300);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
   const [loading, setLoading] = useState(false);
   const [showFeeDetails, setShowFeeDetails] = useState(false); // Collapsed by default
   const [isEditingAddress, setIsEditingAddress] = useState(false);
@@ -162,6 +165,11 @@ export default function CashRequest() {
       return;
     }
 
+    if (!deliveryMode) {
+      toast.error("Please select a delivery style");
+      return;
+    }
+
     if (profile && profile.daily_usage + pricing.total > profile.daily_limit) {
       toast.error(`${strings.customer.dailyLimitExceeded} $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
       return;
@@ -174,6 +182,7 @@ export default function CashRequest() {
       platform_fee: pricing.platformFee,
       compliance_fee: pricing.complianceFee,
       delivery_fee: pricing.deliveryFee,
+      delivery_mode: deliveryMode,
       has_delivery_notes: !!selectedAddress.delivery_notes,
     });
 
@@ -198,7 +207,7 @@ export default function CashRequest() {
     } finally {
       setLoading(false);
     }
-  }, [selectedAddress, pricing, profile, amount, navigate]);
+  }, [selectedAddress, pricing, profile, amount, deliveryMode, navigate]);
 
   // Memoize the summary section (everything except breakdown) - stable reference
   // MUST be before any conditional returns to follow Rules of Hooks
@@ -244,29 +253,42 @@ export default function CashRequest() {
           )}
         </button>
 
-        {/* Fee Breakdown */}
-        {pricing && showFeeDetails && (
-          <div className="overflow-hidden">
-            <div className="space-y-2 pt-3">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Cash amount</span>
-                <span className="text-gray-900 font-medium">${amount.toFixed(2)}</span>
+        {/* Fee Breakdown - iOS-style expand/collapse */}
+        <AnimatePresence initial={false}>
+          {pricing && showFeeDetails && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                mass: 0.5,
+              }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="space-y-2" style={{ paddingTop: "12px" }}>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600">Cash amount</span>
+                  <span className="text-gray-900 font-medium">${amount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600">Platform fee</span>
+                  <span className="text-gray-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600">Compliance fee</span>
+                  <span className="text-gray-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600">Delivery fee</span>
+                  <span className="text-gray-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Platform fee</span>
-                <span className="text-gray-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Compliance fee</span>
-                <span className="text-gray-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Delivery fee</span>
-                <span className="text-gray-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }, [pricing, amount, showFeeDetails]);
@@ -276,7 +298,9 @@ export default function CashRequest() {
   // Standardized spacing: space-y-4 (16px) for main content blocks
   const topContent = useMemo(() => {
     return (
-    <div className="space-y-4" style={{ minHeight: "180px" }}>
+    <div className="space-y-4 pb-[180px]" style={{ minHeight: "180px" }}>
+      {/* Cash Amount Section */}
+
       {/* Main Amount Display */}
       {/* Element fills container and sizes by content */}
       {/* Reserve space with minHeight to prevent layout shift */}
@@ -379,23 +403,42 @@ export default function CashRequest() {
         {summarySection}
       </div>
 
-      {/* Terms Block */}
+      {/* Delivery Style Selector */}
       {/* Element fills container and sizes by content */}
-      <div className="w-full">
-        <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600">
-          <span>By confirming, you agree to Benjamin's terms</span>
-          <InfoTooltip
-            label="Order cancellation policy"
-            side="top"
-            align="center"
-          >
-            Once a runner begins preparing your order, it can't be changed or cancelled.
-          </InfoTooltip>
+      <div className="w-full pt-6">
+        <div className="mb-4">
+          <h2 className="text-[22px] sm:text-[24px] font-semibold leading-tight tracking-tight text-slate-900">
+            How should we deliver?
+          </h2>
+          <p className="text-[16px] sm:text-[17px] text-slate-500 leading-snug mt-0.5">
+            Choose what matters most this time.
+          </p>
         </div>
+
+        <DeliveryModeSelector
+          value={deliveryMode}
+          onChange={(mode) => setDeliveryMode(mode)}
+        />
       </div>
     </div>
   );
-  }, [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr, pricing]);
+  }, [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr, pricing, deliveryMode]);
+
+  // Memoize terms content for footer
+  const termsContent = useMemo(() => {
+    return (
+      <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600">
+        <span>By confirming, you agree to Benjamin's terms</span>
+        <InfoTooltip
+          label="Order cancellation policy"
+          side="top"
+          align="center"
+        >
+          Once a runner begins preparing your order, it can't be changed or cancelled.
+        </InfoTooltip>
+      </div>
+    );
+  }, []);
 
   // Memoize footer to prevent infinite re-renders
   const footer = useMemo(() => {
@@ -420,12 +463,13 @@ export default function CashRequest() {
           onPrimary={handleSubmit}
           onSecondary={handleBackToAddress}
           isLoading={loading}
-          primaryDisabled={loading || !selectedAddress || !pricing}
+          primaryDisabled={loading || !selectedAddress || !pricing || !deliveryMode}
+          termsContent={termsContent}
         />
       );
     }
     return null;
-  }, [step, isEditingAddress, handleNextStep, handleBackToHome, handleSubmit, handleBackToAddress, loading, selectedAddress, pricing, isContinueDisabled]);
+  }, [step, isEditingAddress, handleNextStep, handleBackToHome, handleBackToAddress, handleSubmit, loading, selectedAddress, pricing, isContinueDisabled, deliveryMode, termsContent]);
 
   // Set bottom slot - only depends on memoized footer and stable setBottomSlot
   useEffect(() => {
@@ -437,27 +481,31 @@ export default function CashRequest() {
   if (step === 1) {
     // Top content: zero-address state OR address selector + add button
     const addressTopContent = addresses.length === 0 ? (
-      <div className="w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
-          <MapPin className="w-8 h-8 text-slate-600" />
+      <div className="space-y-4">
+
+        <div className="w-full flex flex-col items-center justify-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
+            <MapPin className="w-8 h-8 text-slate-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 text-center">
+            No Address Yet
+          </h3>
+          <p className="text-sm text-slate-500 text-center">
+            Let's add your first address.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowAddAddressForm(true)}
+            className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
+          >
+            <Plus className="w-5 h-5" />
+            Add Your First Address
+          </button>
         </div>
-        <h3 className="text-lg font-semibold text-slate-900 text-center">
-          No Address Yet
-        </h3>
-        <p className="text-sm text-slate-500 text-center">
-          Let's add your first address.
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowAddAddressForm(true)}
-          className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
-        >
-          <Plus className="w-5 h-5" />
-          Add Your First Address
-        </button>
       </div>
     ) : (
-      <div className="w-full space-y-4">
+      <div className="space-y-4">
+
         <AddressSelector
           selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
           onAddressSelect={handleAddressSelect}
@@ -486,9 +534,9 @@ export default function CashRequest() {
     return (
       <CustomerScreen
         loading={false}
+        stepKey="address"
         title="Where should we deliver?"
         subtitle="Select a location. You can save more than one."
-        stepKey="address"
         topContent={addressTopContent}
         map={<CustomerMapViewport selectedAddress={selectedAddress} />}
       >
@@ -497,18 +545,16 @@ export default function CashRequest() {
     );
   }
 
-  // Step 2: Cash Amount
-  // Loading state: calculating pricing or submitting order
+  // Step 2: Cash Amount + Delivery Style
   const isLoading = loading || !pricing;
 
   return (
     <CustomerScreen
       loading={isLoading}
-      title="How much cash do you need?"
-      subtitle="Choose an amount to have delivered."
       stepKey="amount"
+      title="How much cash do you need?"
+      subtitle="Choose an amount and delivery style."
       topContent={topContent}
-      map={<CustomerMapViewport selectedAddress={selectedAddress} />}
     >
       {/* No children - everything is in topContent */}
     </CustomerScreen>

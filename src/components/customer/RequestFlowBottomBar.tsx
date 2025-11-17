@@ -15,6 +15,7 @@ interface RequestFlowBottomBarProps {
   primaryDisabled?: boolean;  // disable primary button
   useFixedPosition?: boolean; // if false, uses relative positioning for flex layouts
   primaryLabel?: string;      // optional custom label (overrides mode-based label)
+  termsContent?: React.ReactNode; // optional terms text/content to show above buttons
 }
 
 export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
@@ -25,6 +26,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
   primaryDisabled = false,
   useFixedPosition = true, // default to fixed for backward compatibility
   primaryLabel: customPrimaryLabel,
+  termsContent,
 }) => {
   // Label logic
   const primaryLabel =
@@ -87,6 +89,13 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Terms content - shown above buttons for better visibility */}
+      {termsContent && (
+        <div className="mb-4 flex items-center justify-center">
+          {termsContent}
+        </div>
+      )}
 
       <div className={cn("flex w-full gap-3 items-center justify-center")}>
         <AnimatePresence mode="wait" initial={false}>

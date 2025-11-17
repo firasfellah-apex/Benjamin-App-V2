@@ -16,6 +16,8 @@
  * - All navigation and routing unchanged
  */
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, MapPin, Plus } from "lucide-react";
 import type { CustomerAddress } from "@/types/types";
 import { AddressForm, type AddressFormRef } from "./AddressForm";
@@ -37,8 +39,15 @@ function AddressFormModal({
 }) {
   const formRef = useRef<AddressFormRef>(null);
   const [loading, setLoading] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
+
+  // iOS-style spring physics configuration
+  const iosSpring = {
+    type: "spring" as const,
+    stiffness: 300,
+    damping: 30,
+    mass: 0.5,
+  };
 
   const handleSave = () => {
     if (formRef.current) {
@@ -47,21 +56,12 @@ function AddressFormModal({
   };
 
   const handleClose = () => {
-    setIsClosing(true);
+    setIsOpen(false);
     // Wait for animation to complete before calling onCancel
     setTimeout(() => {
       onCancel();
-    }, 300); // Match animation duration
+    }, 400); // Match spring animation duration
   };
-
-  // Trigger slide-up animation on mount
-  React.useEffect(() => {
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      setIsMounted(true);
-    }, 10);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Sync loading state from form
   React.useEffect(() => {
@@ -70,112 +70,138 @@ function AddressFormModal({
     }
   }, []);
 
-  return (
-    <>
-      {/* Backdrop - must be above header (z-40) but below modal content */}
-      {/* Placed outside modal container to ensure proper stacking context */}
-      <div 
-        className={cn(
-          "fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 z-[50]",
-          isMounted && !isClosing ? "opacity-100" : "opacity-0"
-        )}
-        onClick={handleClose}
-      />
-      <div 
-        className={cn(
-          "fixed inset-0 z-[60] flex items-end justify-center transition-opacity duration-300 pointer-events-none",
-          isMounted && !isClosing ? "opacity-100" : "opacity-0"
-        )}
-      >
-      
-      {/* Modal Content - Bottom sheet style */}
-      <div 
-        className={cn(
-          "relative w-full max-w-2xl h-[90vh] bg-white rounded-t-3xl shadow-2xl flex flex-col transition-transform duration-300 ease-in-out pointer-events-auto",
-          isMounted && !isClosing ? "translate-y-0" : "translate-y-full"
-        )}
-      >
-        {/* Header - Fixed to top */}
-        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-3xl sticky top-0 z-10">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">
-              {editingAddress ? "Edit Delivery Address" : "Add Delivery Address"}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              You can edit or remove it anytime.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="text-gray-500 rounded-full p-2 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        
-        {/* Scrollable Content Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="p-6">
-            <AddressForm
-              ref={formRef}
-              address={editingAddress}
-              onSave={(address) => {
-                setLoading(false);
-                // Trigger close animation before saving
-                setIsClosing(true);
-                setTimeout(() => {
-                  onSave(address);
-                  // Close the form after animation completes
-                  onCancel();
-                }, 300);
-              }}
-              onCancel={handleClose}
-            />
-          </div>
-        </div>
+  // Render modal as portal at document body level (standalone, not wrapped in layouts)
+  if (typeof document === 'undefined') {
+    return null;
+  }
 
-        {/* Footer - Fixed to bottom */}
-        <div className="flex-shrink-0 border-t border-gray-200 px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-white rounded-b-3xl sticky bottom-0 z-10">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={loading}
-              className={cn(
-                "flex-1 rounded-full py-4 px-6",
-                "border border-gray-300",
-                "bg-white text-gray-900",
-                "text-base font-semibold",
-                "flex items-center justify-center",
-                "transition-all duration-200",
-                "active:scale-[0.97]",
-                loading && "opacity-60 cursor-not-allowed"
-              )}
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop - covers everything including header */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80]"
+            onClick={handleClose}
+          />
+          
+          {/* Modal Container */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none"
+          >
+            {/* Modal Content - Bottom sheet style with iOS spring physics */}
+            <motion.div
+              layout
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={iosSpring}
+              className="relative w-full max-w-2xl h-[90vh] bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
             >
-              {addAddressCopy.cancelButton}
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={loading}
-              className={cn(
-                "flex-[2] rounded-full py-4 px-6",
-                "bg-black text-white",
-                "text-base font-semibold",
-                "flex items-center justify-center",
-                "transition-all duration-200",
-                "active:scale-[0.97]",
-                loading && "opacity-60 cursor-not-allowed"
-              )}
-            >
-              {loading ? "Saving..." : addAddressCopy.saveButton}
-            </button>
-          </div>
-        </div>
-      </div>
-      </div>
-    </>
+              {/* Header - Fixed to top with safe area */}
+              <motion.div
+                layout
+                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 flex items-center justify-between rounded-t-3xl sticky top-0 z-10"
+              >
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {editingAddress ? "Edit Delivery Address" : "Add Delivery Address"}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {editingAddress ? "Update your delivery address" : "You can edit or remove it anytime."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="ml-4 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors touch-manipulation"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </motion.div>
+              
+              {/* Scrollable Content Area */}
+              <motion.div
+                layout
+                className="flex-1 min-h-0 overflow-y-auto"
+              >
+                <div className="px-6 py-6 space-y-6">
+                  <AddressForm
+                    ref={formRef}
+                    address={editingAddress}
+                    onSave={(address) => {
+                      setLoading(false);
+                      // Trigger close animation before saving
+                      setIsOpen(false);
+                      setTimeout(() => {
+                        onSave(address);
+                        // Close the form after animation completes
+                        onCancel();
+                      }, 400);
+                    }}
+                    onCancel={handleClose}
+                  />
+                </div>
+              </motion.div>
+
+              {/* Footer - Fixed to bottom with safe area */}
+              <motion.div
+                layout
+                className="flex-shrink-0 border-t border-gray-200 px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-white rounded-b-3xl sticky bottom-0 z-10"
+              >
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    disabled={loading}
+                    className={cn(
+                      "flex-1 rounded-full py-4 px-6",
+                      "border border-gray-300",
+                      "bg-white text-gray-900",
+                      "text-base font-semibold",
+                      "flex items-center justify-center",
+                      "transition-all duration-200",
+                      "active:scale-[0.97]",
+                      "touch-manipulation",
+                      loading && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    {addAddressCopy.cancelButton}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={loading}
+                    className={cn(
+                      "flex-[2] rounded-full py-4 px-6",
+                      "bg-black text-white",
+                      "text-base font-semibold",
+                      "flex items-center justify-center",
+                      "transition-all duration-200",
+                      "active:scale-[0.97]",
+                      "touch-manipulation",
+                      loading && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    {loading ? "Saving..." : addAddressCopy.saveButton}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }
 

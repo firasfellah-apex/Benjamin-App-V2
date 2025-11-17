@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { EllipsisVertical, MapPin, Home, User, LogOut, Package } from "@/lib/icons";
+import { EllipsisVertical, MapPin, Home, User, LogOut } from "@/lib/icons";
+import { Clock } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,18 +61,18 @@ export function CustomerMenuButton() {
   };
 
   const getMenuItemClasses = (path: string, exact: boolean = false, isDestructive: boolean = false) => {
-    const baseClasses = "w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors text-left relative";
+    const baseClasses = "w-full flex items-center gap-3 px-4 py-3.5 text-base font-medium rounded-lg transition-all text-left relative";
     const active = isActive(path, exact);
     
     if (isDestructive) {
-      return `${baseClasses} ${active ? 'bg-destructive/10 text-destructive border-l-2 border-destructive' : 'text-destructive hover:bg-destructive/10 hover:text-destructive'}`;
+      return `${baseClasses} text-white font-semibold`;
     }
     
     if (active) {
-      return `${baseClasses} bg-accent text-accent-foreground font-semibold border-l-2 border-primary`;
+      return `${baseClasses} bg-black text-white font-semibold`;
     }
     
-    return `${baseClasses} hover:bg-accent hover:text-accent-foreground`;
+    return `${baseClasses} text-slate-700 hover:bg-slate-50 active:bg-slate-100`;
   };
 
   const isCustomer = profile?.role.includes('customer');
@@ -85,47 +86,49 @@ export function CustomerMenuButton() {
             <span className="sr-only">Open menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="w-80">
-          <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
-            <SheetDescription asChild>
-              {user ? (
-                <div className="text-left">
-                  {!profileReady ? (
-                    <>
-                      <Skeleton className="h-5 w-32 mb-2" />
-                      <Skeleton className="h-4 w-48" />
-                    </>
-                  ) : profile?.first_name || profile?.last_name ? (
-                    <>
-                      <p className="font-semibold text-foreground">
-                        {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
-                      </p>
-                      {profile.phone && (
-                        <p className="text-sm text-muted-foreground">{profile.phone}</p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-semibold text-foreground">Complete your profile</p>
-                      <p className="text-sm text-muted-foreground">Add your name to get started</p>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <span>Access your account</span>
-              )}
-            </SheetDescription>
-          </SheetHeader>
+        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 flex flex-col">
+          <div className="px-6 pt-6 pb-4 border-b border-slate-200">
+            <SheetHeader>
+              <SheetTitle className="text-lg font-semibold text-slate-900">Menu</SheetTitle>
+              <SheetDescription asChild>
+                {user ? (
+                  <div className="text-left mt-2">
+                    {!profileReady ? (
+                      <>
+                        <Skeleton className="h-5 w-32 mb-2" />
+                        <Skeleton className="h-4 w-48" />
+                      </>
+                    ) : profile?.first_name || profile?.last_name ? (
+                      <>
+                        <p className="font-semibold text-slate-900 text-base">
+                          {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
+                        </p>
+                        {profile.phone && (
+                          <p className="text-sm text-slate-500 mt-0.5">{profile.phone}</p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-slate-900 text-base">Complete your profile</p>
+                        <p className="text-sm text-slate-500 mt-0.5">Add your name to get started</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-slate-600">Access your account</span>
+                )}
+              </SheetDescription>
+            </SheetHeader>
+          </div>
 
-          <div className="mt-6 space-y-1">
+          <div className="flex-1 px-6 py-4 space-y-1">
             {user ? (
               <>
                 <button
                   onClick={() => handleMenuItemClick("/account")}
                   className={getMenuItemClasses("/account", true)}
                 >
-                  <User className="h-5 w-5" />
+                  <User className="h-5 w-5" style={isActive("/account", true) ? { color: '#34D399' } : { color: '#64748b' }} />
                   <span>My Profile</span>
                 </button>
 
@@ -134,7 +137,7 @@ export function CustomerMenuButton() {
                     onClick={() => handleMenuItemClick("/customer/home")}
                     className={getMenuItemClasses("/customer/home", false)}
                   >
-                    <Home className={`h-5 w-5 ${isActive("/customer/home", false) ? 'text-accent-foreground' : ''}`} />
+                    <Home className="h-5 w-5" style={isActive("/customer/home", false) ? { color: '#34D399' } : { color: '#64748b' }} />
                     <span>Home</span>
                   </button>
                 )}
@@ -144,7 +147,7 @@ export function CustomerMenuButton() {
                     onClick={() => handleMenuItemClick("/customer/deliveries")}
                     className={getMenuItemClasses("/customer/deliveries", false)}
                   >
-                    <Package className="h-5 w-5" />
+                    <Clock className="h-5 w-5" style={isActive("/customer/deliveries", false) ? { color: '#34D399' } : { color: '#64748b' }} />
                     <span>My Deliveries</span>
                   </button>
                 )}
@@ -154,20 +157,10 @@ export function CustomerMenuButton() {
                     onClick={() => handleMenuItemClick("/customer/addresses")}
                     className={getMenuItemClasses("/customer/addresses", true)}
                   >
-                    <MapPin className="h-5 w-5" />
+                    <MapPin className="h-5 w-5" style={isActive("/customer/addresses", true) ? { color: '#34D399' } : { color: '#64748b' }} />
                     <span>Manage Addresses</span>
                   </button>
                 )}
-
-                <Separator className="my-2" />
-
-                <button
-                  onClick={handleLogoutClick}
-                  className={getMenuItemClasses("", false, true)}
-                >
-                  <LogOut className="h-5 w-5" />
-                  <span>Log Out</span>
-                </button>
               </>
             ) : (
               <>
@@ -188,6 +181,18 @@ export function CustomerMenuButton() {
               </>
             )}
           </div>
+
+          {user && (
+            <div className="px-6 pb-6 pt-4 border-t border-slate-200">
+              <button
+                onClick={handleLogoutClick}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-semibold rounded-lg transition-all text-left bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Log Out</span>
+              </button>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 

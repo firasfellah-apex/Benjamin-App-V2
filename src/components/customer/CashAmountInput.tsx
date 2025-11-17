@@ -201,7 +201,7 @@ export default function CashAmountInput({
             className={cn(
               "px-4 py-2 rounded-lg border text-sm font-medium transition-colors touch-manipulation",
               value === amt
-                ? "bg-black text-white border-black"
+                ? "bg-black border-black text-white"
                 : "border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100"
             )}
           >
