@@ -480,9 +480,9 @@ export default function CashRequest() {
   // Step 1: Address Selection
   if (step === 1) {
     // Top content: zero-address state OR address selector + add button
+    // Always render AddressSelector so it can handle the modal trigger
     const addressTopContent = addresses.length === 0 ? (
       <div className="space-y-4">
-
         <div className="w-full flex flex-col items-center justify-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
             <MapPin className="w-8 h-8 text-slate-600" />
@@ -502,10 +502,20 @@ export default function CashRequest() {
             Add Your First Address
           </button>
         </div>
+        {/* Render AddressSelector hidden to handle modal trigger */}
+        <AddressSelector
+          selectedAddressId={null}
+          onAddressSelect={handleAddressSelect}
+          onAddressChange={() => {}}
+          onEditingChange={setIsEditingAddress}
+          onAddressesCountChange={() => {}}
+          hideManageButton={true}
+          triggerAddAddress={showAddAddressForm}
+          onAddAddressTriggered={() => setShowAddAddressForm(false)}
+        />
       </div>
     ) : (
       <div className="space-y-4">
-
         <AddressSelector
           selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
           onAddressSelect={handleAddressSelect}

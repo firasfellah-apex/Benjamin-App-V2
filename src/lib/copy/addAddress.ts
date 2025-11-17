@@ -9,7 +9,7 @@ export const addAddressCopy = {
   addressPlaceholder: "Home, Office, Mom's Place",
 
   // --- Address Fields ---
-  streetAddress: "Street address",
+  streetAddress: "Street Address",
   apt: "Apt, suite, etc. (optional)",
   city: "City",
   state: "State",

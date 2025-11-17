@@ -73,14 +73,14 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
         <button
           type="button"
           className={cn(
-            "flex items-center justify-center w-12 h-12 rounded-xl border-2 border-gray-200 bg-white hover:border-[#22C55E] hover:bg-green-50 transition-colors",
+            "flex items-center justify-center w-12 h-12 rounded-xl border-2 border-gray-200 bg-white hover:border-[#22C55E] hover:bg-green-50 transition-colors touch-manipulation",
             className
           )}
         >
           <IconComponent className="h-5 w-5 text-gray-700" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-4" align="start">
+      <PopoverContent className="w-80 p-4 z-[100]" align="start">
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Preset Locations</h3>
@@ -96,7 +96,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex items-center justify-center p-3 rounded-xl border-2 transition-all",
+                      "flex items-center justify-center p-3 rounded-xl border-2 transition-all touch-manipulation",
                       "hover:scale-105 active:scale-95",
                       isSelected
                         ? "border-[#22C55E] bg-green-50"
@@ -128,7 +128,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex items-center justify-center p-3 rounded-xl border-2 transition-all",
+                      "flex items-center justify-center p-3 rounded-xl border-2 transition-all touch-manipulation",
                       "hover:scale-105 active:scale-95",
                       isSelected
                         ? "border-[#22C55E] bg-green-50"

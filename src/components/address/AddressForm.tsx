@@ -56,6 +56,9 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
     
     // Delivery notes section - closed by default
     const [showDeliveryNotes, setShowDeliveryNotes] = useState(false);
+    // Track if address has been selected from autocomplete to show additional fields
+    // If editing an existing address, show fields immediately
+    const [hasSelectedAddress, setHasSelectedAddress] = useState(!!address?.line1);
     const [formData, setFormData] = useState({
       icon: address?.icon || 'Home',
       label: address?.label || "",
@@ -364,11 +367,6 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
 
       {/* Address Section */}
       <div className="space-y-4">
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-gray-900">Address Details</h3>
-          <p className="text-xs text-gray-500">Enter your complete delivery address</p>
-        </div>
-
         <div className="space-y-4">
           <div className="space-y-2">
             <AddressAutocomplete
@@ -392,6 +390,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   latitude: normalized.location?.lat || formData.latitude,
                   longitude: normalized.location?.lng || formData.longitude,
                 });
+                // Show additional fields after address is selected
+                setHasSelectedAddress(true);
                 // Clear errors for auto-filled fields
                 setErrors({
                   ...errors,
@@ -412,6 +412,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   latitude: place.latitude,
                   longitude: place.longitude,
                 });
+                // Show additional fields after address is selected
+                setHasSelectedAddress(true);
                 setErrors({
                   ...errors,
                   line1: undefined,
@@ -431,90 +433,95 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="line2" className="text-sm font-medium text-gray-900">{addAddressCopy.apt}</Label>
-            <Input
-              id="line2"
-              name="line2"
-              autoComplete="address-line2"
-              placeholder="Apt 4B (optional)"
-              value={formData.line2}
-              onChange={(e) => setFormData({ ...formData, line2: e.target.value })}
-            />
-          </div>
+          {/* Show additional fields only after address is selected from autocomplete */}
+          {hasSelectedAddress && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="line2" className="text-sm font-medium text-gray-900">{addAddressCopy.apt}</Label>
+                <Input
+                  id="line2"
+                  name="line2"
+                  autoComplete="address-line2"
+                  placeholder="Apt 4B (optional)"
+                  value={formData.line2}
+                  onChange={(e) => setFormData({ ...formData, line2: e.target.value })}
+                />
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city" className="text-sm font-medium text-gray-900">{addAddressCopy.city}</Label>
-              <Input
-                id="city"
-                name="city"
-                autoComplete="address-level2"
-                placeholder="San Francisco"
-                value={formData.city}
-                onChange={(e) => {
-                  setFormData({ ...formData, city: e.target.value });
-                  if (errors.city) setErrors({ ...errors, city: undefined });
-                }}
-                className={cn(
-                  errors.city && "border-[#FF5A5F] bg-[#FFF7F7]"
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city" className="text-sm font-medium text-gray-900">{addAddressCopy.city}</Label>
+                  <Input
+                    id="city"
+                    name="city"
+                    autoComplete="address-level2"
+                    placeholder="San Francisco"
+                    value={formData.city}
+                    onChange={(e) => {
+                      setFormData({ ...formData, city: e.target.value });
+                      if (errors.city) setErrors({ ...errors, city: undefined });
+                    }}
+                    className={cn(
+                      errors.city && "border-[#FF5A5F] bg-[#FFF7F7]"
+                    )}
+                  />
+                  {errors.city && (
+                    <p className="text-xs text-[#FF5A5F] mt-1">
+                      {errors.city}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="state" className="text-sm font-medium text-gray-900">{addAddressCopy.state}</Label>
+                  <Input
+                    id="state"
+                    name="state"
+                    autoComplete="address-level1"
+                    placeholder="CA"
+                    value={formData.state}
+                    onChange={(e) => {
+                      setFormData({ ...formData, state: e.target.value.toUpperCase() });
+                      if (errors.state) setErrors({ ...errors, state: undefined });
+                    }}
+                    maxLength={2}
+                    className={cn(
+                      errors.state && "border-[#FF5A5F] bg-[#FFF7F7]"
+                    )}
+                  />
+                  {errors.state && (
+                    <p className="text-xs text-[#FF5A5F] mt-1">
+                      {errors.state}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="postal_code" className="text-sm font-medium text-gray-900">{addAddressCopy.zip}</Label>
+                <Input
+                  id="postal_code"
+                  name="postal_code"
+                  autoComplete="postal-code"
+                  placeholder="94102"
+                  value={formData.postal_code}
+                  onChange={(e) => {
+                    setFormData({ ...formData, postal_code: e.target.value });
+                    if (errors.postal_code) setErrors({ ...errors, postal_code: undefined });
+                  }}
+                  maxLength={10}
+                  className={cn(
+                    errors.postal_code && "border-[#FF5A5F] bg-[#FFF7F7]"
+                  )}
+                />
+                {errors.postal_code && (
+                  <p className="text-xs text-[#FF5A5F] mt-1">
+                    {errors.postal_code}
+                  </p>
                 )}
-              />
-              {errors.city && (
-                <p className="text-xs text-[#FF5A5F] mt-1">
-                  {errors.city}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="state" className="text-sm font-medium text-gray-900">{addAddressCopy.state}</Label>
-              <Input
-                id="state"
-                name="state"
-                autoComplete="address-level1"
-                placeholder="CA"
-                value={formData.state}
-                onChange={(e) => {
-                  setFormData({ ...formData, state: e.target.value.toUpperCase() });
-                  if (errors.state) setErrors({ ...errors, state: undefined });
-                }}
-                maxLength={2}
-                className={cn(
-                  errors.state && "border-[#FF5A5F] bg-[#FFF7F7]"
-                )}
-              />
-              {errors.state && (
-                <p className="text-xs text-[#FF5A5F] mt-1">
-                  {errors.state}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="postal_code" className="text-sm font-medium text-gray-900">{addAddressCopy.zip}</Label>
-            <Input
-              id="postal_code"
-              name="postal_code"
-              autoComplete="postal-code"
-              placeholder="94102"
-              value={formData.postal_code}
-              onChange={(e) => {
-                setFormData({ ...formData, postal_code: e.target.value });
-                if (errors.postal_code) setErrors({ ...errors, postal_code: undefined });
-              }}
-              maxLength={10}
-              className={cn(
-                errors.postal_code && "border-[#FF5A5F] bg-[#FFF7F7]"
-              )}
-            />
-            {errors.postal_code && (
-              <p className="text-xs text-[#FF5A5F] mt-1">
-                {errors.postal_code}
-              </p>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -614,25 +621,27 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
         </div>
       </div>
 
-      {/* Default Address Toggle */}
-      <div className="flex items-center justify-between py-3 px-1 border-t border-gray-100">
-        <div className="space-y-0.5">
-          <Label htmlFor="is_default" className="text-sm font-semibold text-gray-900 cursor-pointer">
-            Make this my default address
-          </Label>
-          <p className="text-xs text-gray-500">
-            Use this address for future deliveries
-          </p>
+      {/* Default Address Toggle - Hidden for now, logic preserved for future use */}
+      {false && (
+        <div className="flex items-center justify-between py-3 px-1 border-t border-gray-100">
+          <div className="space-y-0.5">
+            <Label htmlFor="is_default" className="text-sm font-semibold text-gray-900 cursor-pointer">
+              Make this my default address
+            </Label>
+            <p className="text-xs text-gray-500">
+              Use this address for future deliveries
+            </p>
+          </div>
+          <Switch
+            id="is_default"
+            checked={formData.is_default}
+            onCheckedChange={(checked) => 
+              setFormData({ ...formData, is_default: checked })
+            }
+            className="data-[state=checked]:bg-[#22C55E]"
+          />
         </div>
-        <Switch
-          id="is_default"
-          checked={formData.is_default}
-          onCheckedChange={(checked) => 
-            setFormData({ ...formData, is_default: checked })
-          }
-          className="data-[state=checked]:bg-[#22C55E]"
-        />
-      </div>
+      )}
       </form>
     );
   }

@@ -109,7 +109,7 @@ function AddressFormModal({
               {/* Header - Fixed to top with safe area */}
               <motion.div
                 layout
-                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 flex items-center justify-between rounded-t-3xl sticky top-0 z-10"
+                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 flex items-center justify-between rounded-t-3xl z-10"
               >
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">
@@ -129,10 +129,13 @@ function AddressFormModal({
                 </button>
               </motion.div>
               
-              {/* Scrollable Content Area */}
+              {/* Scrollable Content Area - between header and footer */}
               <motion.div
                 layout
                 className="flex-1 min-h-0 overflow-y-auto"
+                style={{ 
+                  paddingBottom: '120px' // Space for fixed footer
+                }}
               >
                 <div className="px-6 py-6 space-y-6">
                   <AddressForm
@@ -153,10 +156,10 @@ function AddressFormModal({
                 </div>
               </motion.div>
 
-              {/* Footer - Fixed to bottom with safe area */}
+              {/* Footer - Fixed to bottom of screen with safe area */}
               <motion.div
                 layout
-                className="flex-shrink-0 border-t border-gray-200 px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-white rounded-b-3xl sticky bottom-0 z-10"
+                className="absolute bottom-0 left-0 right-0 flex-shrink-0 border-t border-gray-200 px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-white rounded-b-3xl z-10"
               >
                 <div className="flex gap-3">
                   <button
