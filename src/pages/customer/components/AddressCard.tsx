@@ -139,7 +139,8 @@ export function AddressCard({
                 <span className="text-base font-semibold text-slate-900 truncate">
                   {label || 'Address'}
                 </span>
-                {isDefault && (
+                {/* Default badge hidden for now */}
+                {false && isDefault && (
                   <span className="px-3 py-[3px] rounded-full bg-[#E6F7EB] text-[#17904A] text-xs font-medium shrink-0">
                     Default
                   </span>
@@ -212,7 +213,8 @@ export function AddressCard({
           <span className="text-base font-semibold text-slate-900 truncate">
             {label || "Saved address"}
           </span>
-          {isDefault && (
+          {/* Default badge hidden for now */}
+          {false && isDefault && (
             <span className="ml-2 inline-flex items-center px-3 py-[3px] rounded-full bg-[#E6F7EB] text-[#17904A] text-xs font-medium shrink-0">
               Default
             </span>

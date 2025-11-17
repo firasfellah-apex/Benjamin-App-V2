@@ -81,7 +81,8 @@ export function AddressCardShell({
                 {label || "Saved address"}
               </span>
             </div>
-            {isDefault && (
+            {/* Default badge hidden for now */}
+            {false && isDefault && (
               <span className="px-3 py-1 rounded-full bg-[#E5FAEA] text-emerald-700 text-xs font-medium shrink-0">
                 Default
               </span>
@@ -103,7 +104,8 @@ export function AddressCardShell({
                 {label || "Saved address"}
               </span>
             </div>
-            {isDefault && (
+            {/* Default badge hidden for now */}
+            {false && isDefault && (
               <span className="px-3 py-1 rounded-full bg-[#E5FAEA] text-emerald-700 text-xs font-medium shrink-0">
                 Default
               </span>

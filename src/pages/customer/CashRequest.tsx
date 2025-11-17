@@ -47,6 +47,7 @@ export default function CashRequest() {
   // Wizard state
   const [step, setStep] = useState<Step>(1);
   const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
+  const [savedCarouselIndex, setSavedCarouselIndex] = useState<number | null>(null); // Persist carousel position
   const [amount, setAmount] = useState(300);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
   const [loading, setLoading] = useState(false);
@@ -134,6 +135,9 @@ export default function CashRequest() {
       toast.error(strings.customer.addressRequiredError);
       return;
     }
+    // Save the current carousel index before moving to next step
+    // This will be restored when returning to address selection
+    // Note: The index is saved via onCarouselIndexChange callback
     // Prepare transition, then update step
     shelfRef.current.prepare('amount', 420);
     // Update step after reserve phase starts
@@ -151,6 +155,9 @@ export default function CashRequest() {
   }, []);
   
   const handleBackToHome = useCallback(() => {
+    // Reset selected address and carousel index when going back to home (starting a new request)
+    setSelectedAddress(null);
+    setSavedCarouselIndex(null);
     shelfRef.current.goTo('/customer/home', 'home', 320);
   }, []);
 
@@ -298,127 +305,121 @@ export default function CashRequest() {
   // Standardized spacing: space-y-4 (16px) for main content blocks
   const topContent = useMemo(() => {
     return (
-    <div className="space-y-4 pb-[180px]" style={{ minHeight: "180px" }}>
+    <div className="space-y-4 pb-8" style={{ minHeight: "180px" }}>
       {/* Cash Amount Section */}
-
-      {/* Main Amount Display */}
-      {/* Element fills container and sizes by content */}
-      {/* Reserve space with minHeight to prevent layout shift */}
-      <div className="w-full flex items-center justify-center" style={{ minHeight: '60px' }}>
-        {!isEditingAmount ? (
-          <div 
-            onClick={() => {
-              setIsEditingAmount(true);
-              setDraftAmountStr(String(amount)); // seed with current value
-              setTimeout(() => amountInputRef.current?.focus(), 0);
-            }}
-            className="cursor-text"
-            style={{ 
-              fontSize: 48, 
-              fontWeight: 700, 
-              color: '#0F172A',
-              textAlign: 'center',
-              fontVariantNumeric: 'tabular-nums'
-            }}
-          >
-            ${amount.toLocaleString()}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <input
-              ref={amountInputRef}
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={draftAmountStr}
-              onChange={(e) => {
-                // allow free typing of digits; strip commas/spaces
-                const raw = e.target.value.replace(/[^\d]/g, "");
-                // optional: cap length to something sane (e.g., 5 digits)
-                setDraftAmountStr(raw);
+      <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
+        {/* Main Amount Display */}
+        {/* Element fills container and sizes by content */}
+        {/* Reserve space with minHeight to prevent layout shift */}
+        <div className="w-full flex items-center justify-center" style={{ minHeight: '60px' }}>
+          {!isEditingAmount ? (
+            <div 
+              onClick={() => {
+                setIsEditingAmount(true);
+                setDraftAmountStr(String(amount)); // seed with current value
+                setTimeout(() => amountInputRef.current?.focus(), 0);
               }}
-              onBlur={() => {
-                // commit on blur: parse, clamp, step-round, then exit edit mode
-                const num = parseInt(draftAmountStr || "0", 10);
-                // if empty or 0, fall back to MIN so we never commit NaN
-                const safe = Number.isFinite(num) && num > 0 ? num : MIN_AMOUNT;
-                // round to nearest $20 and clamp to [MIN, MAX]
-                const rounded = Math.round(safe / 20) * 20;
-                const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, rounded));
-                setAmount(clamped);
-                setIsEditingAmount(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.currentTarget.blur(); // triggers the same commit logic
-                } else if (e.key === "Escape") {
-                  // cancel edits and revert
-                  setDraftAmountStr(String(amount));
-                  setIsEditingAmount(false);
-                }
-              }}
-              style={{
-                fontSize: 48,
-                fontWeight: 700,
+              className="cursor-text"
+              style={{ 
+                fontSize: 48, 
+                fontWeight: 700, 
                 color: '#0F172A',
                 textAlign: 'center',
-                width: '200px',
-                border: 'none',
-                borderBottom: '2px solid #000',
-                background: 'transparent',
-                outline: 'none',
-                paddingBottom: '4px'
+                fontVariantNumeric: 'tabular-nums'
               }}
-              autoFocus
-            />
-          </div>
-        )}
-      </div>
+            >
+              ${amount.toLocaleString()}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <input
+                ref={amountInputRef}
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={draftAmountStr}
+                onChange={(e) => {
+                  // allow free typing of digits; strip commas/spaces
+                  const raw = e.target.value.replace(/[^\d]/g, "");
+                  // optional: cap length to something sane (e.g., 5 digits)
+                  setDraftAmountStr(raw);
+                }}
+                onBlur={() => {
+                  // commit on blur: parse, clamp, step-round, then exit edit mode
+                  const num = parseInt(draftAmountStr || "0", 10);
+                  // if empty or 0, fall back to MIN so we never commit NaN
+                  const safe = Number.isFinite(num) && num > 0 ? num : MIN_AMOUNT;
+                  // round to nearest $20 and clamp to [MIN, MAX]
+                  const rounded = Math.round(safe / 20) * 20;
+                  const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, rounded));
+                  setAmount(clamped);
+                  setIsEditingAmount(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur(); // triggers the same commit logic
+                  } else if (e.key === "Escape") {
+                    // cancel edits and revert
+                    setDraftAmountStr(String(amount));
+                    setIsEditingAmount(false);
+                  }
+                }}
+                style={{
+                  fontSize: 48,
+                  fontWeight: 700,
+                  color: '#0F172A',
+                  textAlign: 'center',
+                  width: '200px',
+                  border: 'none',
+                  borderBottom: '2px solid #000',
+                  background: 'transparent',
+                  outline: 'none',
+                  paddingBottom: '4px'
+                }}
+                autoFocus
+              />
+            </div>
+          )}
+        </div>
 
-      {/* Range Helper Text */}
-      {/* Element fills container and sizes by content */}
-      <div className="w-full text-center">
-        <p className="text-sm text-slate-600">
-          ${MIN_AMOUNT.toLocaleString()}–${MAX_AMOUNT.toLocaleString()} range
-        </p>
-      </div>
+        {/* Range Helper Text */}
+        {/* Element fills container and sizes by content */}
+        <div className="w-full text-center">
+          <p className="text-sm text-slate-600">
+            ${MIN_AMOUNT.toLocaleString()}–${MAX_AMOUNT.toLocaleString()} range
+          </p>
+        </div>
 
-      {/* Amount Selection Components (Preset Buttons & Slider) */}
-      {/* Element fills container and sizes by content */}
-      <div className="w-full">
-        <CashAmountInput
-          value={amount}
-          onChange={handleAmountChange}
-          min={MIN_AMOUNT}
-          max={MAX_AMOUNT}
-          step={20}
-          hideAmountDisplay={true}
-          hideRangeText={true}
-        />
-      </div>
+        {/* Amount Selection Components (Preset Buttons & Slider) */}
+        {/* Element fills container and sizes by content */}
+        <div className="w-full">
+          <CashAmountInput
+            value={amount}
+            onChange={handleAmountChange}
+            min={MIN_AMOUNT}
+            max={MAX_AMOUNT}
+            step={20}
+            hideAmountDisplay={true}
+            hideRangeText={true}
+          />
+        </div>
 
-      {/* Summary Section */}
-      {/* Element fills container and sizes by content */}
-      <div className="w-full">
-        {summarySection}
+        {/* Summary Section */}
+        {/* Element fills container and sizes by content */}
+        <div className="w-full">
+          {summarySection}
+        </div>
       </div>
 
       {/* Delivery Style Selector */}
       {/* Element fills container and sizes by content */}
       <div className="w-full pt-6">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            How should we deliver?
-          </h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Choose what matters most this time.
-          </p>
+        <div className="bg-slate-50 rounded-2xl p-4">
+          <DeliveryModeSelector
+            value={deliveryMode}
+            onChange={(mode) => setDeliveryMode(mode)}
+          />
         </div>
-
-        <DeliveryModeSelector
-          value={deliveryMode}
-          onChange={(mode) => setDeliveryMode(mode)}
-        />
       </div>
     </div>
   );
@@ -525,6 +526,8 @@ export default function CashRequest() {
           hideManageButton={true}
           triggerAddAddress={showAddAddressForm}
           onAddAddressTriggered={() => setShowAddAddressForm(false)}
+          initialCarouselIndex={savedCarouselIndex}
+          onCarouselIndexChange={setSavedCarouselIndex}
         />
         {/* Add Address button - only show when user has 1+ addresses */}
         {hasAnyAddress && (

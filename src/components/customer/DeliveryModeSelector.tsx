@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Zap, ShieldCheck, AlertCircle } from "lucide-react";
+import { Zap, ShieldCheck, Shield, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
 export type DeliveryMode = "quick_handoff" | "count_confirm";
 
@@ -14,13 +15,13 @@ const modes = [
   {
     value: "count_confirm" as DeliveryMode,
     title: "Counted",
-    subtitle: "You open the envelope with the runner present and count the bills before you confirm. Extra peace of mind if you prefer to double-check.",
+    subtitle: "Count bills with the runner before confirming.",
     Icon: ShieldCheck,
   },
   {
     value: "quick_handoff" as DeliveryMode,
     title: "Speed",
-    subtitle: "Our runner verifies your one-time code and hands you a sealed envelope. Fast and discreet — no need to count on the spot.",
+    subtitle: "Quick handoff, no counting together.",
     Icon: Zap,
   },
 ];
@@ -30,6 +31,87 @@ export function DeliveryModeSelector({
   onChange,
   className,
 }: DeliveryModeSelectorProps) {
+  const [isSecurityTipExpanded, setIsSecurityTipExpanded] = useState(false);
+  const securityTipRef = useRef<HTMLDivElement>(null);
+
+  // Scroll adjustment when security tip expands/collapses
+  useEffect(() => {
+    if (!securityTipRef.current) return;
+    
+    // Function to calculate and scroll to show bottom of component
+    const scrollToBottom = () => {
+      if (!securityTipRef.current) return;
+      
+      // Get the actual current position after any layout changes
+      const rect = securityTipRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const currentScrollY = window.scrollY;
+      
+      // If component is above viewport (rect.bottom is negative or very small),
+      // we need to calculate using the top position instead
+      let componentBottom: number;
+      
+      if (rect.bottom < 0 || rect.top < 0) {
+        // Component is above viewport, calculate from top
+        const componentTop = rect.top + currentScrollY;
+        // Estimate or measure the actual height
+        const componentHeight = rect.height || securityTipRef.current.offsetHeight;
+        componentBottom = componentTop + componentHeight;
+      } else {
+        // Component is in viewport, use rect.bottom directly
+        componentBottom = rect.bottom + currentScrollY;
+      }
+      
+      // Calculate target scroll position to show bottom of component at bottom of viewport
+      // Add a small padding to ensure it's fully visible
+      const targetScrollY = componentBottom - viewportHeight + 20;
+      
+      // Scroll to show the bottom of the component
+      window.scrollTo({
+        top: Math.max(0, targetScrollY),
+        behavior: 'smooth'
+      });
+    };
+    
+    let rafId1: number | null = null;
+    let rafId2: number | null = null;
+    let rafId3: number | null = null;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    
+    if (isSecurityTipExpanded) {
+      // When expanding, we need to wait for the expansion animation to actually change the DOM
+      // Use multiple RAF calls to ensure we're measuring after layout has updated
+      rafId1 = requestAnimationFrame(() => {
+        rafId2 = requestAnimationFrame(() => {
+          rafId3 = requestAnimationFrame(() => {
+            // Now measure and scroll - the expansion should have started
+            scrollToBottom();
+            
+            // Fine-tune after animation completes
+            timeout = setTimeout(() => {
+              scrollToBottom();
+            }, 350);
+          });
+        });
+      });
+    } else {
+      // When collapsing, scroll immediately
+      scrollToBottom();
+      
+      // Fine-tune after collapse animation
+      timeout = setTimeout(() => {
+        scrollToBottom();
+      }, 300);
+    }
+    
+    return () => {
+      if (rafId1 !== null) cancelAnimationFrame(rafId1);
+      if (rafId2 !== null) cancelAnimationFrame(rafId2);
+      if (rafId3 !== null) cancelAnimationFrame(rafId3);
+      if (timeout !== null) clearTimeout(timeout);
+    };
+  }, [isSecurityTipExpanded]);
+
   return (
     <div className={cn("space-y-3", className)}>
       {/* Pill-shaped toggle with morphing background - iOS-style button morph effect */}
@@ -111,7 +193,7 @@ export function DeliveryModeSelector({
         style={{ overflow: "hidden" }}
       >
         {value && (
-          <div className="pt-3">
+          <div className="pt-3 pb-3">
             <p className="text-sm text-slate-600 leading-relaxed">
               {modes.find(m => m.value === value)?.subtitle}
             </p>
@@ -119,13 +201,64 @@ export function DeliveryModeSelector({
         )}
       </motion.div>
       
-      <div className="mt-6 pt-4 border-t border-slate-200">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
-          <p className="text-[11px] leading-snug text-slate-500">
-            Anyone with your one-time code can receive your envelope.
-            You're responsible for who uses it.
-          </p>
+      {/* Security Tip - Collapsible Card */}
+      <div className="mt-10">
+        <div ref={securityTipRef} className="w-full rounded-2xl bg-[#FFF9E8] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSecurityTipExpanded(!isSecurityTipExpanded);
+            }}
+            className="w-full px-4 py-3 text-left transition-opacity duration-200 active:opacity-70"
+          >
+            {/* Top Row - Always Visible */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-5 w-5 text-slate-700 flex-shrink-0" />
+                  <p className="text-sm font-medium text-slate-900">
+                    Guard your one-time code
+                  </p>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  Anyone with the code can receive your envelope.
+                </p>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-5 w-5 text-slate-600 flex-shrink-0 transition-transform duration-200 mt-0.5",
+                  isSecurityTipExpanded && "transform rotate-180"
+                )}
+              />
+            </div>
+          </button>
+
+          {/* Expanded Content - Outside button to prevent scroll shift */}
+          <AnimatePresence initial={false}>
+            {isSecurityTipExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{
+                  duration: 0.3,
+                  ease: [0.4, 0, 0.2, 1],
+                }}
+                style={{ overflow: "hidden" }}
+              >
+                <div className="px-4 pb-3 pt-0 border-t border-amber-200/40">
+                  <div className="space-y-2 pt-3">
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      Only share it when your runner is at your door.
+                    </p>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      Benjamin will never ask for it by phone or text.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

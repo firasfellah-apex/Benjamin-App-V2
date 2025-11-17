@@ -22,10 +22,8 @@ export default function ManageAddresses() {
   const [addressToDelete, setAddressToDelete] = useState<CustomerAddress | null>(null);
   const [isClosingModal, setIsClosingModal] = useState(false);
 
-  // Sort addresses: default first, then by created_at
+  // Sort addresses by created_at (default logic hidden for now)
   const addresses = rawAddresses.sort((a, b) => {
-    if (a.is_default && !b.is_default) return -1;
-    if (!a.is_default && b.is_default) return 1;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { createAddress, updateAddress, setDefaultAddress } from "@/db/api";
+import { createAddress, updateAddress } from "@/db/api";
 import type { CustomerAddress } from "@/types/types";
 import { cn } from "@/lib/utils";
 import { IconPicker, ALL_ICONS } from "./IconPicker";
@@ -68,7 +68,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
       state: address?.state || "",
       postal_code: address?.postal_code || "",
       delivery_notes: address?.delivery_notes || "",
-      is_default: address?.is_default || false,
+      is_default: false, // Default logic hidden for now
       latitude: address?.latitude || null,
       longitude: address?.longitude || null,
     });
@@ -236,20 +236,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           longitude: formData.longitude || null,
         };
         
-        // Handle default address setting separately
-        if (formData.is_default && !address.is_default) {
-          const defaultSuccess = await setDefaultAddress(address.id);
-          if (!defaultSuccess) {
-            toast.error("Failed to set default address");
-            updateLoading(false);
-            return;
-          }
-        } else if (!formData.is_default && address.is_default) {
-          // Unset default if checkbox was unchecked
-          await updateAddress(address.id, { is_default: false });
-        }
-        
-        // Update address fields
+        // Update address fields (default logic hidden for now)
         const success = await updateAddress(address.id, updateFields);
         if (success) {
           invalidateAddresses(); // Invalidate query cache
@@ -257,7 +244,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           const updatedAddress: CustomerAddress = { 
             ...address, 
             ...updateFields,
-            is_default: formData.is_default
+            is_default: false // Always false for now
           };
           onSave(updatedAddress);
         } else {
@@ -276,28 +263,15 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           delivery_notes: formData.delivery_notes?.trim() || null,
           latitude: formData.latitude || undefined,
           longitude: formData.longitude || undefined,
-          is_default: false // Always create without default first, then set if needed
+          is_default: false // Default logic hidden for now
         };
         
         const result = await createAddress(addressData);
         if (result) {
-          // If it should be default, set it as default
-          if (formData.is_default) {
-            const defaultSuccess = await setDefaultAddress(result.id);
-            if (defaultSuccess) {
-              invalidateAddresses(); // Invalidate query cache
-              toast.success("Address saved");
-              onSave({ ...result, is_default: true });
-            } else {
-              invalidateAddresses(); // Invalidate query cache
-              toast.success("Address saved, but failed to set as default");
-              onSave(result);
-            }
-          } else {
-            invalidateAddresses(); // Invalidate query cache
-            toast.success("Address saved");
-            onSave(result);
-          }
+          // Default logic hidden for now - always create without default
+          invalidateAddresses(); // Invalidate query cache
+          toast.success("Address saved");
+          onSave({ ...result, is_default: false });
           // Form will close via onSave callback in parent component
         } else {
           console.error("Address save error: Failed to create address");

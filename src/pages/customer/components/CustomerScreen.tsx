@@ -101,7 +101,8 @@ export function CustomerScreen({
         !hasChildren && "hidden"
       )}
       style={{
-        paddingBottom: 'calc(150px + max(24px, env(safe-area-inset-bottom)))'
+        paddingBottom: 'calc(150px + max(24px, env(safe-area-inset-bottom)))',
+        WebkitOverflowScrolling: 'touch', // iOS momentum scrolling
       }}>
         {children}
       </main>

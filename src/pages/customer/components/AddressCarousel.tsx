@@ -24,6 +24,8 @@ type AddressCarouselProps = {
   onDeleteAddress?: (address: CustomerAddress) => void;
   onManageAddresses?: () => void; // New handler for manage addresses card
   hideZeroAddressButton?: boolean; // Hide the "Add Your First Address" button in zero-address state
+  initialIndex?: number | null; // Saved carousel index to restore position
+  onIndexChange?: (index: number) => void; // Callback to save carousel index
 };
 
 type Slide = { type: "address"; address: CustomerAddress } | { type: "manage" };
@@ -37,6 +39,8 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   onDeleteAddress,
   onManageAddresses,
   hideZeroAddressButton = false,
+  initialIndex: savedIndex = null,
+  onIndexChange,
 }) => {
   const location = useLocation();
   const slides: Slide[] = useMemo(() => {
@@ -44,17 +48,51 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
     return [...base, { type: "manage" } as Slide];
   }, [addresses]);
 
-  const initialIndex = useMemo(() => {
+  // Calculate the correct index based on selectedAddressId
+  // This is the source of truth for where the carousel should be
+  const getSelectedIndex = useCallback(() => {
     if (!selectedAddressId || slides.length === 0) return 0;
     const idx = slides.findIndex(
       (s) => s.type === "address" && s.address.id === selectedAddressId
     );
     return idx >= 0 ? idx : 0;
-  }, [slides, selectedAddressId]);
+  }, [selectedAddressId, slides]);
 
-  const [index, setIndex] = useState(initialIndex);
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
+  // Initialize index: use savedIndex if provided, otherwise use selectedAddressId
+  // This preserves carousel position when returning to the page
+  const [index, setIndex] = useState(() => {
+    // Priority: savedIndex > selectedAddressId > 0
+    if (savedIndex !== null && savedIndex >= 0) {
+      return savedIndex;
+    }
+    // If we have selectedAddressId and slides, find the index
+    if (selectedAddressId && slides.length > 0) {
+      const idx = slides.findIndex(
+        (s) => s.type === "address" && s.address.id === selectedAddressId
+      );
+      return idx >= 0 ? idx : 0;
+    }
+    return 0;
+  });
+  
+  // Update index when slides load - only if we don't have a saved index
+  // If we have a saved index, the main sync effect will handle it
+  useEffect(() => {
+    if (slides.length === 0) return;
+    
+    // If we have a saved index, don't override it with selectedAddressId
+    // The saved index takes priority when returning from cash amount
+    if (savedIndex !== null && savedIndex >= 0 && savedIndex < slides.length) {
+      return; // Let the main sync effect handle saved index
+    }
+    
+    // Only use selectedAddressId if we don't have a saved index (new order flow)
+    const selectedIdx = getSelectedIndex();
+    if (selectedIdx !== index && selectedAddressId && !savedIndex) {
+      setIndex(selectedIdx);
+    }
+  }, [slides.length, selectedAddressId, savedIndex, index, getSelectedIndex]);
+  
   const isUserInitiatedChange = useRef(false);
   const prevActiveAddressId = useRef<string | null>(null);
   const isUserScrollingRef = useRef(false);
@@ -62,9 +100,6 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAnimatingRef = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
-
-  // Swipe detection
-  const minSwipeDistance = 50;
 
   // iOS-like easing function
   const easeOutCubic = (t: number): number => {
@@ -119,100 +154,112 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
 
   const goTo = (next: number) => {
     if (!slides.length) return;
-    const bounded = (next + slides.length) % slides.length;
+    // Clamp to bounds instead of wrapping (no loop effect)
+    const bounded = Math.max(0, Math.min(slides.length - 1, next));
     isUserInitiatedChange.current = true;
     snapToIndex(bounded);
   };
 
-  // Simplified touch handlers - let native scroll snapping handle most of the work
-  // Only use for very intentional swipes that need programmatic navigation
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchEndX.current = null;
-    touchStartX.current = e.targetTouches[0].clientX;
-    isUserScrollingRef.current = true;
-  };
+  // Native scrolling handles all touch interactions - no custom touch handlers needed
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.targetTouches[0].clientX;
-  };
-
-  const onTouchEnd = () => {
-    // Let native scroll snapping handle the positioning
-    // Only trigger programmatic navigation for very clear swipes
-    if (!touchStartX.current || !touchEndX.current) {
-      isUserScrollingRef.current = false;
-      return;
-    }
-    
-    const distance = touchStartX.current - touchEndX.current;
-    const isLeftSwipe = distance > minSwipeDistance * 1.5; // Increased threshold
-    const isRightSwipe = distance < -minSwipeDistance * 1.5;
-    
-    // Only programmatically navigate for very clear swipes
-    // Otherwise let the native scroll snap handle it
-    if (isLeftSwipe || isRightSwipe) {
-      isUserInitiatedChange.current = true;
-      if (isLeftSwipe) {
-        goTo(index + 1);
-      } else {
-        goTo(index - 1);
-      }
-    }
-    
-    // Reset after a short delay to allow scroll to settle
-    setTimeout(() => {
-      isUserScrollingRef.current = false;
-    }, 100);
-  };
-
-  // Keep index in sync when addresses/selection change (external sync only)
-  // Only sync when selectedAddressId changes externally, not when user scrolls
+  // Keep index and scroll position in sync with selectedAddressId
+  // BUT: If we have a savedIndex, prioritize it over selectedAddressId (when returning from cash amount)
   const prevSelectedAddressIdRef = useRef<string | null>(selectedAddressId);
+  const hasScrolledToSelectedRef = useRef(false);
   const isInitialMountRef = useRef(true);
+  const hasRestoredFromSavedIndexRef = useRef(false);
   
   useEffect(() => {
-    if (!slides.length) return;
+    if (!slides.length || !carouselRef.current) return;
     
-    // Skip sync on initial mount - let initialIndex handle it
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
+    // If we have a saved index, use it instead of syncing to selectedAddressId
+    // This preserves the carousel position when returning from cash amount
+    if (savedIndex !== null && savedIndex >= 0 && savedIndex < slides.length) {
+      const savedSlide = slides[savedIndex];
+      
+      // Only sync if index doesn't match saved index OR if we haven't restored yet
+      if (savedIndex !== index || !hasRestoredFromSavedIndexRef.current) {
+        isUserInitiatedChange.current = false;
+        setIndex(savedIndex);
+        
+        // If the saved slide is an address, select it to keep carousel and selection in sync
+        if (savedSlide?.type === "address" && savedSlide.address.id !== selectedAddressId) {
+          onSelectAddress(savedSlide.address);
+        }
+        
+        // Directly set scroll position - no animation, no RAF delays
+        const container = carouselRef.current;
+        if (container) {
+          const cardWidth = container.offsetWidth;
+          if (cardWidth > 0) {
+            container.scrollLeft = savedIndex * cardWidth; // hard-align scroll
+          }
+        }
+        
+        hasRestoredFromSavedIndexRef.current = true;
+      }
+      // Treat savedIndex as single source of truth and skip the selectedAddressId sync below
       return;
+    } else {
+      // Reset the flag when we don't have a saved index (new order flow)
+      hasRestoredFromSavedIndexRef.current = false;
     }
     
-    // Only sync if selectedAddressId changed externally (not from user scrolling)
+    // Only sync to selectedAddressId if we don't have a saved index
+    const selectedIdx = getSelectedIndex();
     const selectedAddressIdChanged = prevSelectedAddressIdRef.current !== selectedAddressId;
     prevSelectedAddressIdRef.current = selectedAddressId;
     
-    // Don't sync if user is currently scrolling or just scrolled
-    if (isUserScrollingRef.current || isUserInitiatedChange.current) {
+    // On initial mount, always reset the scroll flag to force sync
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      hasScrolledToSelectedRef.current = false;
+    }
+    
+    // Don't sync if user is currently scrolling (unless selectedAddressId changed or initial mount)
+    if (isUserScrollingRef.current && !selectedAddressIdChanged && hasScrolledToSelectedRef.current) {
       return;
     }
     
-    // Don't sync if we're currently on the "Manage addresses" slide
-    // This allows the user to stay on that slide without being forced back
-    const currentSlide = slides[index];
-    if (currentSlide?.type === "manage") {
-      return;
+    // Always sync index to match selected address
+    if (selectedIdx !== index) {
+      isUserInitiatedChange.current = false;
+      setIndex(selectedIdx);
     }
     
-    // Only sync if selectedAddressId actually changed externally
-    if (selectedAddressIdChanged && selectedAddressId) {
-      const selectedIdx = slides.findIndex(
-        (s) => s.type === "address" && s.address.id === selectedAddressId
-      );
-      
-      if (selectedIdx >= 0 && selectedIdx !== index) {
-        // This is an external sync, not user-initiated
-        isUserInitiatedChange.current = false;
-        snapToIndex(selectedIdx);
-      }
+    // Scroll to the selected address if:
+    // 1. selectedAddressId changed, OR
+    // 2. We haven't scrolled to it yet, OR
+    // 3. Current scroll position doesn't match
+    const container = carouselRef.current;
+    const cardWidth = container.offsetWidth;
+    if (!cardWidth) return;
+    
+    const expectedScroll = selectedIdx * cardWidth;
+    const currentScroll = container.scrollLeft;
+    const scrollOffset = Math.abs(currentScroll - expectedScroll);
+    
+    // Always scroll if we're off by more than 5px OR if we haven't scrolled yet
+    if (selectedAddressIdChanged || !hasScrolledToSelectedRef.current || scrollOffset > 5) {
+      hasScrolledToSelectedRef.current = false;
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (carouselRef.current) {
+            snapToIndex(selectedIdx);
+            hasScrolledToSelectedRef.current = true;
+          }
+        });
+      });
+    } else {
+      hasScrolledToSelectedRef.current = true;
     }
     
     // Safety check: ensure index is within bounds
     if (index >= slides.length) {
       setIndex(Math.max(0, slides.length - 1));
     }
-  }, [slides, selectedAddressId, index, snapToIndex]);
+  }, [slides, selectedAddressId, index, snapToIndex, getSelectedIndex, savedIndex, onSelectAddress]);
 
   const active = slides[index];
 
@@ -244,32 +291,6 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
     }
   }, [active, onSelectAddress, index, addresses.length]);
 
-  // Initial scroll to selected index on mount (only if not index 0)
-  const hasInitialScrolledRef = useRef(false);
-  useEffect(() => {
-    if (hasInitialScrolledRef.current || !carouselRef.current) return;
-    if (initialIndex === 0) {
-      hasInitialScrolledRef.current = true;
-      console.log('[InitialScroll] Skipped: initialIndex is 0');
-      return;
-    }
-    
-    console.log('[InitialScroll] Scrolling to initial index:', initialIndex);
-    // Small delay to ensure container is rendered
-    const timeout = setTimeout(() => {
-      if (carouselRef.current && !hasInitialScrolledRef.current) {
-        hasInitialScrolledRef.current = true;
-        snapToIndex(initialIndex);
-        console.log('[InitialScroll] Scrolled to index:', initialIndex);
-      }
-    }, 150);
-    return () => clearTimeout(timeout);
-  }, [initialIndex, snapToIndex]);
-
-  // Reset initial scroll flag when addresses change (component remounts or addresses reload)
-  useEffect(() => {
-    hasInitialScrolledRef.current = false;
-  }, [addresses.length]);
 
   // Scroll to active card when index changes programmatically (not user scrolling)
   useEffect(() => {
@@ -306,13 +327,32 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
     }
     
     // Mark as user scrolling to prevent sync effect from interfering
-    isUserScrollingRef.current = true;
+    // This happens when scroll position changes
+    if (newIndex !== index) {
+      isUserScrollingRef.current = true;
+    }
     
     // Update index if we've moved to a different slide
     // This works for ALL slides, including "Add address" (last slide)
+    // Always update index to match scroll position so pills stay in sync
     if (newIndex !== index && newIndex >= 0 && newIndex < slides.length) {
       isUserInitiatedChange.current = true;
       setIndex(newIndex);
+      
+      // Save the index for persistence
+      onIndexChange?.(newIndex);
+      
+      // Auto-select the address if it's an address slide (not "manage")
+      const newSlide = slides[newIndex];
+      if (newSlide?.type === "address" && newSlide.address.id !== prevActiveAddressId.current) {
+        prevActiveAddressId.current = newSlide.address.id;
+        onSelectAddress(newSlide.address);
+        track('address_selected', {
+          address_count: addresses.length,
+          is_default: newSlide.address.is_default || false,
+          source: 'carousel_swipe',
+        });
+      }
     }
     
     // After scrolling stops, ensure we snap to the nearest slide with iOS-like easing
@@ -336,15 +376,37 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
         return;
       }
       
+      // Update index to the nearest slide (this will trigger auto-selection)
+      if (nearestIndex !== index) {
+        isUserInitiatedChange.current = true;
+        setIndex(nearestIndex);
+        
+        // Save the index for persistence
+        onIndexChange?.(nearestIndex);
+      }
+      
       // Snap to nearest index with iOS-like easing
       snapToIndex(nearestIndex);
+      
+      // Auto-select the address if it's an address slide (not "manage")
+      const nearestSlide = slides[nearestIndex];
+      if (nearestSlide?.type === "address" && nearestSlide.address.id !== prevActiveAddressId.current) {
+        prevActiveAddressId.current = nearestSlide.address.id;
+        onSelectAddress(nearestSlide.address);
+        track('address_selected', {
+          address_count: addresses.length,
+          is_default: nearestSlide.address.is_default || false,
+          source: 'carousel_swipe',
+        });
+      }
       
       // Reset scrolling flags after a delay
       setTimeout(() => {
         isUserScrollingRef.current = false;
+        isUserInitiatedChange.current = false;
       }, 100);
     }, 80);
-  }, [index, slides.length, snapToIndex]);
+  }, [index, slides, snapToIndex, onSelectAddress, addresses.length, prevActiveAddressId]);
 
   // Cleanup timeouts and animation frames on unmount
   useEffect(() => {
@@ -382,12 +444,13 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       return;
     }
 
+    const selectedIdx = getSelectedIndex();
     console.log('[Bounce] Effect triggered:', {
       slidesLength: slides.length,
       hasBounced: hasBouncedRef.current,
       pathname: location.pathname,
       containerExists: !!carouselRef.current,
-      initialIndex: initialIndex
+      selectedIndex: selectedIdx
     });
 
     if (slides.length < 2) {
@@ -400,10 +463,10 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       return;
     }
     
-    // Only bounce when there's no selected address (initialIndex === 0)
+    // Only bounce when there's no selected address (selectedIdx === 0)
     // This means we're showing the first address card
-    if (initialIndex !== 0) {
-      console.log('[Bounce] Skipped: initialIndex is not 0 (selected address exists), initialIndex:', initialIndex);
+    if (selectedIdx !== 0) {
+      console.log('[Bounce] Skipped: selectedIndex is not 0 (selected address exists), selectedIndex:', selectedIdx);
       return;
     }
 
@@ -457,7 +520,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       });
       
       // Verify we're still at the first card (within reasonable tolerance)
-      // Since we already checked initialIndex === 0 above, we just need to verify scroll position
+      // Since we already checked getSelectedIndex() === 0 above, we just need to verify scroll position
       const isAtFirstCard = Math.abs(currentScroll) < 50; // More lenient tolerance
       
       if (!isAtFirstCard) {
@@ -568,7 +631,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
         bounceAnimationFrameRef.current = null;
       }
     };
-  }, [slides.length, location.pathname, snapToIndex, initialIndex]); // Include initialIndex to check if we should bounce
+  }, [slides.length, location.pathname, snapToIndex, getSelectedIndex]); // Include getSelectedIndex to check if we should bounce
 
   // Helper function to get address title
   const getAddressTitle = (addr: CustomerAddress): string => {
@@ -612,9 +675,6 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       <div
         ref={carouselRef}
         className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         onScroll={handleScroll}
         style={{ 
           scrollbarWidth: 'none', 
@@ -638,7 +698,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
                 label={getAddressTitle(slide.address)}
                 addressLine={formatAddress(slide.address)}
                 isDefault={slide.address.is_default}
-                isSelected={i === index}
+                isSelected={slide.address.id === selectedAddressId}
                 icon={(() => {
                   const IconComponent = getIconByName(slide.address.icon || 'Home');
                   return (
@@ -649,6 +709,9 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
                 })()}
                 onClick={() => {
                   isUserInitiatedChange.current = true;
+                  setIndex(i);
+                  // Save the index for persistence
+                  onIndexChange?.(i);
                   snapToIndex(i);
                   onSelectAddress(slide.address);
                   track('address_selected', {
@@ -692,6 +755,9 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
               type="button"
               onClick={() => {
                 isUserInitiatedChange.current = true;
+                setIndex(i);
+                // Save the index for persistence
+                onIndexChange?.(i);
                 snapToIndex(i);
                 // Also handle address selection if clicking on an address dot
                 if (i < slides.length && slides[i]?.type === "address") {
@@ -708,7 +774,8 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
               }}
               className={cn(
                 "h-1.5 rounded-full transition-all duration-300 ease-in-out",
-                i === index 
+                // Show active state based on current index (what's actually visible)
+                i === index
                   ? "w-6 bg-gray-900" 
                   : "w-1.5 bg-gray-300 hover:bg-gray-400"
               )}

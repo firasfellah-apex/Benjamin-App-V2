@@ -95,21 +95,26 @@ function AddressFormModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none"
+            className="fixed inset-0 z-[90] flex flex-col pointer-events-none"
           >
-            {/* Modal Content - Bottom sheet style with iOS spring physics */}
+            {/* Modal Content - Starts higher up, fills to bottom */}
             <motion.div
               layout
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
               transition={iosSpring}
-              className="relative w-full max-w-2xl h-[90vh] bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+              className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+              style={{
+                marginTop: '15vh', // Start 15% from top (more space for modal)
+                height: 'calc(100vh - 15vh)', // Fill remaining space
+                maxHeight: 'calc(100vh - 15vh)'
+              }}
             >
-              {/* Header - Fixed to top with safe area */}
+              {/* Header - Fixed to top of modal */}
               <motion.div
                 layout
-                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 flex items-center justify-between rounded-t-3xl z-10"
+                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-3xl z-10"
               >
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">
@@ -155,12 +160,14 @@ function AddressFormModal({
                   />
                 </div>
               </motion.div>
+            </motion.div>
 
-              {/* Footer - Fixed to bottom of screen with safe area */}
-              <motion.div
-                layout
-                className="absolute bottom-0 left-0 right-0 flex-shrink-0 border-t border-gray-200 px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-white rounded-b-3xl z-10"
-              >
+            {/* Footer - Fixed to bottom of screen with safe area */}
+            <motion.div
+              layout
+              className="fixed bottom-0 left-0 right-0 flex justify-center flex-shrink-0 border-t border-gray-200 bg-white z-10 pointer-events-auto"
+            >
+              <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -198,7 +205,7 @@ function AddressFormModal({
                     {loading ? "Saving..." : addAddressCopy.saveButton}
                   </button>
                 </div>
-              </motion.div>
+              </div>
             </motion.div>
           </motion.div>
         </>
@@ -217,6 +224,8 @@ interface AddressSelectorProps {
   hideManageButton?: boolean;
   triggerAddAddress?: boolean; // External trigger to open add address form
   onAddAddressTriggered?: () => void; // Callback when form is opened
+  initialCarouselIndex?: number | null; // Saved carousel index to restore position
+  onCarouselIndexChange?: (index: number) => void; // Callback to save carousel index
 }
 
 export function AddressSelector({ 
@@ -228,6 +237,8 @@ export function AddressSelector({
   hideManageButton = false,
   triggerAddAddress = false,
   onAddAddressTriggered,
+  initialCarouselIndex = null,
+  onCarouselIndexChange,
 }: AddressSelectorProps) {
   const navigate = useNavigate();
   const { addresses, isLoading: loading } = useCustomerAddresses();
@@ -238,33 +249,35 @@ export function AddressSelector({
   const hasAutoSelectedRef = useRef(false);
 
   // Auto-select address when addresses first load
+  // Only auto-select if no address is currently selected
   useEffect(() => {
     if (loading || addresses.length === 0) return;
     
-    // Only auto-select once when addresses first become available
-    if (!hasAutoSelectedRef.current) {
-      // If selectedAddressId is provided (from URL params), try to select that address
-      if (selectedAddressId) {
-        const address = addresses.find(a => a.id === selectedAddressId);
-        if (address) {
-          onAddressSelect(address);
-          track('address_selected', {
-            address_count: addresses.length,
-            is_default: address.is_default || false,
-            source: 'url_param',
-          });
+    // If selectedAddressId is already provided, don't auto-select
+    // This preserves the user's selection when navigating back
+    if (selectedAddressId) {
+      // Verify the selected address still exists in the list
+      const address = addresses.find(a => a.id === selectedAddressId);
+      if (address) {
+        // Address is already selected, just mark as auto-selected to prevent re-selection
+        if (!hasAutoSelectedRef.current) {
           hasAutoSelectedRef.current = true;
-          return;
         }
+        // Notify parent of addresses count
+        onAddressesCountChange?.(addresses.length);
+        return;
       }
-      
-      // Otherwise, auto-select default address or first address
-      const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
-      if (defaultAddr) {
-        onAddressSelect(defaultAddr);
+    }
+    
+    // Only auto-select once when addresses first become available AND no address is selected
+    if (!hasAutoSelectedRef.current && !selectedAddressId) {
+      // Auto-select first address (default logic hidden for now)
+      const firstAddr = addresses[0];
+      if (firstAddr) {
+        onAddressSelect(firstAddr);
         track('address_selected', {
           address_count: addresses.length,
-          is_default: defaultAddr.is_default || false,
+          is_default: false, // Default logic hidden
           source: 'auto_select',
         });
         hasAutoSelectedRef.current = true;
@@ -274,7 +287,7 @@ export function AddressSelector({
     // Notify parent of addresses count
     onAddressesCountChange?.(addresses.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addresses, loading]);
+  }, [addresses, loading, selectedAddressId]);
   
   // Handle selectedAddressId changes (e.g., from URL params changing)
   useEffect(() => {
@@ -300,12 +313,11 @@ export function AddressSelector({
     // Prevent background scrolling when modal is open
     if (showForm) {
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
     }
     
     return () => {
-      document.body.style.overflow = 'unset';
+      // Always restore scrolling when component unmounts or modal closes
+      document.body.style.overflow = '';
     };
   }, [showForm, onEditingChange]);
 
@@ -435,6 +447,8 @@ export function AddressSelector({
             }}
             onEditAddress={handleEdit}
             onManageAddresses={() => navigate("/customer/addresses")}
+            initialIndex={initialCarouselIndex}
+            onIndexChange={onCarouselIndexChange}
           />
         </div>
       ) : (

@@ -1,14 +1,12 @@
-import React, { useState } from "react";
-import { EllipsisVertical, MapPin, Home, User, LogOut } from "@/lib/icons";
+import { useState } from "react";
+import { EllipsisVertical, MapPin, Home, User, LogOut, X } from "@/lib/icons";
 import { Clock } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
+  SheetClose,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import {
@@ -21,10 +19,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export function CustomerMenuButton() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,7 +28,7 @@ export function CustomerMenuButton() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { profile, isReady: profileReady } = useProfile(user?.id);
+  const { profile } = useProfile(user?.id);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -86,45 +82,27 @@ export function CustomerMenuButton() {
             <span className="sr-only">Open menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 flex flex-col">
+        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 flex flex-col rounded-tl-3xl rounded-bl-3xl [&>button]:hidden">
+          {/* Header - matches kebab menu position */}
           <div 
-            className="px-6 pb-4 border-b border-slate-200"
-            style={{ paddingTop: 'calc(max(44px, env(safe-area-inset-top)) + 24px)' }}
+            className="px-6 flex items-center justify-end border-b border-slate-200"
+            style={{ 
+              paddingTop: 'max(44px, env(safe-area-inset-top))',
+              paddingBottom: '12px' // Match header bar's pb-3
+            }}
           >
-            <SheetHeader>
-              <SheetTitle className="text-lg font-semibold text-slate-900">Menu</SheetTitle>
-              <SheetDescription asChild>
-                {user ? (
-                  <div className="text-left mt-2">
-                    {!profileReady ? (
-                      <>
-                        <Skeleton className="h-5 w-32 mb-2" />
-                        <Skeleton className="h-4 w-48" />
-                      </>
-                    ) : profile?.first_name || profile?.last_name ? (
-                      <>
-                        <p className="font-semibold text-slate-900 text-base">
-                          {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
-                        </p>
-                        {profile.phone && (
-                          <p className="text-sm text-slate-500 mt-0.5">{profile.phone}</p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-semibold text-slate-900 text-base">Complete your profile</p>
-                        <p className="text-sm text-slate-500 mt-0.5">Add your name to get started</p>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-slate-600">Access your account</span>
-                )}
-              </SheetDescription>
-            </SheetHeader>
+            <SheetClose asChild>
+              <button
+                type="button"
+                className="text-slate-500 hover:text-slate-700 rounded-full p-2 transition-colors touch-manipulation"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </SheetClose>
           </div>
 
-          <div className="flex-1 px-6 py-4 space-y-1">
+          <div className="flex-1 px-6 py-6 space-y-1 overflow-y-auto">
             {user ? (
               <>
                 <button
@@ -186,7 +164,10 @@ export function CustomerMenuButton() {
           </div>
 
           {user && (
-            <div className="px-6 pb-6 pt-4 border-t border-slate-200">
+            <div 
+              className="px-6 pt-4 border-t border-slate-200"
+              style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
+            >
               <button
                 onClick={handleLogoutClick}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-semibold rounded-lg transition-all text-left bg-red-600 text-white hover:bg-red-700 active:bg-red-800"

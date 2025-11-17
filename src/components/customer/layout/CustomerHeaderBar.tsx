@@ -31,6 +31,7 @@ const CustomerHeaderBar = React.memo(function CustomerHeaderBar({
       className="w-full bg-white fixed top-0 left-0 right-0 z-[60]"
       style={{ paddingTop: 'max(44px, env(safe-area-inset-top))' }}
       // z-[60] ensures it stays below modal backdrop (z-[80]) and modal content (z-[90])
+      // bg-white matches CustomerTopShelf background color
       aria-label="App header"
     >
       {/* Container sets padding: px-6 (24px) horizontal, pb-3 for spacing */}

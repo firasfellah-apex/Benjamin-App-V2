@@ -62,17 +62,21 @@ export default function CustomerTopShelf({
     <div 
       ref={shelfRef}
       className={cn(
-        "fixed z-[65] bg-white w-full left-0 right-0 rounded-bl-3xl rounded-br-3xl",
-        // Add light shadow for depth on home and address pages (when not extended to bottom)
-        // Matches bottom nav shadow style: lighter grey with higher blur
-        !extendToBottom && "shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
+        "fixed z-[65] bg-white w-full left-0 right-0 rounded-bl-3xl rounded-br-3xl"
       )}
       style={{ 
+        // Start with slight overlap to ensure seamless connection (no visible line)
+        // Overlap hides any potential shadow artifacts or rendering gaps
         top: `calc(max(44px, env(safe-area-inset-top)) + ${headerContentHeight}px - 1px)`,
         height: height,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        // Bottom-only shadow: only appears below the component (positive Y offset, no upward spread)
+        // Matches bottom nav shadow style: lighter grey with higher blur
+        ...(!extendToBottom && {
+          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.08)',
+        }),
       }}
     >
       {/* Fixed below header; keep same bg as header */}
@@ -92,12 +96,16 @@ export default function CustomerTopShelf({
         {/* Only make scrollable if extendToBottom is true, otherwise just normal flow */}
         <div 
           className={cn(
-            "w-full px-6 pt-6 pb-6 space-y-6",
+            "w-full px-6 pt-6 space-y-6",
             extendToBottom && "overflow-y-auto flex-1 min-h-0"
           )}
           style={extendToBottom ? { 
-            WebkitOverflowScrolling: 'touch'
-          } : {}}
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: 'calc(150px + max(24px, env(safe-area-inset-bottom)))', // Space for bottom nav + safe area
+            touchAction: 'pan-y', // Allow vertical scrolling
+          } : {
+            paddingBottom: '24px' // pb-6 when not extended
+          }}
         >
           {children}
         </div>
