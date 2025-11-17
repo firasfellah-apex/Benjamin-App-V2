@@ -21,9 +21,9 @@ import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
 import type { OrderWithDetails, Order } from '@/types/types';
-import bankIllustration from '@/assets/illustrations/bank.png';
-import atmIllustration from '@/assets/illustrations/atm.png';
-import runnersIllustration from '@/assets/illustrations/runners.png';
+import bankIllustration from '@/assets/illustrations/Bank.png';
+import atmIllustration from '@/assets/illustrations/ATM.png';
+import runnersIllustration from '@/assets/illustrations/Runners.png';
 import {
   ShieldCheckIcon,
   KeyIcon,
