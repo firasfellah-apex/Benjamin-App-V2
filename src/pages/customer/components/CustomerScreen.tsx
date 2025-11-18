@@ -48,6 +48,7 @@ export function CustomerScreen({
   className,
 }: CustomerScreenProps) {
   const showHero = !!title || !!subtitle;
+  const isFlowPage = !!flowHeader; // If flowHeader exists, hide logo/menu
 
   return (
     <div
@@ -59,23 +60,23 @@ export function CustomerScreen({
         className
       )}
     >
-      {/* Header: logo + menu + optional hero */}
-      <header className="px-6 pt-6 pb-2">
-        <CustomerHeader
-          title={showHero ? title : null}
-          subtitle={showHero ? subtitle : null}
-          showBack={showBack}
-          onBack={onBack}
-        />
-      </header>
+      {/* Header: logo + menu + optional hero (only show when NOT a flow page) */}
+      {!isFlowPage && (
+        <header className="px-6 pt-6 pb-2">
+          <CustomerHeader
+            title={showHero ? title : null}
+            subtitle={showHero ? subtitle : null}
+            showBack={showBack}
+            onBack={onBack}
+          />
+        </header>
+      )}
 
-      {/* Flow header (dots + title) – white bar with dividers */}
+      {/* Flow header (replaces logo/menu row + title/subtitle) */}
       {flowHeader && (
-        <div className="border-y border-slate-200/70 bg-white">
-          <div className="px-6 py-4">
-            {flowHeader}
-          </div>
-        </div>
+        <header className="px-6 pt-6 pb-2">
+          {flowHeader}
+        </header>
       )}
 
       {/* Fixed content (map, section titles) – not scrollable */}

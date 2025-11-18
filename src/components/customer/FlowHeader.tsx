@@ -24,8 +24,8 @@ export function FlowHeader({
 
   return (
     <div className="w-full">
-      {/* Top row: button-style nav + dots */}
-      <div className="mb-3 flex items-center justify-between gap-3">
+      {/* Top row: nav button + dots (replaces logo/menu row) */}
+      <div className="flex items-center justify-between mb-4">
         <button
           type="button"
           onClick={onPrimaryNavClick}
@@ -66,12 +66,14 @@ export function FlowHeader({
         <div className="w-[80px]" />
       </div>
 
-      {/* Title & subtitle */}
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      {/* Title & subtitle - aligned with home page */}
+      <h1 className="text-2xl font-semibold leading-snug tracking-tight text-slate-900">
         {title}
       </h1>
       {subtitle && (
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        <p className="text-slate-500 text-base mt-1 leading-relaxed">
+          {subtitle}
+        </p>
       )}
     </div>
   );
