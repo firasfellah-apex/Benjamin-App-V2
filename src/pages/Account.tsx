@@ -157,11 +157,14 @@ export default function Account() {
                         <span>Account Role</span>
                       </div>
                       <div className="flex gap-2 flex-wrap">
-                        {profile.role.map((role) => (
-                          <Badge key={role} variant="secondary">
-                            {role}
-                          </Badge>
-                        ))}
+                        {/* In customer context, only show customer role, not admin/runner */}
+                        {profile.role
+                          .filter((role) => role === 'customer')
+                          .map((role) => (
+                            <Badge key={role} variant="secondary">
+                              {role}
+                            </Badge>
+                          ))}
                       </div>
                     </div>
 
@@ -369,11 +372,14 @@ export default function Account() {
                   <span>Account Role</span>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {profile.role.map((role) => (
-                    <Badge key={role} variant="secondary">
-                      {role}
-                    </Badge>
-                  ))}
+                  {/* In customer context, only show customer role, not admin/runner */}
+                  {profile.role
+                    .filter((role) => role === 'customer')
+                    .map((role) => (
+                      <Badge key={role} variant="secondary">
+                        {role}
+                      </Badge>
+                    ))}
                 </div>
               </div>
 

@@ -1,112 +1,109 @@
-/**
- * CustomerScreen Component
- * 
- * Clean 3-row layout for customer pages:
- * - Top: header bar + top shelf (auto height, hugs content)
- * - Middle: map band (fixed height, optional)
- * - Main: scrollable content area (flex-1, overflow-y-auto)
- * - Bottom: handled by CustomerLayout via CustomerBottomSlotContext (not rendered here)
- */
+// src/pages/customer/components/CustomerScreen.tsx
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import CustomerHeaderBar from "@/components/customer/layout/CustomerHeaderBar";
-import CustomerTopShelf from "@/components/customer/layout/CustomerTopShelf";
-import TopShelfSection from "@/components/customer/layout/TopShelfSection";
+import { CustomerHeader } from "@/pages/customer/components/CustomerHeader";
 
 interface CustomerScreenProps {
+  /** For Home: big greeting title */
   title?: React.ReactNode;
+  /** For Home: subtitle below greeting */
   subtitle?: React.ReactNode;
-  loading?: boolean;              // Loading state for skeletons
-  actions?: React.ReactNode;      // Optional action buttons/chips
-  stepKey?: string;               // Step key for transition (e.g. "home", "address", "amount")
-  headerLeft?: React.ReactNode;   // Optional custom left header (defaults to logo)
-  headerRight?: React.ReactNode;  // Optional custom right header (defaults to menu)
-  topContent?: React.ReactNode;   // Content to show in TopShelfSection (e.g. LastDeliveryCard)
-  map?: React.ReactNode;           // Map band (fixed height, sits between header and content)
-  children?: React.ReactNode;      // Main scrollable content (cards, lists, forms, etc.)
+  /** For flow pages: a prebuilt FlowHeader component (step pills + title/subtitle) */
+  flowHeader?: React.ReactNode;
+  /** Fixed content between flowHeader and scrollable area (e.g. map, section titles) */
+  fixedContent?: React.ReactNode;
+  /** Content that should sit just under the header (e.g. LastDeliveryCard, address card, cash amount card) */
+  topContent?: React.ReactNode;
+  /** Main page content (lists, extra cards, etc.) – optional for now */
+  children?: React.ReactNode;
+  /** Show a back arrow instead of the logo in the header */
+  showBack?: boolean;
+  /** Custom back handler – default is history.back() */
+  onBack?: () => void;
+  /** Custom bottom padding for scroll container (e.g. for pages with taller bottom nav) */
+  customBottomPadding?: string;
   className?: string;
 }
 
-export function CustomerScreen({ 
-  title, 
+/**
+ * Vanilla layout:
+ *
+ * - Single background: white for the whole screen
+ * - Header: Benjamin + menu (and optional hero for home)
+ * - Optional flow header bar (full-width, not in a card)
+ * - Inner scroll container for Safari/Comet compatibility
+ * - Bottom nav is fixed by RequestFlowBottomBar
+ */
+export function CustomerScreen({
+  title,
   subtitle,
-  loading = false,
-  actions,
-  stepKey,
-  headerLeft,
-  headerRight,
+  flowHeader,
+  fixedContent,
   topContent,
-  map,
   children,
+  showBack = false,
+  onBack,
+  customBottomPadding,
   className,
 }: CustomerScreenProps) {
-  // Count actual children (handles fragments, null, etc.)
-  const hasChildren = React.Children.count(children) > 0;
-  // Home screen: has map but no children content
-  const isHomeScreen = !!map && !hasChildren;
+  const showHero = !!title || !!subtitle;
 
   return (
-    <div className={cn("flex flex-col h-screen overflow-hidden", className)}>
-      {/* TOP: Header bar + top shelf (fixed, pinned to top) */}
-      <CustomerHeaderBar 
-        headerLeft={headerLeft}
-        headerRight={headerRight}
-      />
-      <CustomerTopShelf extendToBottom={stepKey === "amount"}>
-        <TopShelfSection
-          loading={loading}
-          title={title}
-          subtitle={subtitle}
-          actions={actions}
-          stepKey={stepKey}
-        >
-          {topContent}
-        </TopShelfSection>
-      </CustomerTopShelf>
-      
-      {/* Spacer to push content below fixed header + top shelf */}
-      {/* Uses CSS variable set by CustomerTopShelf for dynamic height */}
-      {/* Header: safe area + 40px (logo + padding) */}
-      <div 
-        className="flex-shrink-0"
-        style={{ 
-          height: `calc(max(44px, env(safe-area-inset-top)) + 40px + var(--top-shelf-height, 200px))`
-        }}
-      />
+    <div
+      className={cn(
+        // Treat this as the app viewport for that screen
+        "flex h-screen flex-col bg-white",
+        "text-slate-900",
+        "pt-safe-top", // respect notch
+        className
+      )}
+    >
+      {/* Header: logo + menu + optional hero */}
+      <header className="px-6 pt-6 pb-2">
+        <CustomerHeader
+          title={showHero ? title : null}
+          subtitle={showHero ? subtitle : null}
+          showBack={showBack}
+          onBack={onBack}
+        />
+      </header>
 
-      {/* MIDDLE: Map band – tucks under top shelf and bottom nav equally */}
-      {map && (
-        <div 
-          className="-mx-6 flex-1 min-h-0 relative z-0 flex flex-col" 
-          style={{ 
-            marginTop: '-26px',
-            marginBottom: '-26px',
-          }}
-        >
-          <div className="flex-1 min-h-0 overflow-hidden rounded-t-none rounded-b-3xl">
-            {map}
+      {/* Flow header (dots + title) – white bar with dividers */}
+      {flowHeader && (
+        <div className="border-y border-slate-200/70 bg-white">
+          <div className="px-6 py-4">
+            {flowHeader}
           </div>
         </div>
       )}
 
-      {/* MAIN: Scrollable content area (flex-1, overflow-y-auto) */}
-      {/* This is the ONE scroll container per page */}
-      {/* Standardized spacing: px-6 (24px) horizontal, space-y-6 (24px) between major sections */}
-      {/* Always render main to maintain layout structure, even if empty */}
-      {/* Bottom padding accounts for fixed bottom nav (~150px) + safe area */}
-      {/* z-index lower than bottom nav to ensure nav stays on top */}
-      <main className={cn(
-        "flex-1 min-h-0 overflow-y-auto px-6 space-y-6 mt-6 relative z-10",
-        !hasChildren && "hidden"
+      {/* Fixed content (map, section titles) – not scrollable */}
+      {fixedContent && (
+        <div className="px-6 pt-4 bg-white shrink-0">
+          {fixedContent}
+        </div>
       )}
-      style={{
-        paddingBottom: 'calc(150px + max(24px, env(safe-area-inset-bottom)))',
-        WebkitOverflowScrolling: 'touch', // iOS momentum scrolling
-      }}>
+
+      {/* MAIN: the ONLY scroll container */}
+      <main
+        className={cn(
+          "flex-1 min-h-0 px-6 space-y-6",
+          "overflow-y-auto",
+          fixedContent ? "pt-2" : "pt-4" // Less top padding when fixedContent is present
+        )}
+        style={{
+          paddingBottom: customBottomPadding || "calc(24px + max(24px, env(safe-area-inset-bottom)) + 96px)",
+          WebkitOverflowScrolling: "touch", // important for iOS
+        }}
+      >
+        {topContent}
         {children}
       </main>
+
+      {/* Bottom nav injected via CustomerBottomSlot / RequestFlowBottomBar */}
     </div>
   );
 }
 
+export default CustomerScreen;

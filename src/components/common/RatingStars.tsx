@@ -47,10 +47,11 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
             aria-label={`Rate ${i + 1} out of 5 stars`}
           >
             <svg
-              className={cn(
-                sizeClasses,
-                filled ? "text-amber-400 fill-amber-400" : "text-slate-300 fill-slate-300"
-              )}
+              className={cn(sizeClasses)}
+              style={{
+                color: filled ? '#DFB300' : '#D1D5DB',
+                fill: filled ? '#DFB300' : '#D1D5DB'
+              }}
               viewBox="0 0 20 20"
               fill="currentColor"
             >

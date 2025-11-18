@@ -1,25 +1,20 @@
-import { PropsWithChildren } from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 
 /**
  * MobilePageShell
  *
- * Dumb, presentational component that ONLY constrains width and centers content.
- * No layout logic, no bottom slots, no overflow handling.
- * Full screen width - no side padding.
+ * Simple, non-restrictive wrapper. No h-screen, no overflow-hidden.
+ * CustomerScreen is now the viewport, so this just passes through.
  */
-export function MobilePageShell({
-  children,
-  className,
-}: PropsWithChildren<{ className?: string }>) {
+interface MobilePageShellProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function MobilePageShell({ children, className }: MobilePageShellProps) {
   return (
-    <div
-      className={cn(
-        "w-full",
-        "pt-safe-top",
-        className
-      )}
-    >
+    <div className={cn("w-full", className)}>
       {children}
     </div>
   );

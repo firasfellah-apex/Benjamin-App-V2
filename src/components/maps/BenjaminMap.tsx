@@ -160,11 +160,11 @@ export function BenjaminMap({
       }
     }
 
-    // Hide Google Maps attribution when minimal mode is enabled
+    // Always hide Google Maps attribution
     let hideAttributionTimeout: ReturnType<typeof setTimeout> | null = null;
     let observer: MutationObserver | null = null;
     
-    if (minimal && mapInstanceRef.current && mapDivRef.current) {
+    if (mapInstanceRef.current && mapDivRef.current) {
       const hideAttribution = () => {
         const mapContainer = mapDivRef.current;
         if (mapContainer) {
@@ -176,10 +176,18 @@ export function BenjaminMap({
             }
           });
           
-          // Hide copyright container
-          const copyrightContainers = mapContainer.querySelectorAll('.gm-style-cc, .gmnoprint');
+          // Hide copyright container and Google logo
+          const copyrightContainers = mapContainer.querySelectorAll('.gm-style-cc, .gmnoprint, .gm-bundled-control, a[href*="google.com/maps"]');
           copyrightContainers.forEach((container: any) => {
             container.style.display = 'none';
+          });
+
+          // Hide the Google logo image
+          const googleLogos = mapContainer.querySelectorAll('img[src*="google"], img[alt="Google"]');
+          googleLogos.forEach((img: any) => {
+            if (img.closest('.gm-style-cc') || img.closest('.gmnoprint')) {
+              img.style.display = 'none';
+            }
           });
         }
       };
@@ -223,47 +231,34 @@ export function BenjaminMap({
   return (
     <div
       className={cn("w-full h-full", className)}
+      style={{ width: "100%", height: "100%" }}
     >
       <div
         ref={mapDivRef}
         className="w-full h-full"
         style={{
+          width: "100%",
+          height: "100%",
           background: "#e5e7eb",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Hide Google Maps attribution and controls when minimal */}
-        {minimal && (
-          <style>{`
-            .gm-style-cc,
-            .gm-style-cc div,
-            .gmnoprint,
-            .gm-bundled-control,
-            .gm-fullscreen-control,
-            a[href*="google.com/maps"],
-            a[href*="keyboard_shortcuts"],
-            .gm-style > div:last-child {
-              display: none !important;
-            }
-          `}</style>
-        )}
-        {/* quick label so you know this div is there */}
-        <div
-          style={{
-            position: "absolute",
-            left: 4,
-            bottom: 4,
-            background: "rgba(0,0,0,0.7)",
-            color: "white",
-            fontSize: 10,
-            padding: "2px 4px",
-            borderRadius: 4,
-            zIndex: 10,
-          }}
-        >
-          BenjaminMap container
-        </div>
+        {/* Always hide Google Maps attribution and controls */}
+        <style>{`
+          .gm-style-cc,
+          .gm-style-cc div,
+          .gmnoprint,
+          .gm-bundled-control,
+          .gm-fullscreen-control,
+          a[href*="google.com/maps"],
+          a[href*="keyboard_shortcuts"],
+          a[href*="terms_maps"],
+          img[src*="google"][alt="Google"],
+          .gm-style > div:last-child {
+            display: none !important;
+          }
+        `}</style>
 
         {showSkeleton && (
           <div

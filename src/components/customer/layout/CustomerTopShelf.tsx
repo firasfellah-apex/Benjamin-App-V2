@@ -25,29 +25,6 @@ export default function CustomerTopShelf({
   // Top shelf should start exactly where header ends
   const headerContentHeight = 40; // Logo (28px) + bottom padding (12px)
 
-  // Update CSS variable for top shelf height so content can account for it
-  useEffect(() => {
-    if (!shelfRef.current) return;
-
-    const updateHeight = () => {
-      if (shelfRef.current) {
-        const height = shelfRef.current.offsetHeight;
-        document.documentElement.style.setProperty('--top-shelf-height', `${height}px`);
-      }
-    };
-
-    // Initial update
-    updateHeight();
-
-    // Observe resize changes
-    const resizeObserver = new ResizeObserver(updateHeight);
-    resizeObserver.observe(shelfRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [children]);
-
   // Tuck amount to pin under bottom nav (same as map viewport: 26px)
   const TUCK_AMOUNT = 26;
   

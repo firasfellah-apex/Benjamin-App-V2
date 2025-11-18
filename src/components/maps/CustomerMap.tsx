@@ -74,6 +74,7 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
       ref={wrapperRef}
       className={cn("w-full h-full", className)}
       style={{ 
+        width: "100%",
         height: "100%",
         display: "block", // NOT flex
         overflow: "visible", // NOT hidden

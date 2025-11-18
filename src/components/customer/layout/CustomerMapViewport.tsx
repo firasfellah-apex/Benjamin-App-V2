@@ -17,7 +17,8 @@ export const CustomerMapViewport: React.FC<CustomerMapViewportProps> = ({
 }) => {
   return (
     <div
-      className="relative w-full h-full overflow-hidden rounded-t-none rounded-b-3xl"
+      className="relative w-full h-full overflow-hidden"
+      style={{ width: "100%" }}
     >
       <CustomerMap
         selectedAddress={selectedAddress}

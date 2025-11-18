@@ -17,13 +17,12 @@ import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
 import { useLocation } from '@/contexts/LocationContext';
 import { getCustomerOrders } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
-import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
 import type { OrderWithDetails, Order } from '@/types/types';
-import bankIllustration from '@/assets/illustrations/Bank.svg';
-import atmIllustration from '@/assets/illustrations/ATM.svg';
-import runnersIllustration from '@/assets/illustrations/Runners.svg';
+import bankIllustration from '@/assets/illustrations/Bank.png';
+import atmIllustration from '@/assets/illustrations/ATM.png';
+import runnersIllustration from '@/assets/illustrations/Runners.png';
 import {
   ShieldCheckIcon,
   KeyIcon,
@@ -133,11 +132,6 @@ export default function CustomerHome() {
     navigate(`/customer/deliveries/${orderId}`);
   }, [navigate]);
   
-  // Handle view all action
-  const handleViewAll = useCallback(() => {
-    navigate('/customer/deliveries');
-  }, [navigate]);
-
   /**
    * Format and capitalize a name, filtering out invalid IDs
    * @param name - The name to format (first_name, full_name, or email prefix)
@@ -266,64 +260,56 @@ export default function CustomerHome() {
       );
     }
     
-    // TESTING MODE: Always show TrustCarousel regardless of order history
-    // TODO: Revert to original logic (only show TrustCarousel when no lastCompletedOrder)
-    return <TrustCarousel cards={trustCards} />;
+    // Show actual card if we have a last delivery (completed or cancelled)
+    // Show it even if there's an active order
+    if (lastCompletedOrder) {
+      return (
+        <LastDeliveryCard
+          order={lastCompletedOrder}
+          onRateRunner={handleRateRunner}
+        />
+      );
+    }
     
-    // Original logic (commented out for testing):
-    // // Show actual card if we have a last delivery (completed or cancelled)
-    // // Show it even if there's an active order
-    // if (lastCompletedOrder) {
-    //   return (
-    //     <LastDeliveryCard
-    //       order={lastCompletedOrder}
-    //       onRateRunner={handleRateRunner}
-    //       onViewAll={handleViewAll}
-    //     />
-    //   );
-    // }
-    // 
-    // // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
-    // return <TrustCarousel cards={trustCards} />;
-  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, handleViewAll, trustCards]);
+    // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
+    return <TrustCarousel cards={trustCards} />;
+  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, trustCards]);
 
   // If no user, redirect to landing
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
-  // Loading state for greeting/title area - only depends on auth/profile, not orders
-  // Orders loading is handled separately in topContent useMemo
-  // IMPORTANT: Never include ordersLoading here - it causes title to flicker when navigating back
-  const loading = authLoading || (user && !isReady);
-  const shelf = useTopShelfTransition();
   const { setBottomSlot } = useCustomerBottomSlot();
 
   // Set bottom slot for MobilePageShell
   // Only depend on setBottomSlot (which is stable from context)
-  // Create the handler inline to avoid shelf dependency
   useEffect(() => {
     setBottomSlot(
       <RequestFlowBottomBar
         mode="home"
         onPrimary={() => {
-          shelf.goTo('/customer/request', 'address', 320);
+          navigate('/customer/request');
         }}
         useFixedPosition={true}
       />
     );
     return () => setBottomSlot(null);
-  }, [setBottomSlot]); // Only setBottomSlot - shelf is stable from hook
+  }, [setBottomSlot, navigate]);
 
   return (
     <CustomerScreen
-      loading={loading}
       title={title}
       subtitle="Skip the ATM. Request cash in seconds."
       stepKey="home"
       topContent={topContent}
     >
-      {/* No children - TrustCarousel is in topContent when no last delivery */}
+      {/* Show TrustCarousel below View All Deliveries, even when there's a last delivery */}
+      {lastCompletedOrder && (
+        <div className="space-y-6">
+          <TrustCarousel cards={trustCards} />
+        </div>
+      )}
     </CustomerScreen>
   );
 }

@@ -15,7 +15,7 @@ import { rateRunner } from '@/db/api';
 import { toast } from 'sonner';
 import type { OrderWithDetails } from '@/types/types';
 import { getRunnerDisplayName } from '@/lib/reveal';
-import OnTimeIllustration from '@/assets/illustrations/OnTime.svg';
+import OnTimeIllustration from '@/assets/illustrations/OnTime.png';
 
 interface CompletionRatingModalProps {
   order: OrderWithDetails | null;
@@ -117,12 +117,12 @@ export function CompletionRatingModal({
             </div>
 
             <div className="relative">
-              {/* Illustration Section - Orange Background */}
-              <div className="bg-orange-500 h-80 flex items-center justify-center relative overflow-hidden">
+              {/* Illustration Section */}
+              <div className="h-80 flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: '#F5F5F4' }}>
                 <img
                   src={OnTimeIllustration}
                   alt="Delivery completed"
-                  className="w-full h-full object-cover object-center"
+                  className="w-full h-full object-contain object-center"
                 />
               </div>
 
@@ -189,12 +189,11 @@ export function CompletionRatingModal({
                           disabled={submitting}
                         >
                           <Star
-                            className={cn(
-                              "h-10 w-10 transition-colors",
-                              star <= (hoveredRating || rating)
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "fill-slate-200 text-slate-200"
-                            )}
+                            className="h-10 w-10 transition-colors"
+                            style={{
+                              color: star <= (hoveredRating || rating) ? '#DFB300' : '#E5E7EB',
+                              fill: star <= (hoveredRating || rating) ? '#DFB300' : '#E5E7EB'
+                            }}
                           />
                         </button>
                       ))}

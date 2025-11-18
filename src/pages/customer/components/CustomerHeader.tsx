@@ -35,8 +35,8 @@ export function CustomerHeader({
   showBack,
   onBack,
 }: {
-  title: ReactNode;
-  subtitle?: ReactNode;
+  title: ReactNode | null;
+  subtitle?: ReactNode | null;
   right?: ReactNode;
   showBack?: boolean;
   onBack?: () => void;
@@ -226,17 +226,24 @@ export function CustomerHeader({
         {backButton}
         {menuButton}
       </div>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-extrabold leading-tight tracking-tight">
-            {title}
-          </h1>
-          {subtitle && (
-            <p className="text-slate-500 text-lg mt-1">{subtitle}</p>
-          )}
+      {/* Only render hero block when we actually have a title/subtitle */}
+      {(title || subtitle || right) && (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            {title && (
+              <h1 className="text-2xl font-semibold leading-snug tracking-tight text-slate-900">
+                {title}
+              </h1>
+            )}
+            {subtitle && (
+              <p className="text-slate-500 text-base mt-1 leading-relaxed">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {right && <div className="shrink-0">{right}</div>}
         </div>
-        {right && <div className="shrink-0">{right}</div>}
-      </div>
+      )}
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>

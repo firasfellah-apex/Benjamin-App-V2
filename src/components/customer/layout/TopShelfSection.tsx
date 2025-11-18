@@ -10,6 +10,7 @@ type Props = {
   actions?: React.ReactNode;
   children?: React.ReactNode;
   stepKey?: string; // Optional step key override (defaults to route-based)
+  backButton?: React.ReactNode; // Optional back button to show above title
 };
 
 /**
@@ -27,6 +28,7 @@ export default function TopShelfSection({
   actions,
   children,
   stepKey,
+  backButton,
 }: Props) {
   const location = useLocation();
   const shelf = useTopShelfTransition({ minBase: 168, settleDelayMs: 240 });
@@ -50,6 +52,13 @@ export default function TopShelfSection({
 
   return (
     <>
+      {/* Back button - above title */}
+      {backButton && (
+        <div className="mb-2">
+          {backButton}
+        </div>
+      )}
+      
       {/* Title row - no layout animations, just static */}
       {/* No mb-* here - spacing comes from parent space-y-6 */}
       <header className="flex items-start justify-between gap-3">

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -128,7 +128,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
     <div className={cn("w-full", className)}>
       <div className="w-full flex justify-center">
         {/* Fixed outer frame */}
-        <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
+        <div className="w-full max-w-sm rounded-2xl bg-white border border-[#E5E7EB] overflow-hidden">
           {/* Horizontal scrolling container inside the frame */}
           <div
             ref={carouselRef}
@@ -167,15 +167,15 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
               >
                   <div className="w-full flex flex-col md:flex-row">
                   {/* Image half - extends to top and sides, ignoring parent padding */}
-                  <div className="w-full md:w-1/2 h-80 md:h-96 flex items-center justify-center">
+                  <div className="w-full md:w-1/2 h-48 md:h-56 flex items-center justify-center" style={{ backgroundColor: '#F5F5F4' }}>
                     {card.image ? (
                       <img
                         src={card.image}
                         alt={card.title}
-                        className="w-full h-full object-cover"
+                        className="w-3/4 h-3/4 object-contain"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+                      <div className="w-3/4 h-3/4 bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center rounded-lg">
                         <span className="text-slate-400 text-sm">Image placeholder</span>
                       </div>
                     )}
@@ -205,7 +205,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
           
           {/* Dots indicator - outside scrolling container, always visible - iOS-style spring animations */}
           {cards.length > 1 && (
-            <div className="flex justify-center gap-2 pt-6 pb-6 px-6 bg-white">
+            <div className="flex justify-center gap-2 pb-6 px-6 bg-white">
               {cards.map((_, idx) => (
                 <motion.button
                   key={idx}

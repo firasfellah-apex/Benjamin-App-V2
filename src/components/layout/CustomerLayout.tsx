@@ -18,12 +18,10 @@ function CustomerLayoutContent({ children }: { children: ReactNode }) {
   const { bottomSlot } = useCustomerBottomSlot();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F5F7]">
-      {/* Main content column */}
-      <MobilePageShell className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 flex flex-col">
-          {children}
-        </div>
+    <div className="min-h-screen flex flex-col bg-white">
+      {/* Main content column - no overflow constraints, let page scroll naturally */}
+      <MobilePageShell className="flex-1 flex flex-col">
+        {children}
       </MobilePageShell>
       
       {/* Bottom slot - RequestFlowBottomBar handles its own fixed positioning */}

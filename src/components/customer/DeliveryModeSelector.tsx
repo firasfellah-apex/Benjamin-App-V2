@@ -113,7 +113,7 @@ export function DeliveryModeSelector({
   }, [isSecurityTipExpanded]);
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-4", className)}>
       {/* Pill-shaped toggle with morphing background - iOS-style button morph effect */}
       <div className="relative flex rounded-full border border-slate-200 bg-white p-1 overflow-hidden">
         {/* Morphing background indicator - slides between positions */}
@@ -201,60 +201,55 @@ export function DeliveryModeSelector({
         )}
       </motion.div>
       
-      {/* Security Tip - Collapsible Card */}
-      <div className="mt-10">
-        <div ref={securityTipRef} className="w-full rounded-2xl bg-[#FFF9E8] overflow-hidden">
+      {/* Security Tip - Tinted Alert Card */}
+      <div className="mt-4">
+        <div
+          ref={securityTipRef}
+          className={cn(
+            "w-full rounded-xl px-4 py-3",
+            "bg-amber-50"
+          )}
+        >
           <button
             type="button"
-            onClick={() => {
-              setIsSecurityTipExpanded(!isSecurityTipExpanded);
-            }}
-            className="w-full px-4 py-3 text-left transition-opacity duration-200 active:opacity-70"
+            onClick={() => setIsSecurityTipExpanded(!isSecurityTipExpanded)}
+            className="w-full text-left active:opacity-80"
           >
-            {/* Top Row - Always Visible */}
+            {/* Top Row */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-5 w-5 text-slate-700 flex-shrink-0" />
-                  <p className="text-sm font-medium text-slate-900">
+                <div className="mb-1.5 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs font-semibold text-slate-900">
                     Guard your one-time code
                   </p>
                 </div>
-                <p className="text-sm text-slate-700 leading-relaxed">
+                <p className="text-xs text-slate-700">
                   Anyone with the code can receive your envelope.
                 </p>
               </div>
               <ChevronDown
                 className={cn(
-                  "h-5 w-5 text-slate-600 flex-shrink-0 transition-transform duration-200 mt-0.5",
-                  isSecurityTipExpanded && "transform rotate-180"
+                  "mt-0.5 h-4 w-4 text-slate-500 flex-shrink-0 transition-transform duration-200",
+                  isSecurityTipExpanded && "rotate-180"
                 )}
               />
             </div>
           </button>
 
-          {/* Expanded Content - Outside button to prevent scroll shift */}
+          {/* Expanded content */}
           <AnimatePresence initial={false}>
             {isSecurityTipExpanded && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{
-                  duration: 0.3,
-                  ease: [0.4, 0, 0.2, 1],
-                }}
+                transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
                 style={{ overflow: "hidden" }}
               >
-                <div className="px-4 pb-3 pt-0 border-t border-amber-200/40">
-                  <div className="space-y-2 pt-3">
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      Only share it when your runner is at your door.
-                    </p>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      Benjamin will never ask for it by phone or text.
-                    </p>
-                  </div>
+                <div className="mt-2 border-t border-amber-200/60 pt-2.5 text-xs text-slate-800 space-y-1.5">
+                  <p>Only share it when your runner is at your door.</p>
+                  <p>Benjamin will never ask for it by phone or text.</p>
                 </div>
               </motion.div>
             )}

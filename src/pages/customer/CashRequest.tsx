@@ -10,27 +10,30 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp } from "@/lib/icons";
+import { ChevronDown, ChevronUp, X } from "@/lib/icons";
+import { Pencil } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { FlowCard } from "@/components/customer/FlowCard";
+import { FlowHeader } from "@/components/customer/FlowHeader";
 import { toast } from "sonner";
 import { createOrder, formatAddress } from "@/db/api";
 import { useProfile } from "@/contexts/ProfileContext";
 import { strings } from "@/lib/strings";
-import { AddressSelector } from "@/components/address/AddressSelector";
 import type { CustomerAddress } from "@/types/types";
 import { calculatePricing } from "@/lib/pricing";
 import CashAmountInput from "@/components/customer/CashAmountInput";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapViewport";
 import { CustomerOrderFlowFooter } from "@/components/customer/layout/CustomerOrderFlowFooter";
-import { useLocation } from "@/contexts/LocationContext";
-import { MapPin, Plus } from "@/lib/icons";
 import { track } from "@/lib/analytics";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { useTopShelfTransition } from "@/features/shelf/useTopShelfTransition";
-import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 import { DeliveryModeSelector, type DeliveryMode } from "@/components/customer/DeliveryModeSelector";
+import { AddressForm, type AddressFormRef } from "@/components/address/AddressForm";
+import { addAddressCopy } from "@/lib/copy/addAddress";
 
 type Step = 1 | 2;
 
@@ -38,7 +41,6 @@ export default function CashRequest() {
   const navigate = useNavigate();
   const { profile } = useProfile();
   const [searchParams] = useSearchParams();
-  const { location: liveLocation } = useLocation();
   
   // Constants
   const MIN_AMOUNT = 100;
@@ -47,16 +49,10 @@ export default function CashRequest() {
   // Wizard state
   const [step, setStep] = useState<Step>(1);
   const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
-  const [savedCarouselIndex, setSavedCarouselIndex] = useState<number | null>(null); // Persist carousel position
   const [amount, setAmount] = useState(300);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
   const [loading, setLoading] = useState(false);
   const [showFeeDetails, setShowFeeDetails] = useState(false); // Collapsed by default
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
-  const [isEditingAmount, setIsEditingAmount] = useState(false);
-  const [draftAmountStr, setDraftAmountStr] = useState<string>("");
-  const [showAddAddressForm, setShowAddAddressForm] = useState(false);
-  const amountInputRef = useRef<HTMLInputElement>(null);
 
   // Map center is now computed inside CustomerMapViewport using computeCustomerMapCenter
 
@@ -113,15 +109,57 @@ export default function CashRequest() {
     setSelectedAddress(address);
   };
 
-  const shelf = useTopShelfTransition({ currentStep: step });
   const { addresses, hasAnyAddress } = useCustomerAddresses();
   const { setBottomSlot } = useCustomerBottomSlot();
-  
-  // Use ref to store latest shelf to avoid recreating handlers when shelf changes
-  const shelfRef = useRef(shelf);
+  const invalidateAddresses = useInvalidateAddresses();
+
+  // Modal state for adding address
+  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
+  const addAddressFormRef = useRef<AddressFormRef>(null);
+  const [addAddressLoading, setAddAddressLoading] = useState(false);
+
+  // Auto-select first address when addresses load
   useEffect(() => {
-    shelfRef.current = shelf;
-  }, [shelf]);
+    if (!selectedAddress && addresses.length > 0) {
+      setSelectedAddress(addresses[0]);
+    }
+  }, [addresses, selectedAddress]);
+
+  // Handlers for address management
+  const handleManageAddresses = useCallback(() => {
+    navigate("/customer/addresses");
+  }, [navigate]);
+
+  const handleAddAddress = useCallback(() => {
+    setShowAddAddressModal(true);
+    track('add_address_clicked', { source: 'cash_request_step_1' });
+  }, []);
+
+  const handleSaveAddress = useCallback((address: CustomerAddress) => {
+    setAddAddressLoading(false);
+    setShowAddAddressModal(false);
+    invalidateAddresses();
+    // Select the newly created address
+    setSelectedAddress(address);
+    track('address_created', { source: 'cash_request_step_1' });
+  }, [invalidateAddresses]);
+
+  const handleCloseAddAddressModal = useCallback(() => {
+    setShowAddAddressModal(false);
+  }, []);
+
+  const handleSaveAddAddress = useCallback(() => {
+    if (addAddressFormRef.current) {
+      addAddressFormRef.current.submit();
+    }
+  }, []);
+
+  // Sync loading state from form
+  useEffect(() => {
+    if (addAddressFormRef.current && showAddAddressModal) {
+      addAddressFormRef.current.setLoadingCallback(setAddAddressLoading);
+    }
+  }, [showAddAddressModal]);
   
   // Clean logic using cached hasAnyAddress:
   // - If user has 0 addresses (from cache), button is always disabled
@@ -138,28 +176,18 @@ export default function CashRequest() {
     // Save the current carousel index before moving to next step
     // This will be restored when returning to address selection
     // Note: The index is saved via onCarouselIndexChange callback
-    // Prepare transition, then update step
-    shelfRef.current.prepare('amount', 420);
-    // Update step after reserve phase starts
-    setTimeout(() => {
-      setStep(2);
-    }, 140);
+    setStep(2);
   }, [selectedAddress]);
   
   const handleBackToAddress = useCallback(() => {
-    shelfRef.current.prepare('address', 320);
-    // Update step after reserve phase starts
-    setTimeout(() => {
-      setStep(1);
-    }, 140);
+    setStep(1);
   }, []);
   
   const handleBackToHome = useCallback(() => {
-    // Reset selected address and carousel index when going back to home (starting a new request)
+    // Reset selected address when going back to home (starting a new request)
     setSelectedAddress(null);
-    setSavedCarouselIndex(null);
-    shelfRef.current.goTo('/customer/home', 'home', 320);
-  }, []);
+    navigate('/customer/home');
+  }, [navigate]);
 
   const handleSubmit = useCallback(async () => {
     if (!selectedAddress) {
@@ -220,28 +248,43 @@ export default function CashRequest() {
   // MUST be before any conditional returns to follow Rules of Hooks
   const summarySection = useMemo(() => {
     return (
-      <div className="w-full space-y-4">
-        <div className="w-full flex justify-between items-center">
-          <span className="text-sm font-medium text-slate-900">You'll get</span>
-          <span 
-            className="text-lg font-bold text-slate-900"
-            style={{ fontVariantNumeric: "tabular-nums" }}
-          >
-            ${amount.toFixed(0)}
-          </span>
-        </div>
-        <div className="w-full flex justify-between items-center">
-          <span className="text-sm font-medium text-slate-900">You'll pay</span>
-          <span 
-            className="text-lg font-bold text-slate-900"
-            style={{ fontVariantNumeric: "tabular-nums" }}
-          >
-            ${pricing?.total.toFixed(2) || '0.00'}
-          </span>
-        </div>
-        
-        {/* View breakdown link/expander */}
-        {/* Element fills container and sizes by content */}
+      <div className="w-full space-y-3">
+        {/* Summary Mini-Card */}
+        <motion.div
+          initial={false}
+          animate={{ backgroundColor: showFeeDetails ? '#fafafa' : '#ffffff' }}
+          transition={{ duration: 0.15 }}
+          className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"
+        >
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-slate-500">You'll get</span>
+            <motion.span
+              key={`get-${amount}`}
+              initial={{ opacity: 0.6 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="text-sm font-semibold text-slate-900"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              ${amount.toFixed(0)}
+            </motion.span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-slate-500">You'll pay</span>
+            <motion.span
+              key={`pay-${pricing?.total || 0}`}
+              initial={{ opacity: 0.6, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="text-sm font-semibold text-slate-900"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              ${pricing?.total.toFixed(2) || '0.00'}
+            </motion.span>
+          </div>
+        </motion.div>
+
+        {/* View breakdown button - better affordance, 12px spacing from summary */}
         <button
           onClick={() => {
             const newState = !showFeeDetails;
@@ -250,17 +293,17 @@ export default function CashRequest() {
               is_expanded: newState,
             });
           }}
-          className="w-full flex items-center justify-between transition-opacity pt-4 border-t border-slate-200"
+          className="w-full flex items-center justify-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors touch-manipulation py-1 mt-3"
         >
-          <span className="text-sm font-medium text-slate-600">View breakdown</span>
           {showFeeDetails ? (
-            <ChevronUp className="h-4 w-4 text-slate-600" />
+            <ChevronUp className="h-4 w-4" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-slate-600" />
+            <ChevronDown className="h-4 w-4" />
           )}
+          <span>View full fee breakdown</span>
         </button>
 
-        {/* Fee Breakdown - iOS-style expand/collapse */}
+        {/* Fee Breakdown - Accordion panel */}
         <AnimatePresence initial={false}>
           {pricing && showFeeDetails && (
             <motion.div
@@ -275,22 +318,40 @@ export default function CashRequest() {
               }}
               style={{ overflow: "hidden" }}
             >
-              <div className="space-y-2" style={{ paddingTop: "12px" }}>
+              <div className="bg-slate-50/60 rounded-xl p-4 space-y-3 border border-slate-100">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-600">Cash amount</span>
-                  <span className="text-slate-900 font-medium">${amount.toFixed(2)}</span>
+                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    ${amount.toFixed(2)}
+                  </span>
                 </div>
+                <div className="h-px bg-slate-200" />
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-600">Platform fee</span>
-                  <span className="text-slate-900 font-medium">${pricing.platformFee.toFixed(2)}</span>
+                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    ${pricing.platformFee.toFixed(2)}
+                  </span>
                 </div>
+                <div className="h-px bg-slate-200" />
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-600">Compliance fee</span>
-                  <span className="text-slate-900 font-medium">${pricing.complianceFee.toFixed(2)}</span>
+                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    ${pricing.complianceFee.toFixed(2)}
+                  </span>
                 </div>
+                <div className="h-px bg-slate-200" />
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-600">Delivery fee</span>
-                  <span className="text-slate-900 font-medium">${pricing.deliveryFee.toFixed(2)}</span>
+                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    ${pricing.deliveryFee.toFixed(2)}
+                  </span>
+                </div>
+                <div className="h-px bg-slate-300 mt-2" />
+                <div className="flex justify-between items-center text-sm pt-1">
+                  <span className="text-slate-900 font-semibold">Total</span>
+                  <span className="text-slate-900 font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    ${pricing.total.toFixed(2)}
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -300,130 +361,70 @@ export default function CashRequest() {
     );
   }, [pricing, amount, showFeeDetails]);
 
+  // Memoize flow header for both steps
+  const flowHeader = useMemo(() => {
+    if (step === 1) {
+      return (
+        <FlowHeader
+          step={1}
+          totalSteps={2}
+          mode="cancel"
+          onPrimaryNavClick={handleBackToHome}
+          title="Where should we deliver?"
+          subtitle="Select a location. You can save more than one."
+        />
+      );
+    } else {
+      return (
+        <FlowHeader
+          step={2}
+          totalSteps={2}
+          mode="back"
+          onPrimaryNavClick={handleBackToAddress}
+          title="How much cash do you need?"
+          subtitle="Choose an amount and delivery style."
+        />
+      );
+    }
+  }, [step, handleBackToHome, handleBackToAddress]);
+
   // Memoize the entire topContent to prevent remounting
   // MUST be before any conditional returns to follow Rules of Hooks
-  // Standardized spacing: space-y-4 (16px) for main content blocks
+  // Premium spacing: 24px padding overall, clear vertical sections
   const topContent = useMemo(() => {
     return (
-    <div className="space-y-4 pb-8" style={{ minHeight: "180px" }}>
+    <div className="space-y-6 pb-24" style={{ minHeight: "180px" }}>
       {/* Cash Amount Section */}
-      <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
-        {/* Main Amount Display */}
-        {/* Element fills container and sizes by content */}
-        {/* Reserve space with minHeight to prevent layout shift */}
-        <div className="w-full flex items-center justify-center" style={{ minHeight: '60px' }}>
-          {!isEditingAmount ? (
-            <div 
-              onClick={() => {
-                setIsEditingAmount(true);
-                setDraftAmountStr(String(amount)); // seed with current value
-                setTimeout(() => amountInputRef.current?.focus(), 0);
-              }}
-              className="cursor-text"
-              style={{ 
-                fontSize: 48, 
-                fontWeight: 700, 
-                color: '#0F172A',
-                textAlign: 'center',
-                fontVariantNumeric: 'tabular-nums'
-              }}
-            >
-              ${amount.toLocaleString()}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <input
-                ref={amountInputRef}
-                type="tel"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={draftAmountStr}
-                onChange={(e) => {
-                  // allow free typing of digits; strip commas/spaces
-                  const raw = e.target.value.replace(/[^\d]/g, "");
-                  // optional: cap length to something sane (e.g., 5 digits)
-                  setDraftAmountStr(raw);
-                }}
-                onBlur={() => {
-                  // commit on blur: parse, clamp, step-round, then exit edit mode
-                  const num = parseInt(draftAmountStr || "0", 10);
-                  // if empty or 0, fall back to MIN so we never commit NaN
-                  const safe = Number.isFinite(num) && num > 0 ? num : MIN_AMOUNT;
-                  // round to nearest $20 and clamp to [MIN, MAX]
-                  const rounded = Math.round(safe / 20) * 20;
-                  const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, rounded));
-                  setAmount(clamped);
-                  setIsEditingAmount(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.currentTarget.blur(); // triggers the same commit logic
-                  } else if (e.key === "Escape") {
-                    // cancel edits and revert
-                    setDraftAmountStr(String(amount));
-                    setIsEditingAmount(false);
-                  }
-                }}
-                style={{
-                  fontSize: 48,
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  textAlign: 'center',
-                  width: '200px',
-                  border: 'none',
-                  borderBottom: '2px solid #000',
-                  background: 'transparent',
-                  outline: 'none',
-                  paddingBottom: '4px'
-                }}
-                autoFocus
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Range Helper Text */}
-        {/* Element fills container and sizes by content */}
-        <div className="w-full text-center">
-          <p className="text-sm text-slate-600">
-            ${MIN_AMOUNT.toLocaleString()}–${MAX_AMOUNT.toLocaleString()} range
-          </p>
-        </div>
-
-        {/* Amount Selection Components (Preset Buttons & Slider) */}
-        {/* Element fills container and sizes by content */}
-        <div className="w-full">
+      <FlowCard>
+        <div className="w-full space-y-6">
+          {/* Amount Selection Components (Amount Display, Preset Buttons & Slider) */}
           <CashAmountInput
             value={amount}
             onChange={handleAmountChange}
             min={MIN_AMOUNT}
             max={MAX_AMOUNT}
             step={20}
-            hideAmountDisplay={true}
-            hideRangeText={true}
+            hideAmountDisplay={false}
+            hideRangeText={false}
           />
-        </div>
 
-        {/* Summary Section */}
-        {/* Element fills container and sizes by content */}
-        <div className="w-full">
-          {summarySection}
+          {/* Summary Section - 20px spacing from slider (space-y-6 = 24px) */}
+          <div className="w-full">
+            {summarySection}
+          </div>
         </div>
-      </div>
+      </FlowCard>
 
       {/* Delivery Style Selector */}
-      {/* Element fills container and sizes by content */}
-      <div className="w-full pt-6">
-        <div className="bg-slate-50 rounded-2xl p-4">
-          <DeliveryModeSelector
-            value={deliveryMode}
-            onChange={(mode) => setDeliveryMode(mode)}
-          />
-        </div>
-      </div>
+      <FlowCard>
+        <DeliveryModeSelector
+          value={deliveryMode}
+          onChange={(mode) => setDeliveryMode(mode)}
+        />
+      </FlowCard>
     </div>
   );
-  }, [amount, isEditingAmount, handleAmountChange, summarySection, draftAmountStr, pricing, deliveryMode]);
+  }, [amount, handleAmountChange, summarySection, pricing, deliveryMode]);
 
   // Memoize terms content for footer
   const termsContent = useMemo(() => {
@@ -444,20 +445,17 @@ export default function CashRequest() {
   // Memoize footer to prevent infinite re-renders
   const footer = useMemo(() => {
     if (step === 1) {
-      if (!isEditingAddress) {
-        return (
-          <CustomerOrderFlowFooter
-            mode="address"
-            onPrimary={handleNextStep}
-            onSecondary={handleBackToHome}
-            isLoading={false}
-            primaryDisabled={isContinueDisabled}
-          />
-        );
-      } else {
-        return null;
-      }
-    } else if (step === 2) {
+      return (
+        <CustomerOrderFlowFooter
+          mode="address"
+          onPrimary={handleNextStep}
+          onAddAddress={addresses.length > 0 ? handleAddAddress : undefined}
+          isLoading={false}
+          primaryDisabled={isContinueDisabled}
+        />
+      );
+    }
+    if (step === 2) {
       return (
         <CustomerOrderFlowFooter
           mode="amount"
@@ -466,11 +464,25 @@ export default function CashRequest() {
           isLoading={loading}
           primaryDisabled={loading || !selectedAddress || !pricing || !deliveryMode}
           termsContent={termsContent}
+          useSliderButton={true}
         />
       );
     }
     return null;
-  }, [step, isEditingAddress, handleNextStep, handleBackToHome, handleBackToAddress, handleSubmit, loading, selectedAddress, pricing, isContinueDisabled, deliveryMode, termsContent]);
+  }, [
+    step,
+    handleNextStep,
+    handleBackToAddress,
+    handleSubmit,
+    handleAddAddress,
+    loading,
+    selectedAddress,
+    pricing,
+    isContinueDisabled,
+    deliveryMode,
+    termsContent,
+    addresses.length,
+  ]);
 
   // Set bottom slot - only depends on memoized footer and stable setBottomSlot
   useEffect(() => {
@@ -478,99 +490,391 @@ export default function CashRequest() {
     return () => setBottomSlot(null);
   }, [setBottomSlot, footer]);
 
+  // iOS-style spring physics configuration for modal
+  const iosSpring = {
+    type: "spring" as const,
+    stiffness: 300,
+    damping: 30,
+    mass: 0.5,
+  };
+
   // Step 1: Address Selection
   if (step === 1) {
-    // Top content: zero-address state OR address selector + add button
-    // Always render AddressSelector so it can handle the modal trigger
-    const addressTopContent = addresses.length === 0 ? (
+    // Fixed content: Map + "Saved locations" title (doesn't scroll)
+    const addressFixedContent = (
       <div className="space-y-4">
-        <div className="w-full flex flex-col items-center justify-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-slate-600" />
-          </div>
-          <h3 className="text-base font-semibold text-slate-900 text-center">
-            No Address Yet
-          </h3>
-          <p className="text-sm text-slate-500 text-center">
-            Let's add your first address.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowAddAddressForm(true)}
-            className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
-          >
-            <Plus className="w-5 h-5" />
-            Add Your First Address
-          </button>
+        {/* Map preview card */}
+        <div className="w-full h-56 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+          <CustomerMapViewport selectedAddress={selectedAddress} />
         </div>
-        {/* Render AddressSelector hidden to handle modal trigger */}
-        <AddressSelector
-          selectedAddressId={null}
-          onAddressSelect={handleAddressSelect}
-          onAddressChange={() => {}}
-          onEditingChange={setIsEditingAddress}
-          onAddressesCountChange={() => {}}
-          hideManageButton={true}
-          triggerAddAddress={showAddAddressForm}
-          onAddAddressTriggered={() => setShowAddAddressForm(false)}
-        />
-      </div>
-    ) : (
-      <div className="space-y-4">
-        <AddressSelector
-          selectedAddressId={selectedAddress?.id || searchParams.get('address_id') || null}
-          onAddressSelect={handleAddressSelect}
-          onAddressChange={() => {}}
-          onEditingChange={setIsEditingAddress}
-          onAddressesCountChange={() => {}}
-          hideManageButton={true}
-          triggerAddAddress={showAddAddressForm}
-          onAddAddressTriggered={() => setShowAddAddressForm(false)}
-          initialCarouselIndex={savedCarouselIndex}
-          onCarouselIndexChange={setSavedCarouselIndex}
-        />
-        {/* Add Address button - only show when user has 1+ addresses */}
-        {hasAnyAddress && (
-          <button
-            onClick={() => {
-              setShowAddAddressForm(true);
-            }}
-            className="w-full rounded-full border border-slate-200 bg-white py-4 px-6 text-base font-semibold text-slate-900 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] active:bg-slate-50 transition-transform duration-150"
-          >
-            <Plus className="w-5 h-5" />
-            Add Address
-          </button>
+
+        {/* Section title - only show when addresses exist */}
+        {addresses.length > 0 && (
+          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase mb-6 pb-1.5">
+            Saved locations
+          </p>
         )}
       </div>
     );
 
+    // Scrollable content: Address list + Add button (scrolls)
+    const addressScrollableContent = (
+      <div className="space-y-4 pb-6">
+        {/* 0 addresses – empty state */}
+        {addresses.length === 0 && (
+          <div className="w-full rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg">
+              +
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-900">
+                Add your first address
+              </p>
+              <p className="text-sm text-slate-500">
+                Save a place where you'd like cash delivered. You can add more later.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddAddress}
+              className="mt-1 w-full rounded-full bg-slate-900 text-white text-sm font-semibold py-3 px-4 active:scale-[0.98] transition-transform duration-150"
+            >
+              Add Address
+            </button>
+          </div>
+        )}
+
+        {/* 1+ addresses – address list */}
+        {addresses.length > 0 && (
+          <div className="space-y-2">
+            {addresses.map((addr) => {
+              const isSelected = selectedAddress?.id === addr.id;
+
+              return (
+                <button
+                  key={addr.id}
+                  type="button"
+                  onClick={() => handleAddressSelect(addr)}
+                  className={cn(
+                    "group w-full rounded-xl px-4 py-3 text-left flex items-center justify-between gap-3 bg-white",
+                    "transition-all duration-150",
+                    isSelected
+                      ? "border-2 border-black"
+                      : "border border-slate-200 hover:border-slate-300"
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {addr.label || "Saved address"}
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-600 truncate">
+                      {formatAddress(addr)}
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleManageAddresses();
+                    }}
+                    className="ml-2 flex items-center justify-center shrink-0 cursor-pointer p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+                  >
+                    <Pencil className="h-4 w-4 text-slate-600 group-hover:text-slate-900" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+      </div>
+    );
+
     return (
-      <CustomerScreen
-        loading={false}
-        stepKey="address"
-        title="Where should we deliver?"
-        subtitle="Select a location. You can save more than one."
-        topContent={addressTopContent}
-        map={<CustomerMapViewport selectedAddress={selectedAddress} />}
-      >
-        {/* No children - everything is in topContent */}
-      </CustomerScreen>
+      <>
+        <CustomerScreen
+          flowHeader={flowHeader}
+          fixedContent={addressFixedContent}
+          topContent={addressScrollableContent}
+          customBottomPadding="calc(24px + max(24px, env(safe-area-inset-bottom)) + 132px)"
+        >
+          {/* No children – everything is in fixedContent and topContent */}
+        </CustomerScreen>
+
+        {/* Add Address Modal - Portal to document.body */}
+        {typeof document !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {showAddAddressModal && (
+              <>
+                {/* Backdrop - covers everything including header */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80]"
+                  onClick={handleCloseAddAddressModal}
+                />
+                
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="fixed inset-0 z-[90] flex flex-col pointer-events-none"
+                >
+                  {/* Modal Content - Starts higher up, fills to bottom */}
+                  <motion.div
+                    layout
+                    initial={{ y: "100%", opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: "100%", opacity: 0 }}
+                    transition={iosSpring}
+                    className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+                    style={{
+                      marginTop: '15vh', // Start 15% from top (more space for modal)
+                      height: 'calc(100vh - 15vh)', // Fill remaining space
+                      maxHeight: 'calc(100vh - 15vh)'
+                    }}
+                  >
+                    {/* Header - Fixed to top of modal */}
+                    <motion.div
+                      layout
+                      className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-3xl z-10"
+                    >
+                      <div className="flex-1">
+                        <h2 className="text-xl font-bold text-gray-900">
+                          Add Delivery Address
+                        </h2>
+                        <p className="text-sm text-gray-600 mt-0.5">
+                          You can edit or remove it anytime.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCloseAddAddressModal}
+                        className="ml-4 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors touch-manipulation"
+                        aria-label="Close"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </motion.div>
+                    
+                    {/* Scrollable Content Area - between header and footer */}
+                    <motion.div
+                      layout
+                      className="flex-1 min-h-0 overflow-y-auto"
+                      style={{ 
+                        paddingBottom: '120px' // Space for fixed footer
+                      }}
+                    >
+                      <div className="px-6 py-6 space-y-6">
+                        <AddressForm
+                          ref={addAddressFormRef}
+                          address={null}
+                          onSave={handleSaveAddress}
+                          onCancel={handleCloseAddAddressModal}
+                        />
+                      </div>
+                    </motion.div>
+                  </motion.div>
+
+                  {/* Footer - Fixed to bottom of screen with safe area */}
+                  <motion.div
+                    layout
+                    className="fixed bottom-0 left-0 right-0 flex justify-center flex-shrink-0 border-t border-gray-200 bg-white z-10 pointer-events-auto"
+                  >
+                    <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={handleCloseAddAddressModal}
+                          disabled={addAddressLoading}
+                          className={cn(
+                            "flex-1 rounded-full py-4 px-6",
+                            "border border-gray-300",
+                            "bg-white text-gray-900",
+                            "text-base font-semibold",
+                            "flex items-center justify-center",
+                            "transition-all duration-200",
+                            "active:scale-[0.97]",
+                            "touch-manipulation",
+                            addAddressLoading && "opacity-60 cursor-not-allowed"
+                          )}
+                        >
+                          {addAddressCopy.cancelButton}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveAddAddress}
+                          disabled={addAddressLoading}
+                          className={cn(
+                            "flex-[2] rounded-full py-4 px-6",
+                            "bg-black text-white",
+                            "text-base font-semibold",
+                            "flex items-center justify-center",
+                            "transition-all duration-200",
+                            "active:scale-[0.97]",
+                            "touch-manipulation",
+                            addAddressLoading && "opacity-60 cursor-not-allowed"
+                          )}
+                        >
+                          {addAddressLoading ? "Saving..." : addAddressCopy.saveButton}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+      </>
     );
   }
 
   // Step 2: Cash Amount + Delivery Style
-  const isLoading = loading || !pricing;
 
   return (
-    <CustomerScreen
-      loading={isLoading}
-      stepKey="amount"
-      title="How much cash do you need?"
-      subtitle="Choose an amount and delivery style."
-      topContent={topContent}
-    >
-      {/* No children - everything is in topContent */}
-    </CustomerScreen>
+    <>
+      <CustomerScreen
+        flowHeader={flowHeader}
+        topContent={topContent}
+      />
+
+      {/* Add Address Modal - Portal to document.body */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showAddAddressModal && (
+            <>
+              {/* Backdrop - covers everything including header */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80]"
+                onClick={handleCloseAddAddressModal}
+              />
+              
+              {/* Modal Container */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-[90] flex flex-col pointer-events-none"
+              >
+                {/* Modal Content - Starts higher up, fills to bottom */}
+                <motion.div
+                  layout
+                  initial={{ y: "100%", opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: "100%", opacity: 0 }}
+                  transition={iosSpring}
+                  className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+                  style={{
+                    marginTop: '15vh', // Start 15% from top (more space for modal)
+                    height: 'calc(100vh - 15vh)', // Fill remaining space
+                    maxHeight: 'calc(100vh - 15vh)'
+                  }}
+                >
+                  {/* Header - Fixed to top of modal */}
+                  <motion.div
+                    layout
+                    className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-3xl z-10"
+                  >
+                    <div className="flex-1">
+                      <h2 className="text-xl font-bold text-gray-900">
+                        Add Delivery Address
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-0.5">
+                        You can edit or remove it anytime.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCloseAddAddressModal}
+                      className="ml-4 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors touch-manipulation"
+                      aria-label="Close"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </motion.div>
+                  
+                  {/* Scrollable Content Area - between header and footer */}
+                  <motion.div
+                    layout
+                    className="flex-1 min-h-0 overflow-y-auto"
+                    style={{ 
+                      paddingBottom: '120px' // Space for fixed footer
+                    }}
+                  >
+                    <div className="px-6 py-6 space-y-6">
+                      <AddressForm
+                        ref={addAddressFormRef}
+                        address={null}
+                        onSave={handleSaveAddress}
+                        onCancel={handleCloseAddAddressModal}
+                      />
+                    </div>
+                  </motion.div>
+                </motion.div>
+
+                {/* Footer - Fixed to bottom of screen with safe area */}
+                <motion.div
+                  layout
+                  className="fixed bottom-0 left-0 right-0 flex justify-center flex-shrink-0 border-t border-gray-200 bg-white z-10 pointer-events-auto"
+                >
+                  <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCloseAddAddressModal}
+                        disabled={addAddressLoading}
+                        className={cn(
+                          "flex-1 rounded-full py-4 px-6",
+                          "border border-gray-300",
+                          "bg-white text-gray-900",
+                          "text-base font-semibold",
+                          "flex items-center justify-center",
+                          "transition-all duration-200",
+                          "active:scale-[0.97]",
+                          "touch-manipulation",
+                          addAddressLoading && "opacity-60 cursor-not-allowed"
+                        )}
+                      >
+                        {addAddressCopy.cancelButton}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveAddAddress}
+                        disabled={addAddressLoading}
+                        className={cn(
+                          "flex-[2] rounded-full py-4 px-6",
+                          "bg-black text-white",
+                          "text-base font-semibold",
+                          "flex items-center justify-center",
+                          "transition-all duration-200",
+                          "active:scale-[0.97]",
+                          "touch-manipulation",
+                          addAddressLoading && "opacity-60 cursor-not-allowed"
+                        )}
+                      >
+                        {addAddressLoading ? "Saving..." : addAddressCopy.saveButton}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   );
 }
 

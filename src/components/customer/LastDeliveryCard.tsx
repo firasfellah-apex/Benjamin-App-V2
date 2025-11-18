@@ -12,7 +12,6 @@ import type { OrderWithDetails } from "@/types/types";
 interface LastDeliveryCardProps {
   order: OrderWithDetails;
   onRateRunner?: (orderId: string) => void;
-  onViewAll?: () => void;
 }
 
 /**
@@ -83,7 +82,7 @@ function formatTimeLabel(date: Date): string {
   });
 }
 
-export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliveryCardProps) {
+export function LastDeliveryCard({ order, onRateRunner }: LastDeliveryCardProps) {
   const navigate = useNavigate();
   
   if (!order) return null;
@@ -112,85 +111,80 @@ export function LastDeliveryCard({ order, onRateRunner, onViewAll }: LastDeliver
     }
   };
   
-  const handleViewAllClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onViewAll) {
-      onViewAll();
-    } else {
-      navigate('/customer/deliveries');
-    }
-  };
-  
   return (
-    // Standardized spacing: px-6 (24px) horizontal and vertical
-    // Internal spacing: space-y-6 (24px) for grouped UI blocks
-    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 px-6 py-6">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-[0.05em] text-slate-500">
-              Latest delivery
+    <>
+      {/* Standardized spacing: px-6 (24px) horizontal and vertical */}
+      {/* Internal spacing: space-y-6 (24px) for grouped UI blocks */}
+      <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 px-6 py-6">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+              <div className="text-[11px] font-medium uppercase tracking-[0.05em] text-slate-500">
+                Latest delivery
+              </div>
+              <div className="text-base font-semibold text-slate-900">
+                ${amount.toFixed(0)} {isCancelled ? 'requested' : 'delivered'} to {addressLabel}
+              </div>
+              <div className="text-[11px] text-slate-500">
+                {dateLabel} · {timeLabel}
+              </div>
             </div>
-            <div className="text-base font-semibold text-slate-900">
-              ${amount.toFixed(0)} {isCancelled ? 'requested' : 'delivered'} to {addressLabel}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              {dateLabel} · {timeLabel}
-            </div>
+            
+            {/* Status pill */}
+            {isCancelled ? (
+              <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                Cancelled
+              </div>
+            ) : (
+              <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Delivered
+              </div>
+            )}
           </div>
           
-          {/* Status pill */}
-          {isCancelled ? (
-            <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-              Cancelled
-            </div>
-          ) : (
-            <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Delivered
-            </div>
-          )}
-        </div>
-        
-        {/* Divider */}
-        <div className="border-t border-slate-200" />
-        
-        {/* Actions */}
-        <div className="flex items-center justify-between gap-3">
-          {canRate ? (
-            <button
-              type="button"
-              onClick={handleRateClick}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-slate-900 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
-            >
-              <span className="text-base leading-[0]">★</span>
-              <span>Rate runner</span>
-            </button>
-          ) : isRated && order.runner_rating ? (
-            <div className="text-[10px] text-amber-500">
-              ★ {order.runner_rating.toFixed(1)} • You rated this runner
-            </div>
-          ) : isCancelled ? (
-            <div className="text-[10px] text-slate-400">
-              This order was cancelled.
-            </div>
-          ) : (
-            <div className="text-[10px] text-slate-400">
-              Thank you for using Benjamin.
-            </div>
-          )}
+          {/* Divider */}
+          <div className="border-t border-slate-200" />
           
-          <button
-            type="button"
-            onClick={handleViewAllClick}
-            className="ml-auto text-[10px] font-medium text-slate-500 inline-flex items-center gap-1 transition-colors"
-          >
-            View all deliveries
-            <span aria-hidden="true" className="text-slate-400">→</span>
-          </button>
+          {/* Actions */}
+          <div className="flex items-center justify-between gap-4">
+            {canRate ? (
+              <button
+                type="button"
+                onClick={handleRateClick}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-slate-900 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+              >
+                <span className="text-base leading-[0]" style={{ color: '#DFB300' }}>★</span>
+                <span>Rate runner</span>
+              </button>
+            ) : isRated && order.runner_rating ? (
+              <div className="flex items-center justify-between w-full">
+                <span className="text-xs text-slate-600">You rated this runner:</span>
+                <div className="inline-flex items-center gap-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="text-base leading-[0]"
+                      style={{ color: i < Math.round(order.runner_rating || 0) ? '#DFB300' : '#E5E7EB' }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : isCancelled ? (
+              <div className="text-xs text-slate-400">
+                This order was cancelled.
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400">
+                Thank you for using Benjamin.
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

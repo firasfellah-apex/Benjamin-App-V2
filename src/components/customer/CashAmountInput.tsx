@@ -30,7 +30,10 @@ export default function CashAmountInput({
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showPulse, setShowPulse] = useState(false);
+  const [showBubble, setShowBubble] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sliderRef = useRef<HTMLInputElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   // Sync input with value prop when not editing
   useEffect(() => {
@@ -152,15 +155,21 @@ export default function CashAmountInput({
     }, 0);
   };
 
+  // Calculate thumb position for bubble
+  const thumbPosition = ((value - min) / (max - min)) * 100;
+
+  // Quick pick amounts
+  const quickPicks = [100, 200, 500, 1000].filter(amt => amt >= min && amt <= max);
+
   return (
-    <div className={cn(hideAmountDisplay && hideRangeText ? "" : "space-y-4", className)}>
-      {/* Primary Value - Large display, clickable to edit (only if not hidden) */}
+    <div className={cn("w-full space-y-6", className)}>
+      {/* ZONE 1: Amount Focus */}
       {!hideAmountDisplay && (
-        <>
+        <div className="w-full text-center space-y-2">
           {!isEditing ? (
             <div 
               onClick={onEditClick || handleDisplayClick}
-              className="text-5xl font-bold text-slate-900 text-center cursor-text hover:opacity-70 transition-opacity touch-manipulation"
+              className="text-3xl font-semibold text-slate-900 cursor-text hover:opacity-70 transition-opacity touch-manipulation"
             >
               ${formatWithCommas(value)}
             </div>
@@ -175,99 +184,188 @@ export default function CashAmountInput({
                 onChange={handleInputChange}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                className="text-5xl font-bold text-slate-900 text-center w-48 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-2 bg-transparent"
+                className="text-3xl font-semibold text-slate-900 text-center w-32 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-1 bg-transparent"
                 aria-label="Cash amount"
                 autoFocus
               />
             </div>
           )}
-        </>
+          <p className="text-xs text-slate-500">Cash you'll receive</p>
+        </div>
       )}
 
-      {/* Secondary Text - Range helper (only if not hidden) */}
-      {!hideRangeText && (
-        <p className="text-sm text-slate-500 text-center">
-          ${min.toLocaleString()}–${max.toLocaleString()} range
-        </p>
-      )}
-
-      {/* Amount Buttons */}
-      <div className="flex justify-center gap-2 flex-wrap" style={{ marginBottom: '16px' }}>
-        {[100, 200, 500, 1000].map((amt) => (
-          <button
-            key={amt}
-            type="button"
-            onClick={() => handleQuickPick(amt)}
-            className={cn(
-              "px-4 py-2 rounded-lg border text-sm font-medium transition-colors touch-manipulation",
-              value === amt
-                ? "bg-black border-black text-white"
-                : "border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100"
-            )}
-          >
-            ${amt.toLocaleString()}
-          </button>
-        ))}
-      </div>
-
-      {/* Slider - Premium Benjamin Design */}
-      <div className="space-y-1">
-        <div className="relative w-full flex items-center" style={{ height: '44px' }}>
-          {/* Background track - matte gray with subtle depth */}
-          <div 
-            className="absolute left-0 right-0 slider-track-bg"
-            style={{ 
-              top: '19px', 
-              height: '6px'
-            }}
-          >
-            <div 
-              className="w-full h-full rounded-full"
-              style={{
-                background: 'linear-gradient(90deg, #e5e7eb, #d1d5db)',
-                boxShadow: '0 0 0 0.5px rgba(15, 23, 42, 0.08) inset'
-              }}
-            />
-          </div>
-          
-          {/* Green fill track - sleek matte glass with horizontal gradient */}
-          <motion.div 
-            className="absolute left-0 pointer-events-none rounded-full slider-fill"
-            style={{ 
-              top: '19px',
-              height: '6px'
-            }}
-            initial={false}
-            animate={{ 
-              width: `${((value - min) / (max - min)) * 100}%`
-            }}
-            transition={{ 
-              duration: 0.2, 
-              ease: "easeOut" 
-            }}
-          >
-            <div 
+      {/* ZONE 2: Controls (Quick Picks + Slider) */}
+      <div className="space-y-4">
+        {/* Quick Pick Buttons */}
+        <div className="flex justify-center gap-2 flex-wrap">
+          {quickPicks.map((amt) => (
+            <button
+              key={amt}
+              type="button"
+              onClick={() => handleQuickPick(amt)}
               className={cn(
-                "w-full h-full rounded-full relative overflow-hidden",
-                isDragging && "pulse-active"
+                "px-4 py-2 rounded-xl border text-sm font-medium transition-colors touch-manipulation shadow-sm",
+                value === amt
+                  ? "bg-black border-black text-white"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100"
               )}
-              style={{
-                background: 'linear-gradient(90deg, #10b981, #0ea564)',
-                boxShadow: '0 0 0 0.5px rgba(15, 23, 42, 0.1) inset'
-              }}
             >
-              {/* Pulse effect overlay - triggers once per drag start */}
+              ${amt.toLocaleString()}
+            </button>
+          ))}
+        </div>
+
+        {/* Slider Block - Premium Design */}
+        <div className="space-y-3">
+          {/* "Adjust amount" label */}
+          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            Adjust amount
+          </p>
+
+          {/* Slider Track Row - Min labels, track, max labels */}
+          <div className="relative" style={{ height: '50px' }}>
+            {/* Track container - full width */}
+            <div className="relative w-full" style={{ height: '44px', marginTop: '10px' }}>
+              {/* Min label - left edge */}
+              <span className="absolute left-0 text-xs text-slate-500" style={{ top: '22px' }}>
+                ${min.toLocaleString()}
+              </span>
+
+              {/* Max label - right edge */}
+              <span className="absolute right-0 text-xs text-slate-500" style={{ top: '22px' }}>
+                ${max.toLocaleString()}
+              </span>
+
+              {/* Track area - full width, between labels */}
+              <div className="absolute left-0 right-0" style={{ height: '6px', top: '19px' }}>
+                {/* Background track - right side (slate-200) */}
+                <div 
+                  className="absolute left-0 right-0 h-full rounded-full"
+                  style={{
+                    background: '#e5e7eb',
+                  }}
+                />
+
+                {/* Dual-tone: Left side (charcoal/black), right side (slate-200) */}
+                <motion.div 
+                  className="absolute left-0 h-full rounded-full pointer-events-none"
+                  style={{ 
+                    background: '#111827',
+                    height: '6px'
+                  }}
+                  initial={false}
+                  animate={{ 
+                    width: `${thumbPosition}%`
+                  }}
+                  transition={{ 
+                    duration: isDragging ? 0 : 0.2, 
+                    ease: "easeOut" 
+                  }}
+                />
+
+                {/* Tick markers at quick pick positions */}
+                {quickPicks.map((amt) => {
+                  const tickPosition = ((amt - min) / (max - min)) * 100;
+                  return (
+                    <div
+                      key={amt}
+                      className="absolute w-px bg-slate-300 pointer-events-none"
+                      style={{
+                        left: `${tickPosition}%`,
+                        top: '-1px',
+                        height: '8px',
+                        opacity: value === amt ? 0.8 : 0.4,
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Floating value bubble - above thumb */}
+                <AnimatePresence>
+                  {(isDragging || showBubble) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.9 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${thumbPosition}%`,
+                        top: '-28px',
+                        transform: 'translateX(-50%)',
+                      }}
+                    >
+                      <div className="bg-slate-900 text-white text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap shadow-lg">
+                        ${formatWithCommas(value)}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Slider input - positioned on top */}
+                <input
+                  ref={sliderRef}
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={value}
+                  onChange={handleSliderChange}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    setIsDragging(true);
+                    setShowBubble(true);
+                    setShowPulse(true);
+                    setTimeout(() => setShowPulse(false), 600);
+                  }}
+                  onMouseDown={() => {
+                    setIsDragging(true);
+                    setShowBubble(true);
+                    setShowPulse(true);
+                    setTimeout(() => setShowPulse(false), 600);
+                  }}
+                  onMouseUp={() => {
+                    setIsDragging(false);
+                    setTimeout(() => setShowBubble(false), 300);
+                  }}
+                  onMouseLeave={() => {
+                    setIsDragging(false);
+                    setTimeout(() => setShowBubble(false), 300);
+                  }}
+                  onTouchEnd={() => {
+                    setIsDragging(false);
+                    setTimeout(() => setShowBubble(false), 300);
+                  }}
+                  disabled={isEditing}
+                  className={cn(
+                    "absolute left-0 right-0 w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-benjamin",
+                    isDragging && "slider-dragging"
+                  )}
+                  style={{ 
+                    height: '44px',
+                    touchAction: 'pan-y',
+                    margin: 0, 
+                    padding: 0,
+                    top: '-13px'
+                  }}
+                  aria-label="Cash amount slider"
+                />
+              </div>
+
+              {/* Pulse effect overlay - centered on thumb */}
               <AnimatePresence>
                 {showPulse && (
                   <motion.div
-                    className="absolute inset-0 rounded-full pointer-events-none"
+                    className="absolute pointer-events-none"
                     style={{
-                      background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.25) 0%, transparent 70%)'
+                      left: `${thumbPosition}%`,
+                      top: '29px',
+                      transform: 'translateX(-50%)',
                     }}
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ 
-                      opacity: [0, 0.5, 0],
-                      scale: [0.9, 1.8, 2.5]
+                      opacity: [0, 0.4, 0],
+                      scale: [0.9, 2, 2.5]
                     }}
                     exit={{ opacity: 0 }}
                     transition={{ 
@@ -275,148 +373,118 @@ export default function CashAmountInput({
                       ease: "easeOut",
                       times: [0, 0.4, 1]
                     }}
-                  />
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%)'
+                      }}
+                    />
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>
-          </motion.div>
-          
-          {/* Slider input - positioned on top, perfectly aligned */}
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={value}
-            onChange={handleSliderChange}
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              setIsDragging(true);
-              setShowPulse(true);
-              setTimeout(() => setShowPulse(false), 600);
-            }}
-            onMouseDown={() => {
-              setIsDragging(true);
-              setShowPulse(true);
-              // Hide pulse after animation completes
-              setTimeout(() => setShowPulse(false), 600);
-            }}
-            onMouseUp={() => setIsDragging(false)}
-            onMouseLeave={() => setIsDragging(false)}
-            onTouchEnd={() => setIsDragging(false)}
-            disabled={isEditing}
-            className={cn(
-              "relative w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-benjamin",
-              isDragging && "slider-dragging"
-            )}
-            style={{ 
-              height: '44px',
-              touchAction: 'pan-y',
-              margin: 0, 
-              padding: 0
-            }}
-            aria-label="Cash amount slider"
-          />
-          
-          <style>{`
-            .slider-benjamin {
-              -webkit-appearance: none;
-              appearance: none;
-              outline: none;
-              touch-action: pan-y;
-            }
-            
-            /* Webkit Thumb - Elegant white circle */
-            .slider-benjamin::-webkit-slider-thumb {
-              -webkit-appearance: none;
-              appearance: none;
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              background: #ffffff;
-              cursor: pointer;
-              border: 2px solid #111827;
-              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-              margin-top: -13px;
-              transition: transform 0.15s ease, box-shadow 0.15s ease;
-            }
-            
-            .slider-benjamin:hover::-webkit-slider-thumb,
-            .slider-benjamin:active::-webkit-slider-thumb {
-              transform: scale(1.05);
-              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-            
-            .slider-dragging.slider-benjamin::-webkit-slider-thumb {
-              transform: scale(1.05);
-              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-            
-            /* Firefox Thumb */
-            .slider-benjamin::-moz-range-thumb {
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              background: #ffffff;
-              cursor: pointer;
-              border: 2px solid #111827;
-              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-              transition: transform 0.15s ease, box-shadow 0.15s ease;
-            }
-            
-            .slider-benjamin:hover::-moz-range-thumb,
-            .slider-benjamin:active::-moz-range-thumb {
-              transform: scale(1.05);
-              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-            
-            .slider-dragging.slider-benjamin::-moz-range-thumb {
-              transform: scale(1.05);
-              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-            
-            /* Track - transparent so we see our custom track */
-            .slider-benjamin::-webkit-slider-runnable-track {
-              background: transparent;
-              height: 6px;
-              border: none;
-            }
-            
-            .slider-benjamin::-moz-range-track {
-              background: transparent;
-              height: 6px;
-              border: none;
-            }
-            
-            /* Focus state */
-            .slider-benjamin:focus {
-              outline: none;
-            }
-            
-            .slider-benjamin:focus::-webkit-slider-thumb {
-              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(16, 185, 129, 0.15);
-            }
-            
-            /* Disabled state */
-            .slider-benjamin:disabled::-webkit-slider-thumb {
-              background: #f3f4f6;
-              border-color: #9ca3af;
-              cursor: not-allowed;
-            }
-            
-            .slider-benjamin:disabled::-moz-range-thumb {
-              background: #f3f4f6;
-              border-color: #9ca3af;
-              cursor: not-allowed;
-            }
-            
-          `}</style>
-        </div>
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>${min.toLocaleString()}</span>
-          <span>${max.toLocaleString()}</span>
+          </div>
+
+          {/* Range caption - below slider */}
+          {!hideRangeText && (
+            <p className="text-xs text-slate-400 text-center">
+              ${min.toLocaleString()}–${max.toLocaleString()} range
+            </p>
+          )}
         </div>
       </div>
+
+      <style>{`
+        .slider-benjamin {
+          -webkit-appearance: none;
+          appearance: none;
+          outline: none;
+          touch-action: pan-y;
+        }
+        
+        /* Webkit Thumb - Elegant white circle with scale on drag */
+        .slider-benjamin::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #ffffff;
+          cursor: pointer;
+          border: 2px solid #111827;
+          box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        
+        .slider-benjamin:hover::-webkit-slider-thumb {
+          transform: scale(1.05);
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+        
+        .slider-dragging.slider-benjamin::-webkit-slider-thumb {
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Firefox Thumb */
+        .slider-benjamin::-moz-range-thumb {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #ffffff;
+          cursor: pointer;
+          border: 2px solid #111827;
+          box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        
+        .slider-benjamin:hover::-moz-range-thumb {
+          transform: scale(1.05);
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+        
+        .slider-dragging.slider-benjamin::-moz-range-thumb {
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Track - transparent so we see our custom track */
+        .slider-benjamin::-webkit-slider-runnable-track {
+          background: transparent;
+          height: 6px;
+          border: none;
+        }
+        
+        .slider-benjamin::-moz-range-track {
+          background: transparent;
+          height: 6px;
+          border: none;
+        }
+        
+        /* Focus state */
+        .slider-benjamin:focus {
+          outline: none;
+        }
+        
+        .slider-benjamin:focus::-webkit-slider-thumb {
+          box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+        
+        /* Disabled state */
+        .slider-benjamin:disabled::-webkit-slider-thumb {
+          background: #f3f4f6;
+          border-color: #9ca3af;
+          cursor: not-allowed;
+        }
+        
+        .slider-benjamin:disabled::-moz-range-thumb {
+          background: #f3f4f6;
+          border-color: #9ca3af;
+          cursor: not-allowed;
+        }
+        
+      `}</style>
 
       {/* Error message */}
       {error && (
@@ -427,4 +495,3 @@ export default function CashAmountInput({
     </div>
   );
 }
-
