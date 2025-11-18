@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => {
       dedupe: ['react', 'react-dom']
     },
     optimizeDeps: {
-      include: ['@radix-ui/react-switch', 'react', 'react-dom']
+      include: ['@radix-ui/react-switch', 'react', 'react-dom', 'mapbox-gl']
     },
     // Expose VITE_APP_TARGET to the app
     define: {

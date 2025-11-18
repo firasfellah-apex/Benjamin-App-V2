@@ -94,19 +94,28 @@ function RunnerLayoutContent({ children, showBottomNav }: RunnerLayoutProps) {
       location.pathname !== '/runner/deliveries';
 
   return (
-    <div className="h-full flex flex-col bg-[#020817] overflow-hidden">
+    <div 
+      className="h-full flex flex-col bg-[#020817]"
+    >
       <RunnerHeader />
-      <PageContainer variant="runner" className="flex-1 min-h-0 overflow-hidden">
+      <PageContainer 
+        variant="runner" 
+        className="flex-1"
+      >
         <div
           key={location.pathname}
           className={cn(
-            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6",
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 bg-[#020817]",
             slideDirection === 'left' && "animate-[slideInLeft_300ms_ease-in-out]",
             slideDirection === 'right' && "animate-[slideInRight_300ms_ease-in-out]",
-            shouldShowBottomNav ? 'pt-2 pb-28' : 'py-2'
+            shouldShowBottomNav ? 'pt-2' : 'py-2'
           )}
           style={{
             WebkitOverflowScrolling: 'touch',
+            backgroundColor: '#020817', // Explicit background to prevent white gap
+            ...(shouldShowBottomNav && {
+              paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+            }),
           }}
         >
           {children}

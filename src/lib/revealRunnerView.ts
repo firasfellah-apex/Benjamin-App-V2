@@ -73,11 +73,13 @@ export function canSeeCashAmount(orderStatus: OrderStatus): boolean {
  * - At arrival/after: Real avatar
  */
 export function canShowCustomerAvatarToRunner(status: OrderStatus): boolean {
-  // For now, show avatar after OTP is generated (when in Pending Handoff with OTP)
-  // TODO: When DB has explicit 'Arrived' status, use that instead
-  // Currently treating 'Pending Handoff' with OTP as "arrived or enroute"
+  // Show customer avatar to runner once order is active
+  // This allows avatars to be visible in chat throughout the delivery process
   return [
-    'Pending Handoff', // Includes arrived state (when OTP exists)
+    'Runner Accepted',
+    'Runner at ATM',
+    'Cash Withdrawn',
+    'Pending Handoff',
     'Completed'
   ].includes(status);
 }

@@ -148,7 +148,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
             {cards.map((card, index) => (
               <motion.div
                 key={card.id}
-                className="snap-center shrink-0 w-full flex justify-center"
+                className="snap-center shrink-0 w-full"
                 style={{ 
                   scrollSnapAlign: 'center',
                   margin: 0,
@@ -166,13 +166,13 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
                 }}
               >
                   <div className="w-full flex flex-col md:flex-row">
-                  {/* Image half */}
-                  <div className="w-full md:w-1/2 h-48 md:h-auto flex items-center justify-center p-6 bg-black">
+                  {/* Image half - extends to top and sides, ignoring parent padding */}
+                  <div className="w-full md:w-1/2 h-80 md:h-96 flex items-center justify-center">
                     {card.image ? (
                       <img
                         src={card.image}
                         alt={card.title}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
@@ -191,7 +191,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
                         const Icon = bullet.icon;
                         return (
                           <li key={i} className="flex items-center gap-3">
-                            <Icon className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <Icon className="w-4 h-4 text-black shrink-0" />
                             <span className="text-sm text-slate-600 leading-relaxed">{bullet.text}</span>
                           </li>
                         );
@@ -205,7 +205,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
           
           {/* Dots indicator - outside scrolling container, always visible - iOS-style spring animations */}
           {cards.length > 1 && (
-            <div className="flex justify-center gap-2 py-4 px-6 bg-white">
+            <div className="flex justify-center gap-2 pt-6 pb-6 px-6 bg-white">
               {cards.map((_, idx) => (
                 <motion.button
                   key={idx}

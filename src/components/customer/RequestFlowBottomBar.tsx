@@ -76,14 +76,22 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
           >
             <div
               className={cn(
-                "h-2 rounded-full transition-all duration-300",
-                activeStep === 1 ? "w-16 bg-black" : "w-8 bg-gray-300"
+                "h-2 w-8 rounded-full transition-all duration-300",
+                activeStep === 1 
+                  ? "bg-black" 
+                  : activeStep > 1 
+                  ? "bg-emerald-500" 
+                  : "bg-gray-300"
               )}
             />
             <div
               className={cn(
-                "h-2 rounded-full transition-all duration-300",
-                activeStep === 2 ? "w-16 bg-black" : "w-8 bg-gray-300"
+                "h-2 w-8 rounded-full transition-all duration-300",
+                activeStep === 2 
+                  ? "bg-black" 
+                  : activeStep > 2 
+                  ? "bg-emerald-500" 
+                  : "bg-gray-300"
               )}
             />
           </motion.div>

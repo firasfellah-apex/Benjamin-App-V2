@@ -553,8 +553,20 @@ export async function createOrder(
     .maybeSingle();
 
   if (error) {
-    console.error("Error creating order:", error);
+    console.error("[Order Creation] ❌ Error creating order:", error);
     throw error;
+  }
+
+  if (data) {
+    console.log("[Order Creation] ✅ Order created successfully:", {
+      orderId: data.id,
+      status: data.status,
+      runnerId: data.runner_id,
+      requestedAmount: data.requested_amount,
+      customerId: data.customer_id,
+      timestamp: new Date().toISOString(),
+    });
+    console.log("[Order Creation] 📡 This order should now be available to runners via Realtime");
   }
 
   return data;
@@ -608,14 +620,14 @@ export async function getRunnerOrders(): Promise<OrderWithDetails[]> {
  * Get runner order history including Completed, Skipped, and Timed-Out orders
  * Completed orders come from orders table, Skipped/Timed-Out from runner_offer_events
  */
-export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' }>> {
+export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' | 'Cancelled' }>> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const history: Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' }> = [];
+  const history: Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' | 'Cancelled' }> = [];
 
-  // Get completed orders
-  const { data: completedOrders, error: ordersError } = await supabase
+  // Get all terminal status orders (Completed, Cancelled)
+  const { data: terminalOrders, error: ordersError } = await supabase
     .from("orders")
     .select(`
       *,
@@ -623,14 +635,18 @@ export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & 
       runner:runner_id(*)
     `)
     .eq("runner_id", user.id)
-    .eq("status", "Completed")
+    .in("status", ["Completed", "Cancelled"])
     .order("created_at", { ascending: false });
 
-  if (!ordersError && completedOrders) {
-    completedOrders.forEach(order => {
+  if (!ordersError && terminalOrders) {
+    terminalOrders.forEach(order => {
+      const historyStatus = order.status === 'Completed' 
+        ? 'Completed' as const 
+        : 'Cancelled' as const;
+      
       history.push({
         ...order,
-        historyStatus: 'Completed' as const
+        historyStatus
       });
     });
   }
@@ -644,46 +660,72 @@ export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & 
       .in('event', ['skipped', 'timeout'])
       .order('created_at', { ascending: false });
 
-    if (!eventsError && offerEvents) {
+    if (eventsError) {
+      // Log error but don't fail completely
+      console.warn('[getRunnerOrderHistory] Error fetching runner offer events:', eventsError);
+      // If table doesn't exist (42P01), that's okay - gracefully degrade
+      if (eventsError.code !== '42P01' && eventsError.code !== 'PGRST116') {
+        // For other errors, log them but continue
+        console.error('[getRunnerOrderHistory] Unexpected error:', eventsError);
+      }
+    } else if (offerEvents && offerEvents.length > 0) {
+      console.log(`[getRunnerOrderHistory] Found ${offerEvents.length} offer events for runner`);
+      
       // Get unique order IDs from events
       const orderIds = [...new Set(offerEvents.map(e => e.offer_id))];
+      console.log(`[getRunnerOrderHistory] Unique order IDs from events:`, orderIds);
       
       if (orderIds.length > 0) {
         // Fetch order details for skipped/timed-out orders
-        const { data: skippedOrders, error: skippedError } = await supabase
-          .from("orders")
-          .select(`
-            *,
-            customer:customer_id(*),
-            runner:runner_id(*)
-          `)
-          .in("id", orderIds);
+        // Exclude orders that are already in history (Completed/Cancelled)
+        const existingOrderIds = new Set(history.map(h => h.id));
+        const newOrderIds = orderIds.filter(id => !existingOrderIds.has(id));
+        console.log(`[getRunnerOrderHistory] New order IDs (not in history):`, newOrderIds);
+        
+        if (newOrderIds.length > 0) {
+          const { data: skippedOrders, error: skippedError } = await supabase
+            .from("orders")
+            .select(`
+              *,
+              customer:customer_id(*),
+              runner:runner_id(*)
+            `)
+            .in("id", newOrderIds);
 
-        if (!skippedError && skippedOrders) {
-          skippedOrders.forEach(order => {
-            // Find the most recent event for this order
-            const orderEvents = offerEvents.filter(e => e.offer_id === order.id);
-            const mostRecentEvent = orderEvents.sort((a, b) => 
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0];
+          if (skippedError) {
+            console.error('[getRunnerOrderHistory] Error fetching skipped orders:', skippedError);
+          } else if (skippedOrders && skippedOrders.length > 0) {
+            console.log(`[getRunnerOrderHistory] Found ${skippedOrders.length} skipped/timed-out orders`);
+            
+            skippedOrders.forEach(order => {
+              // Find the most recent event for this order
+              const orderEvents = offerEvents.filter(e => e.offer_id === order.id);
+              const mostRecentEvent = orderEvents.sort((a, b) => 
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              )[0];
 
-            if (mostRecentEvent) {
-              const historyStatus = mostRecentEvent.event === 'timeout' 
-                ? 'Timed-Out' as const 
-                : 'Skipped' as const;
-              
-              history.push({
-                ...order,
-                historyStatus
-              });
-            }
-          });
+              if (mostRecentEvent) {
+                const historyStatus = mostRecentEvent.event === 'timeout' 
+                  ? 'Timed-Out' as const 
+                  : 'Skipped' as const;
+                
+                history.push({
+                  ...order,
+                  historyStatus
+                });
+              }
+            });
+          } else {
+            console.log('[getRunnerOrderHistory] No skipped orders found (may have been deleted or runner lacks permission)');
+          }
         }
       }
+    } else {
+      console.log('[getRunnerOrderHistory] No offer events found for runner');
     }
   } catch (error) {
     // Table might not exist, gracefully degrade
-    console.warn('Error fetching runner offer events:', error);
+    console.warn('[getRunnerOrderHistory] Exception fetching runner offer events:', error);
   }
 
   // Sort by created_at descending (most recent first)
@@ -744,6 +786,27 @@ export async function getOrderById(orderId: string): Promise<OrderWithDetails | 
   if (error) {
     console.error("Error fetching order:", error);
     return null;
+  }
+
+  // Debug logging in development
+  if (import.meta.env.DEV && data) {
+    console.log('[getOrderById] Fetched order:', {
+      orderId: data.id,
+      hasCustomer: !!data.customer,
+      hasRunner: !!data.runner,
+      customerId: data.customer_id,
+      runnerId: data.runner_id,
+      customerData: data.customer ? {
+        id: data.customer.id,
+        avatar_url: data.customer.avatar_url,
+        first_name: data.customer.first_name
+      } : null,
+      runnerData: data.runner ? {
+        id: data.runner.id,
+        avatar_url: data.runner.avatar_url,
+        first_name: data.runner.first_name
+      } : null,
+    });
   }
 
   return data;
@@ -984,7 +1047,7 @@ export async function markRunnerArrived(orderId: string): Promise<{ success: boo
   }
 }
 
-export async function verifyOTP(orderId: string, otp: string): Promise<{ success: boolean; error?: string }> {
+export async function verifyOTP(orderId: string, otp: string): Promise<{ success: boolean; error?: string; requiresCountConfirmation?: boolean }> {
   try {
     // Fetch order - use select("*") to get all available columns gracefully
     // This handles cases where OTP columns might not exist yet
@@ -1068,9 +1131,10 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
       return { success: false, error: "Incorrect code. Please try again." };
     }
 
-    // OTP is correct - try to update verified_at timestamp (if column exists)
-    // Note: otp_verified_at column may not exist in all database schemas
-    // We'll try to update it, but won't fail if it doesn't exist
+    // Check delivery mode to determine flow
+    const deliveryMode = (order as any).delivery_mode;
+
+    // OTP is correct - update verified_at timestamp (if column exists)
     try {
       const { error: updateError } = await supabase
         .from("orders")
@@ -1097,8 +1161,33 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
       }
     }
 
-    // Use FSM to complete the order
-    // This is the critical step that marks the order as completed
+    // For "Speed" mode (quick_handoff): Complete immediately
+    // For "Counted" mode (count_confirm): Stay in Pending Handoff, wait for count confirmation
+    if (deliveryMode === 'quick_handoff' || !deliveryMode) {
+      // Speed mode: Complete the order immediately
+      const updatedOrder = await advanceOrderStatus(
+        orderId,
+        "Completed",
+        undefined,
+        {
+          action: "verify_otp",
+          otp_verified: true,
+          otp_code: otp // Include OTP in metadata for audit
+        }
+      );
+
+      if (!updatedOrder) {
+        return { success: false, error: "Failed to complete delivery. Please contact support." };
+      }
+
+      return { success: true };
+    } else if (deliveryMode === 'count_confirm') {
+      // Counted mode: OTP verified, but stay in Pending Handoff
+      // Runner will need to confirm count separately
+      return { success: true, requiresCountConfirmation: true };
+    }
+
+    // Default: Complete the order (backward compatibility)
     const updatedOrder = await advanceOrderStatus(
       orderId,
       "Completed",
@@ -1106,7 +1195,7 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
       {
         action: "verify_otp",
         otp_verified: true,
-        otp_code: otp // Include OTP in metadata for audit
+        otp_code: otp
       }
     );
 
@@ -1117,6 +1206,63 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
     return { success: true };
   } catch (error) {
     console.error("Error verifying OTP:", error);
+    return { success: false, error: "An unexpected error occurred. Please try again." };
+  }
+}
+
+/**
+ * Confirm customer count for counted delivery mode
+ * This completes the order after OTP has been verified and customer has counted
+ * 
+ * @param orderId - Order ID
+ * @returns Success status
+ */
+export async function confirmCount(orderId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Fetch order to verify it's in the right state
+    const { data: order, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (fetchError || !order) {
+      return { success: false, error: "Order not found." };
+    }
+
+    // Verify order is in Pending Handoff with OTP verified
+    if (order.status !== "Pending Handoff") {
+      return { success: false, error: "Order is not in the correct state for count confirmation." };
+    }
+
+    const otpVerifiedAt = (order as any).otp_verified_at;
+    if (!otpVerifiedAt) {
+      return { success: false, error: "OTP must be verified before confirming count." };
+    }
+
+    const deliveryMode = (order as any).delivery_mode;
+    if (deliveryMode !== 'count_confirm') {
+      return { success: false, error: "Count confirmation is only required for counted delivery mode." };
+    }
+
+    // Complete the order
+    const updatedOrder = await advanceOrderStatus(
+      orderId,
+      "Completed",
+      undefined,
+      {
+        action: "confirm_count",
+        count_verified: true
+      }
+    );
+
+    if (!updatedOrder) {
+      return { success: false, error: "Failed to complete delivery. Please contact support." };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error confirming count:", error);
     return { success: false, error: "An unexpected error occurred. Please try again." };
   }
 }

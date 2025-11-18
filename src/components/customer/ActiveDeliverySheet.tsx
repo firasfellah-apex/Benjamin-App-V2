@@ -1,20 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronUp, MessageCircle, Phone, MapPin, HelpCircle } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ChevronUp, MessageCircle, Phone, MapPin, HelpCircle, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails, OrderStatus } from '@/types/types';
 import { getCustomerFacingStatus, getCustomerFacingStatusWithArrival, CUSTOMER_TIMELINE_STEPS } from '@/lib/customerStatus';
 import { OrderProgressTimeline } from '@/components/order/OrderProgressTimeline';
-import { OrderChatThread } from '@/components/chat/OrderChatThread';
 import { RatingStars } from '@/components/common/RatingStars';
 import { Avatar } from '@/components/common/Avatar';
+import { DeliveryProgressBar } from '@/components/customer/DeliveryProgressBar';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { 
   canRevealRunnerIdentity, 
   canContactRunner, 
   getRevealMessage, 
   shouldBlurRunnerAvatar,
-  isOrderFinal 
+  isOrderFinal,
+  getRunnerDisplayName
 } from '@/lib/reveal';
 import { shouldShowCustomerOtpToCustomer } from '@/lib/revealRunnerView';
 import { rateRunner } from '@/db/api';
@@ -42,9 +45,12 @@ export function ActiveDeliverySheet({
   onCallSupport,
   onOrderUpdate,
 }: ActiveDeliverySheetProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [submittingRating, setSubmittingRating] = useState(false);
   const [customerStatus, setCustomerStatus] = useState(getCustomerFacingStatus(order.status));
   const lastCheckedOrderRef = useRef<string | null>(null);
+  const unreadCount = useUnreadMessages(order.id);
   
   // Check for runner arrival when status is Pending Handoff
   // Re-check whenever order updates (including when order_events change)
@@ -197,10 +203,32 @@ export function ActiveDeliverySheet({
     }
   };
 
-  // Format ETA (placeholder - would come from order data)
-  const formatEta = (eta?: string): string => {
-    return eta || 'Calculating...';
+  // Calculate estimated arrival time
+  const calculateEstimatedArrival = (): string | null => {
+    // Only show ETA when runner is on the way (Cash Withdrawn or Pending Handoff)
+    if (order.status !== 'Cash Withdrawn' && order.status !== 'Pending Handoff') {
+      return null;
+    }
+
+    // If cash was withdrawn, estimate 5-10 minutes from withdrawal time
+    // Don't show ETA if runner has already arrived
+    if (order.cash_withdrawn_at && customerStatus.step !== 'ARRIVED') {
+      const withdrawnTime = new Date(order.cash_withdrawn_at);
+      const estimatedMinutes = 8; // 8 minutes average
+      const arrivalTime = new Date(withdrawnTime.getTime() + estimatedMinutes * 60000);
+      
+      // Format as "6:03 PM"
+      return arrivalTime.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    return null;
   };
+
+  const estimatedArrival = calculateEstimatedArrival();
 
   return (
     <div
@@ -250,10 +278,28 @@ export function ActiveDeliverySheet({
               }}
               className="space-y-4"
             >
-            {/* Status Line */}
-            <div className="space-y-1">
+            {/* Uber-Style Status Section */}
+            <div className="space-y-3">
+              {/* Status Heading with Arrival Time */}
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">{customerStatus.label}</h2>
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-slate-900">{customerStatus.label}...</h2>
+                  {estimatedArrival && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Clock className="h-3.5 w-3.5 text-slate-500" />
+                      <span className="text-sm text-slate-600">Arrives {estimatedArrival}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toast.info('Estimated arrival time based on average delivery time');
+                        }}
+                        className="ml-1"
+                      >
+                        <Info className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={onToggleExpand}
                   className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
@@ -261,17 +307,68 @@ export function ActiveDeliverySheet({
                   <ChevronUp className="h-5 w-5 text-neutral-600" />
                 </button>
               </div>
-              <p className="text-sm text-slate-500">{getStatusCopy(order.status)}</p>
+
+              {/* Progress Bar */}
+              <DeliveryProgressBar currentStep={customerStatus.step} />
+
+              {/* Status Message */}
+              <p className="text-sm text-slate-600">
+                {customerStatus.step === 'ON_THE_WAY'
+                  ? (() => {
+                      const runnerName = showRunnerIdentity && order.runner 
+                        ? getRunnerDisplayName(
+                            (order.runner as any)?.first_name,
+                            (order.runner as any)?.last_name,
+                            order.status
+                          )
+                        : 'Your runner';
+                      return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
+                    })()
+                  : customerStatus.step === 'ARRIVED'
+                  ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+                  : customerStatus.description}
+              </p>
             </div>
 
-            {/* Key Numbers Row */}
-            <div className="flex items-center justify-between text-sm text-slate-600">
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash amount</div>
-                <div className="text-base font-semibold text-slate-900">${order.requested_amount.toFixed(2)}</div>
-              </div>
-              {/* ETA would go here if available */}
-            </div>
+            {/* Runner Info Card (When Allowed) */}
+            {showRunnerIdentity && order.runner && (customerStatus.step === 'ON_THE_WAY' || customerStatus.step === 'ARRIVED' || customerStatus.step === 'PREPARING') && (() => {
+              const runnerFirstName = (order.runner as any)?.first_name;
+              const runnerLastName = (order.runner as any)?.last_name;
+              const runnerAvatar = (order.runner as any)?.avatar_url;
+              const displayName = getRunnerDisplayName(runnerFirstName, runnerLastName, order.status);
+              
+              return (
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      src={runnerAvatar || undefined}
+                      fallback={displayName}
+                      size="sm"
+                      className={cn(
+                        "transition-all duration-300",
+                        shouldBlurRunnerAvatar(order.status) && "blur-sm"
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-900">
+                          {displayName}
+                        </p>
+                        {(order.runner as any)?.average_rating && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-slate-600">{(order.runner as any).average_rating.toFixed(0)}%</span>
+                            <span className="text-emerald-500">👍</span>
+                          </div>
+                        )}
+                      </div>
+                      {!shouldBlurRunnerAvatar(order.status) && (
+                        <p className="text-xs text-slate-500 mt-0.5">Benjamin Runner</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* OTP Display (when OTP is generated) - Collapsed State */}
             {shouldShowCustomerOtpToCustomer(order.status, !!order.otp_code) && order.otp_code && (
@@ -300,23 +397,20 @@ export function ActiveDeliverySheet({
               </div>
             )}
 
-            {/* Actions Row (Active Only) */}
+            {/* Message Button (Active Only) - Full Width */}
             {allowContact && !isCompleted && !isCancelled && (
-              <div className="flex gap-3 pt-2">
+              <div className="pt-2">
                 <Button
-                  variant="outline"
-                  onClick={onMessage}
-                  className="flex-1 h-10 rounded-full border-neutral-200 text-black hover:bg-neutral-50"
+                  onClick={() => navigate(`/customer/chat/${order.id}`)}
+                  className="w-full h-10 rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2 relative"
                 >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Message
-                </Button>
-                <Button
-                  onClick={onCallSupport}
-                  className="flex-1 h-10 rounded-full bg-black text-white hover:bg-black/90"
-                >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call Support
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Message Runner</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute right-4 h-6 w-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Button>
               </div>
             )}
@@ -457,19 +551,39 @@ export function ActiveDeliverySheet({
                 currentStatus={order.status}
                 variant="customer"
                 tone="customer"
+                currentStep={customerStatus.step}
               />
             </div>
 
             {/* Messages */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Messages</h3>
-              <OrderChatThread
-                orderId={order.id}
-                orderStatus={order.status}
-                role="customer"
-                variant="customer"
-              />
-            </div>
+            {allowContact && !isCompleted && !isCancelled && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageCircle className="h-5 w-5 text-slate-600" />
+                  <h3 className="text-sm font-medium text-slate-900">Message Runner</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">
+                  Communicate with your runner about delivery details
+                </p>
+                <Button
+                  onClick={() => navigate(`/customer/chat/${order.id}`)}
+                  className="w-full bg-black hover:bg-black/90 text-white rounded-xl py-3"
+                >
+                  Open Chat
+                </Button>
+                
+                {/* Call Support Link */}
+                <div className="pt-2">
+                  <button
+                    onClick={onCallSupport}
+                    className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 w-full justify-center"
+                  >
+                    <Phone className="h-3 w-3" />
+                    Call Support
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Rate Your Runner (Completed Only) */}
             {isCompleted && (

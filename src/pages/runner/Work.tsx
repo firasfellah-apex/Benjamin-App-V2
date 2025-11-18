@@ -18,6 +18,7 @@ import { canSeeCashAmount, getCustomerPublicProfile, getCustomerAddressDisplay, 
 import { Avatar } from "@/components/common/Avatar";
 import { RUNNER_TERMINAL_STATUSES } from "@/lib/orderStatus";
 import { useRunnerJobs } from "@/features/runner/state/runnerJobsStore";
+import { supabase } from "@/db/supabase";
 import {
   OnlineCardSkeleton,
   AvailableRequestSkeleton,
@@ -30,7 +31,7 @@ export default function Work() {
   const { profile, refreshProfile } = useProfile();
   const { pendingOffer, setOnline: setStoreOnline } = useRunnerJobs();
   const [activeOrder, setActiveOrder] = useState<OrderWithDetails | null>(null);
-  const [orderHistory, setOrderHistory] = useState<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' }>>([]);
+  const [orderHistory, setOrderHistory] = useState<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' | 'Cancelled' }>>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOnlineStatus, setUpdatingOnlineStatus] = useState(false);
 
@@ -104,13 +105,8 @@ export default function Work() {
         // Sync to store
         setStoreOnline(checked);
         toast.success(checked ? "You're now online" : "You're now offline");
-        // Reload available orders if going online
-        if (checked) {
-          const available = await getAvailableOrders();
-          setAvailableOrders(available);
-        } else {
-          setAvailableOrders([]);
-        }
+        // Available orders are now handled by the global modal system via useJobOffersSubscription
+        // No need to manually reload them here
       } else {
         await refreshProfile();
         // Server-side validation will provide the error message
@@ -141,6 +137,41 @@ export default function Work() {
     onUpdate: handleActiveOrderUpdate,
     enabled: !!profile?.id,
   });
+
+  // Subscribe to runner_offer_events for real-time updates when orders are skipped
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel('runner-offer-events')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'runner_offer_events',
+          filter: `runner_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          console.log('[Work] New offer event:', payload);
+          // If it's a skipped or timeout event, reload order history
+          if (payload.new && (payload.new.event === 'skipped' || payload.new.event === 'timeout')) {
+            console.log('[Work] Order skipped/timed-out, reloading history...');
+            // Reload order history to show the newly skipped order
+            getRunnerOrderHistory().then(history => {
+              setOrderHistory(history.slice(0, 5));
+            }).catch(error => {
+              console.error('[Work] Error reloading order history:', error);
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
 
   // Available orders are now handled by the global modal system via useJobOffersSubscription
   // No need to subscribe or handle accept here
@@ -328,17 +359,25 @@ export default function Work() {
                   bg: 'bg-red-500/10',
                   text: 'text-red-400',
                   label: 'Timed-Out'
+                },
+                'Cancelled': {
+                  bg: 'bg-slate-500/10',
+                  text: 'text-slate-400',
+                  label: 'Cancelled'
                 }
               };
 
               const config = statusConfig[order.historyStatus];
               
+              // Allow clicking on Completed and Cancelled orders to view details
+              const canViewDetails = order.historyStatus === 'Completed' || order.historyStatus === 'Cancelled';
+              
               return (
                 <div
                   key={order.id}
-                  onClick={() => order.historyStatus === 'Completed' ? navigate(`/runner/deliveries/${order.id}`) : undefined}
+                  onClick={() => canViewDetails ? navigate(`/runner/deliveries/${order.id}`) : undefined}
                   className={`rounded-3xl bg-[#050816] border border-white/5 px-4 py-3 flex items-center justify-between gap-3 ${
-                    order.historyStatus === 'Completed' ? 'active:scale-[0.99] transition cursor-pointer hover:border-white/10' : ''
+                    canViewDetails ? 'active:scale-[0.99] transition cursor-pointer hover:border-white/10' : ''
                   }`}
                 >
                   <div>

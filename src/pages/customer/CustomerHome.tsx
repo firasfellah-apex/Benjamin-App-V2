@@ -21,9 +21,9 @@ import { useTopShelfTransition } from '@/features/shelf/useTopShelfTransition';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
 import type { OrderWithDetails, Order } from '@/types/types';
-import bankIllustration from '@/assets/illustrations/Bank.png';
-import atmIllustration from '@/assets/illustrations/ATM.png';
-import runnersIllustration from '@/assets/illustrations/Runners.png';
+import bankIllustration from '@/assets/illustrations/Bank.svg';
+import atmIllustration from '@/assets/illustrations/ATM.svg';
+import runnersIllustration from '@/assets/illustrations/Runners.svg';
 import {
   ShieldCheckIcon,
   KeyIcon,
@@ -266,20 +266,25 @@ export default function CustomerHome() {
       );
     }
     
-    // Show actual card if we have a last delivery (completed or cancelled)
-    // Show it even if there's an active order
-    if (lastCompletedOrder) {
-      return (
-        <LastDeliveryCard
-          order={lastCompletedOrder}
-          onRateRunner={handleRateRunner}
-          onViewAll={handleViewAll}
-        />
-      );
-    }
-    
-    // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
+    // TESTING MODE: Always show TrustCarousel regardless of order history
+    // TODO: Revert to original logic (only show TrustCarousel when no lastCompletedOrder)
     return <TrustCarousel cards={trustCards} />;
+    
+    // Original logic (commented out for testing):
+    // // Show actual card if we have a last delivery (completed or cancelled)
+    // // Show it even if there's an active order
+    // if (lastCompletedOrder) {
+    //   return (
+    //     <LastDeliveryCard
+    //       order={lastCompletedOrder}
+    //       onRateRunner={handleRateRunner}
+    //       onViewAll={handleViewAll}
+    //     />
+    //   );
+    // }
+    // 
+    // // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
+    // return <TrustCarousel cards={trustCards} />;
   }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, handleViewAll, trustCards]);
 
   // If no user, redirect to landing

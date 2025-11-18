@@ -130,10 +130,12 @@ export interface Order {
   total_service_fee: number;
   total_payment: number;
   status: OrderStatus;
+  delivery_mode: 'quick_handoff' | 'count_confirm' | null; // Delivery mode: Speed or Counted
   otp_code: string | null;
   otp_hash: string | null;
   otp_expires_at: string | null;
   otp_attempts: number;
+  otp_verified_at: string | null; // Timestamp when OTP was verified
   address_id: string | null;
   address_snapshot: AddressSnapshot | null;
   customer_address: string | null; // Legacy field, will be deprecated

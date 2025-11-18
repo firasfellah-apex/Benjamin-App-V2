@@ -29,8 +29,12 @@ export function RunnerBottomNav() {
 
   return (
     <div 
-      className="fixed inset-x-0 bottom-0 bg-[#020817] pt-3 pb-6 px-6 border-t border-white/5 z-50"
-      style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+      className="fixed inset-x-0 bottom-0 bg-[#020817] pt-3 px-6 border-t border-white/5 z-50"
+      style={{ 
+        borderBottomLeftRadius: 0, 
+        borderBottomRightRadius: 0,
+        paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+      }}
     >
       <div className="flex items-center justify-between gap-4">
         {TABS.map((tab) => {

@@ -19,46 +19,84 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
   // Admin can view all messages but cannot send (for now - can be enabled later)
   const canSend = !!user && canSendMessage(orderStatus) && role !== 'admin';
 
-  // Initial load
+  // Initial load with read status
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId || !user) return;
     let cancelled = false;
     setLoading(true);
 
-    supabase
-      .from('messages')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: true })
-      .then(({ data, error }) => {
+    const loadMessages = async () => {
+      try {
+        // Load messages
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: true });
+
         if (cancelled) return;
-        if (error) {
+
+        if (messagesError) {
           // Gracefully handle missing table or permission errors
-          // 42P01 = table does not exist, PGRST116 = no rows returned (which is fine)
-          if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('does not exist') || error.message?.includes('permission denied')) {
-            // Silently handle missing messages table - chat feature is optional
-            if (import.meta.env.DEV && error.code === '42P01') {
+          if (messagesError.code === '42P01' || messagesError.code === 'PGRST116' || messagesError.message?.includes('does not exist') || messagesError.message?.includes('permission denied')) {
+            if (import.meta.env.DEV && messagesError.code === '42P01') {
               console.warn('[Chat] Messages table not found. Chat feature disabled.');
             }
           } else {
-            // Only log unexpected errors
             if (import.meta.env.DEV) {
-              console.error('[Chat] load error', error);
+              console.error('[Chat] load error', messagesError);
             }
           }
           setMessages([]);
-        } else {
-          setMessages((data as OrderMessage[]) || []);
+          return;
         }
-      })
-      .finally(() => {
+
+        // Load read status
+        const messageIds = (messagesData || []).map(m => m.id);
+        let readStatuses: Set<string> = new Set();
+        
+        if (messageIds.length > 0) {
+          try {
+            const { data: readsData, error: readsError } = await supabase
+              .from('message_reads')
+              .select('message_id')
+              .eq('user_id', user.id)
+              .in('message_id', messageIds);
+
+            if (!readsError && readsData) {
+              readStatuses = new Set(readsData.map(r => r.message_id));
+            }
+          } catch (readsError: any) {
+            // Gracefully handle missing message_reads table
+            if (import.meta.env.DEV && (readsError.code === '42P01' || readsError.message?.includes('does not exist'))) {
+              console.warn('[Chat] message_reads table not found. Run migration: 20250119_add_message_reads.sql');
+            }
+          }
+        }
+
+        // Combine messages with read status
+        const messagesWithReadStatus = (messagesData || []).map((msg: any) => ({
+          ...msg,
+          is_read: msg.sender_id === user.id || readStatuses.has(msg.id)
+        }));
+
+        setMessages(messagesWithReadStatus as OrderMessage[]);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[Chat] Unexpected error loading messages:', error);
+          setMessages([]);
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+
+    loadMessages();
 
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, user?.id]);
 
   // Realtime subscription
   useEffect(() => {
@@ -79,7 +117,12 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
           setMessages((prev) => {
             // Avoid duplicates
             if (prev.some((m) => m.id === msg.id)) return prev;
-            return [...prev, msg];
+            // New messages from others are unread by default
+            const newMsg: OrderMessage = {
+              ...msg,
+              is_read: msg.sender_id === user?.id // Own messages are always "read"
+            };
+            return [...prev, newMsg];
           });
         }
       )
@@ -139,12 +182,50 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
     [user, orderId, canSend, role]
   );
 
+  // Mark messages as read when they're viewed
+  const markMessagesAsRead = useCallback(async (messageIds: string[]) => {
+    if (!user || !orderId || messageIds.length === 0) return;
+
+    try {
+      // Insert read receipts (ignore conflicts if already read)
+      const reads = messageIds.map(messageId => ({
+        message_id: messageId,
+        user_id: user.id
+      }));
+
+      const { error } = await supabase
+        .from('message_reads')
+        .upsert(reads, { onConflict: 'message_id,user_id', ignoreDuplicates: true });
+
+      if (error) {
+        // Gracefully handle missing table
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          if (import.meta.env.DEV) {
+            console.warn('[Chat] message_reads table not found. Run migration: 20250119_add_message_reads.sql');
+          }
+        } else {
+          console.error('[Chat] Error marking messages as read:', error);
+        }
+      } else {
+        // Update local state to reflect read status
+        setMessages((prev) =>
+          prev.map((msg) =>
+            messageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('[Chat] Unexpected error marking messages as read:', error);
+    }
+  }, [user, orderId]);
+
   return {
     messages,
     loading,
     sending,
     canSend,
     sendMessage,
+    markMessagesAsRead,
   };
 }
 

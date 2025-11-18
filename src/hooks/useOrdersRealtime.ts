@@ -207,19 +207,28 @@ export function useOrdersRealtime({
             const callbacks = callbacksRef.current;
 
             if (eventType === 'INSERT' && newOrder && callbacks.onInsert) {
-              console.log(`[Realtime] ${channelName} - Calling onInsert for order ${newOrder.id}`);
+              console.log(`[Realtime] ${channelName} - 🎯 INSERT event - Calling onInsert for order ${newOrder.id}`, {
+                orderId: newOrder.id,
+                status: newOrder.status,
+                runnerId: newOrder.runner_id,
+                customerId: newOrder.customer_id,
+                timestamp: new Date().toISOString(),
+              });
               callbacks.onInsert(newOrder);
             } else if (eventType === 'UPDATE' && newOrder && callbacks.onUpdate) {
-              console.log(`[Realtime] ${channelName} - Calling onUpdate for order ${newOrder.id}`, {
+              console.log(`[Realtime] ${channelName} - 🔄 UPDATE event - Calling onUpdate for order ${newOrder.id}`, {
+                orderId: newOrder.id,
                 oldStatus: oldOrder?.status,
                 newStatus: newOrder.status,
+                oldRunnerId: oldOrder?.runner_id,
+                newRunnerId: newOrder.runner_id,
               });
               callbacks.onUpdate(newOrder, oldOrder);
             } else if (eventType === 'DELETE' && oldOrder && callbacks.onDelete) {
-              console.log(`[Realtime] ${channelName} - Calling onDelete for order ${oldOrder.id}`);
+              console.log(`[Realtime] ${channelName} - 🗑️ DELETE event - Calling onDelete for order ${oldOrder.id}`);
               callbacks.onDelete(oldOrder);
             } else {
-              console.warn(`[Realtime] ${channelName} - No callback for event type ${eventType}`, {
+              console.warn(`[Realtime] ${channelName} - ⚠️ No callback for event type ${eventType}`, {
                 hasOnInsert: !!callbacks.onInsert,
                 hasOnUpdate: !!callbacks.onUpdate,
                 hasOnDelete: !!callbacks.onDelete,
@@ -237,16 +246,21 @@ export function useOrdersRealtime({
           console.log(`[Realtime] ✅ Subscribed to ${channelName}`, {
             filter: filterString || 'all orders',
             mode: filter.mode,
+            availableOnly: filter.mode === 'runner' ? filter.availableOnly : undefined,
             table: 'orders',
             schema: 'public',
+            timestamp: new Date().toISOString(),
           });
           
           // Test: Log a message to confirm subscription is active
-          console.log(`[Realtime] ${channelName} - Listening for events on orders table...`);
-          console.log(`[Realtime] ${channelName} - To test: Create/update an order and watch for events here`);
+          console.log(`[Realtime] ${channelName} - 📡 Listening for events on orders table...`);
+          if (filter.mode === 'runner' && filter.availableOnly) {
+            console.log(`[Realtime] ${channelName} - 👀 Watching for new Pending orders (runner_id IS NULL)`);
+            console.log(`[Realtime] ${channelName} - 💡 When a customer creates an order, you should see an INSERT event here`);
+          }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.error(`[Realtime] ❌ Subscription error for ${channelName}:`, status);
-          console.error(`[Realtime] ${channelName} - Make sure Realtime is enabled in Supabase Dashboard → Database → Replication`);
+          console.error(`[Realtime] ${channelName} - ⚠️ Make sure Realtime is enabled in Supabase Dashboard → Database → Replication`);
         } else if (status === 'CLOSED') {
           console.log(`[Realtime] ${channelName} - Channel closed`);
         } else {

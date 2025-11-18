@@ -7,10 +7,13 @@ import { getOrderById, cancelOrder } from "@/db/api";
 import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
 import type { OrderWithDetails, OrderStatus, Order } from "@/types/types";
 import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
+import { RunnerDirectionsMap } from "@/components/maps/RunnerDirectionsMap";
+import { getDummyLocations } from "@/components/maps/RunnerDirectionsMap";
 import { triggerConfetti } from "@/lib/confetti";
 import { strings } from "@/lib/strings";
 import { cn } from "@/lib/utils";
 import { ActiveDeliverySheet } from "@/components/customer/ActiveDeliverySheet";
+import { CompletionRatingModal } from "@/components/customer/CompletionRatingModal";
 import { canShowLiveLocation } from "@/lib/reveal";
 
 interface OrderTrackingProps {
@@ -27,6 +30,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const [previousStatus, setPreviousStatus] = useState<OrderStatus | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   const loadOrder = async () => {
     if (!orderId) return;
@@ -39,7 +43,24 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     }
     
     if (data) {
+      const wasCompleted = previousStatus === "Completed";
+      const isNowCompleted = data.status === "Completed";
       setPreviousStatus(data.status);
+      // Show completion modal if order is completed and hasn't been rated
+      // Only show if transitioning to completed or if already completed on initial load
+      if (isNowCompleted && !data.runner_rating) {
+        if (!wasCompleted) {
+          // Just transitioned to completed - show after confetti
+          setTimeout(() => {
+            setShowCompletionModal(true);
+          }, 1000);
+        } else if (!showCompletionModal) {
+          // Already completed on initial load - show after page loads
+          setTimeout(() => {
+            setShowCompletionModal(true);
+          }, 500);
+        }
+      }
     }
     
     setOrder(data);
@@ -77,6 +98,8 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     if (previousStatus && previousStatus !== "Completed" && updatedOrder.status === "Completed") {
       triggerConfetti(3000);
       toast.success(strings.toasts.otpVerified);
+      // Show completion modal if order hasn't been rated yet
+      // We'll check this after fetching full order details
     }
     
     // Update previous status
@@ -89,6 +112,13 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     getOrderById(orderId).then((data) => {
       if (data && data.id === orderId) {
         setOrder(data);
+        // Show completion modal if order just completed and hasn't been rated
+        if (previousStatus && previousStatus !== "Completed" && data.status === "Completed" && !data.runner_rating) {
+          // Small delay to let confetti animation play first
+          setTimeout(() => {
+            setShowCompletionModal(true);
+          }, 1000);
+        }
       }
     }).catch((error) => {
       console.error('[OrderTracking] Error fetching full order details:', error);
@@ -192,6 +222,33 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   }
 
   const showLiveMap = canShowLiveLocation(order.status);
+  
+  // Get map locations based on order status (same logic as runner)
+  const getMapLocations = () => {
+    if (!showLiveMap) return null;
+    
+    const dummyLocations = getDummyLocations();
+    const showCustomerRoute = ['Cash Withdrawn', 'Pending Handoff', 'Completed'].includes(order.status);
+    
+    if (showCustomerRoute) {
+      // After cash withdrawal: show route from ATM to customer
+      const customerLocation = {
+        lat: order.address_snapshot?.latitude || dummyLocations.customer.lat,
+        lng: order.address_snapshot?.longitude || dummyLocations.customer.lng,
+        address: order.customer_address || 'Customer Address',
+      };
+      
+      return {
+        origin: dummyLocations.atm, // ATM location
+        destination: customerLocation,
+        title: 'Route to You',
+      };
+    }
+    
+    return null;
+  };
+
+  const mapLocations = getMapLocations();
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-[#F5F5F7]">
@@ -211,20 +268,45 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
 
       {/* Map Background - Full Screen */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <CustomerOrderMap
-          orderStatus={order.status}
-          customerLocation={{
-            lat: order.address_snapshot?.latitude || 40.7128,
-            lng: order.address_snapshot?.longitude || -74.0060,
-            address: order.customer_address || ''
-          }}
-          estimatedArrival={showLiveMap ? "5 minutes" : undefined}
-          className="h-full pointer-events-none"
-        />
+        {mapLocations ? (
+          <RunnerDirectionsMap
+            origin={mapLocations.origin}
+            destination={mapLocations.destination}
+            title={mapLocations.title}
+            height="100%"
+            className="pointer-events-none"
+          />
+        ) : (
+          <CustomerOrderMap
+            orderStatus={order.status}
+            customerLocation={{
+              lat: order.address_snapshot?.latitude || 40.7128,
+              lng: order.address_snapshot?.longitude || -74.0060,
+              address: order.customer_address || ''
+            }}
+            estimatedArrival={showLiveMap ? "5 minutes" : undefined}
+            className="h-full pointer-events-none"
+          />
+        )}
       </div>
 
       {/* Gradient Overlay for Readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 z-10 pointer-events-none" />
+
+      {/* Completion Rating Modal */}
+      <CompletionRatingModal
+        order={order}
+        open={showCompletionModal}
+        onClose={() => setShowCompletionModal(false)}
+        onRated={() => {
+          // Refresh order to get updated rating
+          if (orderId) {
+            getOrderById(orderId).then((data) => {
+              if (data) setOrder(data);
+            });
+          }
+        }}
+      />
 
       {/* Bottom Sheet */}
       <ActiveDeliverySheet

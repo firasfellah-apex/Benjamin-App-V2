@@ -516,6 +516,8 @@ export default function AdminOrderDetail() {
               orderStatus={order.status}
               role="admin"
               variant="admin"
+              customerProfile={order.customer || null}
+              runnerProfile={order.runner || null}
             />
           </CardContent>
         </Card>

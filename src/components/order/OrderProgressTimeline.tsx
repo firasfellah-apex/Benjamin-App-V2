@@ -13,12 +13,15 @@ type OrderProgressTimelineProps = {
   currentStatus: OrderStatus;
   variant: 'customer' | 'internal';
   tone?: 'customer' | 'runner';
+  // Optional: Override the current step (useful for arrival detection)
+  currentStep?: CustomerFacingStep;
 };
 
 export function OrderProgressTimeline({ 
   currentStatus, 
   variant,
-  tone = 'customer'
+  tone = 'customer',
+  currentStep: currentStepOverride
 }: OrderProgressTimelineProps) {
   let steps: TimelineStep[] = [];
   let currentIndex = -1;
@@ -26,7 +29,8 @@ export function OrderProgressTimeline({
   const isRunner = tone === 'runner';
 
   if (variant === 'customer') {
-    const { step: currentStep } = getCustomerFacingStatus(currentStatus);
+    // Use override if provided, otherwise calculate from status
+    const currentStep = currentStepOverride || getCustomerFacingStatus(currentStatus).step;
     steps = CUSTOMER_TIMELINE_STEPS.map(s => ({
       id: s.step,
       label: s.label,

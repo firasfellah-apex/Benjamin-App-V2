@@ -18,12 +18,14 @@ interface PageContainerProps {
   variant?: PageVariant;
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function PageContainer({
   variant = 'customer',
   children,
-  className
+  className,
+  style
 }: PageContainerProps) {
   // Theme-specific styles
   const variantStyles = {
@@ -32,23 +34,26 @@ export function PageContainer({
     admin: "app-admin bg-[#1B1D21] text-[#F1F3F5]", // Graphite Neutral
   };
 
-  // Runner variant: full-width mobile layout (no container constraint)
+  // Runner variant: full-width mobile layout (no container constraint, no inner wrapper)
   // Customer/Admin: use container max-w-4xl for desktop layout
-  const containerClasses = variant === 'runner'
-    ? "w-full h-full flex flex-col flex-1 min-h-0"
-    : "container max-w-4xl mx-auto w-full h-full flex flex-col flex-1 min-h-0";
+  const containerClasses = "container max-w-4xl mx-auto w-full h-full flex flex-col flex-1 min-h-0";
 
   return (
     <div
       className={cn(
-        "w-full flex flex-col flex-1 min-h-0",
+        "w-full flex flex-col flex-1",
         variantStyles[variant],
         className
       )}
+      style={style}
     >
-      <div className={containerClasses}>
-        {children}
-      </div>
+      {variant === 'runner' ? (
+        children
+      ) : (
+        <div className={containerClasses}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

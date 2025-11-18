@@ -13,6 +13,7 @@ export interface OrderMessage {
   sender_role: MessageRole;
   body: string;
   created_at: string;
+  is_read?: boolean; // Whether current user has read this message
 }
 
 

@@ -116,22 +116,49 @@ export function useJobOffersSubscription() {
 
   // Handle new available order
   const handleNewOrder = useCallback(async (order: Order) => {
-    if (!online) return;
+    console.log('[JobChannel] 📨 New order received via Realtime:', {
+      orderId: order.id,
+      status: order.status,
+      runnerId: order.runner_id,
+      isOnline: online,
+      runnerProfileId: profile?.id,
+    });
+
+    if (!online) {
+      console.log('[JobChannel] ⏸️ Runner is offline, ignoring order');
+      return;
+    }
     
     // Only process Pending orders with no runner
     if (order.status === 'Pending' && !order.runner_id) {
+      console.log('[JobChannel] ✅ Order is available (Pending + no runner)');
+      
       // Check if runner has already skipped or timed-out this order
       const skipped = await hasSkippedOrder(order.id);
       if (skipped) {
+        console.log('[JobChannel] ⏭️ Runner has already skipped this order, ignoring');
         return; // Don't show orders the runner has already skipped or timed-out
       }
       
       const offer = orderToOffer(order as OrderWithDetails);
       if (offer) {
+        console.log('[JobChannel] 🎯 Converting order to offer and sending to runner:', {
+          offerId: offer.id,
+          payout: offer.payout,
+          cashAmount: offer.cashAmount,
+        });
         receiveOffer(offer);
+        console.log('[JobChannel] ✅ Offer sent to runner store - should appear in UI');
+      } else {
+        console.warn('[JobChannel] ⚠️ Could not convert order to offer (missing address_snapshot?)');
       }
+    } else {
+      console.log('[JobChannel] ❌ Order filtered out (not available):', {
+        status: order.status,
+        hasRunner: !!order.runner_id,
+      });
     }
-  }, [online, receiveOffer, orderToOffer, hasSkippedOrder]);
+  }, [online, receiveOffer, orderToOffer, hasSkippedOrder, profile?.id]);
 
   // Handle order updates (remove if accepted)
   const handleOrderUpdate = useCallback((order: Order) => {

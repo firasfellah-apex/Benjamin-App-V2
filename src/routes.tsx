@@ -10,6 +10,7 @@ import CashRequest from './pages/customer/CashRequest';
 import ManageAddresses from './pages/customer/ManageAddresses';
 import CustomerDeliveriesHistory from './pages/customer/CustomerDeliveriesHistory';
 import CustomerOrderDetailPage from './pages/customer/CustomerOrderDetailPage';
+import CustomerChat from './pages/customer/CustomerChat';
 
 import { RunnerLayout } from './components/layout/RunnerLayout';
 import Work from './pages/runner/Work';
@@ -17,6 +18,7 @@ import Earnings from './pages/runner/Earnings';
 import More from './pages/runner/More';
 import MyDeliveries from './pages/runner/MyDeliveries';
 import RunnerOrderDetail from './pages/runner/RunnerOrderDetail';
+import RunnerChat from './pages/runner/RunnerChat';
 
 import { RequireAdminAuth } from './components/auth/RequireAdminAuth';
 import { AdminLayout } from './components/layout/AdminLayout';
@@ -96,6 +98,12 @@ const routes: RouteConfig[] = [
     visible: false
   },
   {
+    name: 'Customer Chat',
+    path: '/customer/chat/:orderId',
+    element: <CustomerLayout><CustomerChat /></CustomerLayout>,
+    visible: false
+  },
+  {
     name: 'Runner Work',
     path: '/runner',
     element: <RunnerLayout><Work /></RunnerLayout>,
@@ -141,6 +149,12 @@ const routes: RouteConfig[] = [
     name: 'Runner Order Detail',
     path: '/runner/deliveries/:orderId',
     element: <RunnerOrderDetail />,
+    visible: false
+  },
+  {
+    name: 'Runner Chat',
+    path: '/runner/chat/:orderId',
+    element: <RunnerChat />,
     visible: false
   },
   // Legacy routes for backwards compatibility

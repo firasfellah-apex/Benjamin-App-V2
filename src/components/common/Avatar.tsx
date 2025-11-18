@@ -60,24 +60,25 @@ export function Avatar({
   const [imageError, setImageError] = React.useState(false);
   const initials = getInitials(fallback || alt);
   
-  // Validate URL before using it
-  const isValidUrl = React.useMemo(() => {
-    if (!src) return false;
-    try {
-      const url = new URL(src);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-      // Invalid URL or relative path
-      return false;
-    }
-  }, [src]);
-  
   // Reset error when src changes
   React.useEffect(() => {
     setImageError(false);
   }, [src]);
   
-  const shouldShowImage = src && isValidUrl && !imageError;
+  // Debug logging in development
+  React.useEffect(() => {
+    if (import.meta.env.DEV && src) {
+      console.log('[Avatar] Rendering with src:', src, {
+        hasSrc: !!src,
+        willShowImage: !!src && !imageError,
+        imageError
+      });
+    }
+  }, [src, imageError]);
+  
+  // Simple check: we have a src and no error
+  // Browser will handle invalid URLs via onError callback
+  const shouldShowImage = !!src && !imageError;
   
   return (
     <RadixAvatar
@@ -93,9 +94,18 @@ export function Avatar({
           src={src}
           alt={alt}
           className="object-cover"
-          onError={() => {
-            console.warn('[Avatar] Failed to load image:', src);
+          onError={(e) => {
+            console.error('[Avatar] Failed to load image:', {
+              src,
+              error: e,
+              target: e.currentTarget?.src
+            });
             setImageError(true);
+          }}
+          onLoad={() => {
+            if (import.meta.env.DEV) {
+              console.log('[Avatar] Image loaded successfully:', src);
+            }
           }}
         />
       )}

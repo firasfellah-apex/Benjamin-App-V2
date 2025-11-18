@@ -168,6 +168,19 @@ All colors MUST be HSL.
     border-color: hsl(var(--border));
   }
 
+  /* Ensure html, body, and root are full height with no margin/padding */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  /* Kill any stray margin/padding on root */
+  #root {
+    margin: 0;
+    padding: 0;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -235,6 +248,21 @@ All colors MUST be HSL.
 
   body.runner-app-viewport {
     /* Runner app styling - can add specific overrides if needed */
+  }
+
+  /* Make sure the "mobile-app-viewport / runner-app-viewport"
+     combo never injects a light gap behind the runner app */
+  body.mobile-app-viewport.runner-app-viewport {
+    margin: 0;
+    padding: 0;
+    background-color: #020817; /* same as runner bg */
+  }
+
+  /* Ensure #root has no margin/padding when in runner viewport */
+  body.mobile-app-viewport.runner-app-viewport #root {
+    margin: 0;
+    padding: 0;
+    height: 100%;
   }
 
   body.admin-app-viewport {
