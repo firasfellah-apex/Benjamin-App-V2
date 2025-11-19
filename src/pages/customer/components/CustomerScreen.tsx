@@ -63,19 +63,19 @@ export function CustomerScreen({
       {/* Header: logo + menu + optional hero (only show when NOT a flow page) */}
       {!isFlowPage && (
         <header className="px-6 pt-6 pb-2">
-          <CustomerHeader
+        <CustomerHeader
             title={showHero ? title : null}
             subtitle={showHero ? subtitle : null}
-            showBack={showBack}
-            onBack={onBack}
-          />
+          showBack={showBack}
+          onBack={onBack}
+        />
         </header>
       )}
 
       {/* Flow header (replaces logo/menu row + title/subtitle) */}
-      {flowHeader && (
+        {flowHeader && (
         <header className="px-6 pt-6 pb-2">
-          {flowHeader}
+            {flowHeader}
         </header>
       )}
 
@@ -83,8 +83,8 @@ export function CustomerScreen({
       {fixedContent && (
         <div className="px-6 pt-4 bg-white shrink-0">
           {fixedContent}
-        </div>
-      )}
+          </div>
+        )}
 
       {/* MAIN: the ONLY scroll container */}
       <main

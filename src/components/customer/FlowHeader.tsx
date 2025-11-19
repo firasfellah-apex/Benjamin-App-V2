@@ -30,19 +30,21 @@ export function FlowHeader({
           type="button"
           onClick={onPrimaryNavClick}
           className={cn(
-            "inline-flex items-center gap-1.5",
+            "inline-flex items-center justify-center",
             "rounded-full border border-slate-200 bg-white",
-            "px-3 py-1.5 text-[11px] font-medium text-slate-700",
-            "shadow-sm hover:bg-slate-50 active:bg-slate-100",
-            "transition-colors"
+            "w-12 h-12", // 48x48px circle
+            "text-slate-900",
+            "hover:bg-slate-50 active:bg-slate-100",
+            "transition-colors",
+            "touch-manipulation"
           )}
+          aria-label={label}
         >
           {mode === "back" ? (
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           ) : (
-            <X className="h-3.5 w-3.5" />
+            <X className="h-5 w-5" strokeWidth={2} />
           )}
-          <span>{label}</span>
         </button>
 
         <div className="flex items-center gap-1.5">

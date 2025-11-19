@@ -114,9 +114,9 @@ export function DeliveryModeSelector({
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Pill-shaped toggle with morphing background - iOS-style button morph effect */}
-      <div className="relative flex rounded-full border border-slate-200 bg-white p-1 overflow-hidden">
-        {/* Morphing background indicator - slides between positions */}
+      {/* Pill-shaped toggle with morphing border indicator */}
+      <div className="relative flex rounded-full gap-2 p-[2px] bg-transparent overflow-visible">
+        {/* Morphing border indicator - slides between positions */}
         {modes.map((mode) => {
           const selected = mode.value === value;
           if (!selected) return null;
@@ -124,16 +124,20 @@ export function DeliveryModeSelector({
           return (
             <motion.div
               key={mode.value}
-              layoutId="delivery-mode-bg"
-              className="absolute inset-y-1 rounded-full bg-black"
+              layoutId="delivery-mode-border"
+              className="absolute rounded-full border-2 border-black bg-white pointer-events-none"
               initial={false}
               transition={{
-                duration: 0.4,
-                ease: [0.34, 1.56, 0.64, 1],
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                mass: 0.5,
               }}
               style={{
-                width: "calc(50% - 4px)",
-                left: mode.value === modes[0].value ? "4px" : "calc(50% + 2px)",
+                top: "2px",
+                bottom: "2px",
+                width: "calc(50% - 8px)",
+                left: mode.value === modes[0].value ? "2px" : "calc(50% + 6px)",
               }}
             />
           );
@@ -150,28 +154,19 @@ export function DeliveryModeSelector({
               onClick={() => onChange(mode.value)}
               className={cn(
                 "relative flex-1 flex items-center justify-center gap-2 px-4 py-3 z-10",
-                "text-base font-semibold rounded-full",
+                "text-base font-semibold rounded-full bg-white",
                 "transition-colors duration-200",
                 selected
-                  ? "text-white"
-                  : "text-slate-900"
+                  ? "border-2 border-transparent text-slate-900"
+                  : "border border-slate-200 text-slate-700 hover:border-slate-300"
               )}
             >
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={selected ? "selected" : "unselected"}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2"
-                >
-                  <Icon 
-                    className={cn("h-5 w-5", selected ? "text-emerald-400" : "text-slate-900")} 
-                  />
-                  <span>{mode.title}</span>
-                </motion.div>
-              </AnimatePresence>
+              <div className="flex items-center gap-2">
+                <Icon 
+                  className={cn("h-5 w-5", selected ? "text-slate-900" : "text-slate-600")} 
+                />
+                <span>{mode.title}</span>
+              </div>
             </button>
           );
         })}

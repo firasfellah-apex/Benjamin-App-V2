@@ -245,20 +245,20 @@ export function BenjaminMap({
         }}
       >
         {/* Always hide Google Maps attribution and controls */}
-        <style>{`
-          .gm-style-cc,
-          .gm-style-cc div,
-          .gmnoprint,
-          .gm-bundled-control,
-          .gm-fullscreen-control,
-          a[href*="google.com/maps"],
-          a[href*="keyboard_shortcuts"],
+          <style>{`
+            .gm-style-cc,
+            .gm-style-cc div,
+            .gmnoprint,
+            .gm-bundled-control,
+            .gm-fullscreen-control,
+            a[href*="google.com/maps"],
+            a[href*="keyboard_shortcuts"],
           a[href*="terms_maps"],
           img[src*="google"][alt="Google"],
-          .gm-style > div:last-child {
-            display: none !important;
-          }
-        `}</style>
+            .gm-style > div:last-child {
+              display: none !important;
+            }
+          `}</style>
 
         {showSkeleton && (
           <div

@@ -199,21 +199,21 @@ export default function CashAmountInput({
         {/* Quick Pick Buttons */}
         <div className="flex justify-center gap-2 flex-wrap">
           {quickPicks.map((amt) => (
-            <button
-              key={amt}
-              type="button"
-              onClick={() => handleQuickPick(amt)}
-              className={cn(
+          <button
+            key={amt}
+            type="button"
+            onClick={() => handleQuickPick(amt)}
+            className={cn(
                 "px-4 py-2 rounded-xl border text-sm font-medium transition-colors touch-manipulation shadow-sm",
-                value === amt
-                  ? "bg-black border-black text-white"
+              value === amt
+                ? "bg-black border-black text-white"
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100"
-              )}
-            >
-              ${amt.toLocaleString()}
-            </button>
-          ))}
-        </div>
+            )}
+          >
+            ${amt.toLocaleString()}
+          </button>
+        ))}
+      </div>
 
         {/* Slider Block - Premium Design */}
         <div className="space-y-3">
@@ -241,26 +241,26 @@ export default function CashAmountInput({
                 {/* Background track - right side (slate-200) */}
                 <div 
                   className="absolute left-0 right-0 h-full rounded-full"
-                  style={{
+            style={{ 
                     background: '#e5e7eb',
-                  }}
-                />
-
+              }}
+            />
+          
                 {/* Dual-tone: Left side (charcoal/black), right side (slate-200) */}
-                <motion.div 
+          <motion.div 
                   className="absolute left-0 h-full rounded-full pointer-events-none"
-                  style={{ 
+            style={{ 
                     background: '#111827',
-                    height: '6px'
-                  }}
-                  initial={false}
-                  animate={{ 
+              height: '6px'
+            }}
+            initial={false}
+            animate={{ 
                     width: `${thumbPosition}%`
-                  }}
-                  transition={{ 
+            }}
+            transition={{ 
                     duration: isDragging ? 0 : 0.2, 
-                    ease: "easeOut" 
-                  }}
+              ease: "easeOut" 
+            }}
                 />
 
                 {/* Tick markers at quick pick positions */}
@@ -337,17 +337,17 @@ export default function CashAmountInput({
                     setTimeout(() => setShowBubble(false), 300);
                   }}
                   disabled={isEditing}
-                  className={cn(
+              className={cn(
                     "absolute left-0 right-0 w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-benjamin",
                     isDragging && "slider-dragging"
-                  )}
-                  style={{ 
+              )}
+              style={{
                     height: '44px',
                     touchAction: 'pan-y',
                     margin: 0, 
                     padding: 0,
                     top: '-13px'
-                  }}
+              }}
                   aria-label="Cash amount slider"
                 />
               </div>
@@ -379,13 +379,13 @@ export default function CashAmountInput({
                       style={{
                         background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%)'
                       }}
-                    />
+                  />
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </div>
-
+          
           {/* Range caption - below slider */}
           {!hideRangeText && (
             <p className="text-xs text-slate-400 text-center">
@@ -394,97 +394,97 @@ export default function CashAmountInput({
           )}
         </div>
       </div>
-
-      <style>{`
-        .slider-benjamin {
-          -webkit-appearance: none;
-          appearance: none;
-          outline: none;
-          touch-action: pan-y;
-        }
-        
+          
+          <style>{`
+            .slider-benjamin {
+              -webkit-appearance: none;
+              appearance: none;
+              outline: none;
+              touch-action: pan-y;
+            }
+            
         /* Webkit Thumb - Elegant white circle with scale on drag */
-        .slider-benjamin::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: #ffffff;
-          cursor: pointer;
-          border: 2px solid #111827;
-          box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        
+            .slider-benjamin::-webkit-slider-thumb {
+              -webkit-appearance: none;
+              appearance: none;
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              background: #ffffff;
+              cursor: pointer;
+              border: 2px solid #111827;
+              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+              transition: transform 0.15s ease, box-shadow 0.15s ease;
+            }
+            
         .slider-benjamin:hover::-webkit-slider-thumb {
-          transform: scale(1.05);
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-        }
-        
-        .slider-dragging.slider-benjamin::-webkit-slider-thumb {
+              transform: scale(1.05);
+              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+            
+            .slider-dragging.slider-benjamin::-webkit-slider-thumb {
           transform: scale(1.1);
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Firefox Thumb */
-        .slider-benjamin::-moz-range-thumb {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: #ffffff;
-          cursor: pointer;
-          border: 2px solid #111827;
-          box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        
+            }
+            
+            /* Firefox Thumb */
+            .slider-benjamin::-moz-range-thumb {
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              background: #ffffff;
+              cursor: pointer;
+              border: 2px solid #111827;
+              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+              transition: transform 0.15s ease, box-shadow 0.15s ease;
+            }
+            
         .slider-benjamin:hover::-moz-range-thumb {
-          transform: scale(1.05);
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-        }
-        
-        .slider-dragging.slider-benjamin::-moz-range-thumb {
+              transform: scale(1.05);
+              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+            
+            .slider-dragging.slider-benjamin::-moz-range-thumb {
           transform: scale(1.1);
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Track - transparent so we see our custom track */
-        .slider-benjamin::-webkit-slider-runnable-track {
-          background: transparent;
-          height: 6px;
-          border: none;
-        }
-        
-        .slider-benjamin::-moz-range-track {
-          background: transparent;
-          height: 6px;
-          border: none;
-        }
-        
-        /* Focus state */
-        .slider-benjamin:focus {
-          outline: none;
-        }
-        
-        .slider-benjamin:focus::-webkit-slider-thumb {
-          box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(16, 185, 129, 0.15);
-        }
-        
-        /* Disabled state */
-        .slider-benjamin:disabled::-webkit-slider-thumb {
-          background: #f3f4f6;
-          border-color: #9ca3af;
-          cursor: not-allowed;
-        }
-        
-        .slider-benjamin:disabled::-moz-range-thumb {
-          background: #f3f4f6;
-          border-color: #9ca3af;
-          cursor: not-allowed;
-        }
-        
-      `}</style>
+            }
+            
+            /* Track - transparent so we see our custom track */
+            .slider-benjamin::-webkit-slider-runnable-track {
+              background: transparent;
+              height: 6px;
+              border: none;
+            }
+            
+            .slider-benjamin::-moz-range-track {
+              background: transparent;
+              height: 6px;
+              border: none;
+            }
+            
+            /* Focus state */
+            .slider-benjamin:focus {
+              outline: none;
+            }
+            
+            .slider-benjamin:focus::-webkit-slider-thumb {
+              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(16, 185, 129, 0.15);
+            }
+            
+            /* Disabled state */
+            .slider-benjamin:disabled::-webkit-slider-thumb {
+              background: #f3f4f6;
+              border-color: #9ca3af;
+              cursor: not-allowed;
+            }
+            
+            .slider-benjamin:disabled::-moz-range-thumb {
+              background: #f3f4f6;
+              border-color: #9ca3af;
+              cursor: not-allowed;
+            }
+            
+          `}</style>
 
       {/* Error message */}
       {error && (

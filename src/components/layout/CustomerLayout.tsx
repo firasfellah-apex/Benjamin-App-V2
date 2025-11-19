@@ -21,7 +21,7 @@ function CustomerLayoutContent({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex flex-col bg-white">
       {/* Main content column - no overflow constraints, let page scroll naturally */}
       <MobilePageShell className="flex-1 flex flex-col">
-        {children}
+          {children}
       </MobilePageShell>
       
       {/* Bottom slot - RequestFlowBottomBar handles its own fixed positioning */}

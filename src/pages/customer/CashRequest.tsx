@@ -106,6 +106,12 @@ export default function CashRequest() {
   }, []);
 
   const handleAddressSelect = (address: CustomerAddress) => {
+    // Haptic feedback on mobile devices when selecting/expanding a card
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      // Light haptic feedback (10ms vibration)
+      navigator.vibrate(10);
+    }
+    
     setSelectedAddress(address);
   };
 
@@ -499,25 +505,119 @@ export default function CashRequest() {
   };
 
   // Step 1: Address Selection
+  // 
+  // REFACTORED: Expandable address cards with per-card map previews
+  // - Removed fixed map at top
+  // - Each address card can expand to show its own map
+  // - Only one card expanded at a time (based on selectedAddress)
+  // - Smooth CSS transitions for expand/collapse
+  // - Auto-scroll to selected card when switching addresses
+  //
+  // Previous layout:
+  // [FlowHeader]
+  // [Fixed MapPreview showing selected address]
+  // [Saved locations list]
+  // [Add Another Address]
+  // [Bottom CTA]
+  //
+  // New layout:
+  // [FlowHeader]
+  // [Saved locations title]
+  // [Expandable address cards with individual map previews]
+  // [Add Another Address]
+  // [Bottom CTA]
+
+  // Refs for scroll behavior - one ref per address card (must be before conditional returns)
+  const addressCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Scroll to selected card when selection changes (must be before conditional returns)
+  // Smooth scrolling: when expanding a card, ensure the full expanded card is visible
+  // Special handling for first card: align its top with the top of scrollable area
+  useEffect(() => {
+    if (step === 1 && selectedAddress?.id) {
+      const cardElement = addressCardRefs.current.get(selectedAddress.id);
+      if (cardElement) {
+        // Wait for expansion animation to start (150ms delay)
+        // This gives the card time to begin expanding before we calculate scroll position
+        const scrollTimeout = setTimeout(() => {
+          requestAnimationFrame(() => {
+            const rect = cardElement.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            const viewportBottom = windowHeight - 120; // Account for bottom nav (~120px)
+            
+            // Expanded card height estimate: map (200px) + content (~48px) = 248px
+            const expandedCardHeight = 248;
+            
+            // Calculate where the bottom of the expanded card would be (using current top position)
+            const expandedBottom = rect.top + expandedCardHeight;
+            
+            // Find the scrollable container (main element)
+            const scrollContainer = cardElement.closest('main');
+            if (!scrollContainer) return;
+            
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const currentScrollTop = scrollContainer.scrollTop;
+            
+            // Card's absolute position relative to the scroll container
+            const cardOffsetTop = currentScrollTop + (rect.top - containerRect.top);
+            
+            // Check if the expanded card would be fully visible
+            const wouldBeFullyVisible = 
+              rect.top >= containerRect.top && // Top is at or below the top of scrollable area
+              expandedBottom <= viewportBottom; // Bottom is at or above bottom of viewport
+            
+            // Only scroll if the expanded card wouldn't be fully visible
+            if (!wouldBeFullyVisible) {
+              // Distance from top of scrollable area to top of card (negative if card is above viewport)
+              const distanceFromScrollTop = rect.top - containerRect.top;
+              
+              // Distance from bottom of viewport to bottom of expanded card (positive if card extends below viewport)
+              const distanceFromBottom = expandedBottom - viewportBottom;
+              
+              // Determine if card is closer to top edge or bottom edge
+              // If card is partially or fully above the scrollable area, or closer to top, align top
+              // Otherwise, if card extends below viewport, align bottom
+              const shouldAlignTop = 
+                distanceFromScrollTop < 0 || // Card is above scrollable area
+                (Math.abs(distanceFromScrollTop) < distanceFromBottom && distanceFromScrollTop <= 0); // Closer to top
+              
+              let targetScrollTop: number;
+              
+              if (shouldAlignTop) {
+                // Scroll so top of card aligns with top of scrollable viewport
+                // This ensures the expanded map starts just below the fixed title
+                // Target: card top (cardOffsetTop) should be at 0 relative to scroll container
+                targetScrollTop = cardOffsetTop;
+              } else {
+                // Scroll so bottom of expanded card aligns with bottom of viewport
+                // Target: card bottom (cardOffsetTop + expandedCardHeight) should be at viewportBottom relative to container
+                targetScrollTop = cardOffsetTop + expandedCardHeight - (viewportBottom - containerRect.top);
+              }
+              
+              // Smoothly scroll to the calculated position
+              scrollContainer.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth',
+              });
+            }
+            // If card is already fully visible, no need to scroll
+          });
+        }, 150); // 150ms delay to let expansion animation start
+
+        return () => clearTimeout(scrollTimeout);
+      }
+    }
+  }, [selectedAddress?.id, step]);
+
   if (step === 1) {
-    // Fixed content: Map + "Saved locations" title (doesn't scroll)
-    const addressFixedContent = (
-      <div className="space-y-4">
-        {/* Map preview card */}
-        <div className="w-full h-56 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
-          <CustomerMapViewport selectedAddress={selectedAddress} />
-        </div>
+    // Fixed title - only show when addresses exist
+    const addressFixedContent = addresses.length > 0 ? (
+      <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase pb-1.5">
+        Saved locations
+      </p>
+    ) : null;
 
-        {/* Section title - only show when addresses exist */}
-        {addresses.length > 0 && (
-          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase mb-6 pb-1.5">
-            Saved locations
-          </p>
-        )}
-      </div>
-    );
-
-    // Scrollable content: Address list + Add button (scrolls)
+    // Scrollable content: expandable address cards (title is fixed above)
     const addressScrollableContent = (
       <div className="space-y-4 pb-6">
         {/* 0 addresses – empty state */}
@@ -544,62 +644,110 @@ export default function CashRequest() {
           </div>
         )}
 
-        {/* 1+ addresses – address list */}
+        {/* 1+ addresses – expandable address cards with map previews */}
         {addresses.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {addresses.map((addr) => {
               const isSelected = selectedAddress?.id === addr.id;
 
+              // Set ref callback for this address card
+              const setCardRef = (el: HTMLDivElement | null) => {
+                if (el) {
+                  addressCardRefs.current.set(addr.id, el);
+                } else {
+                  addressCardRefs.current.delete(addr.id);
+                }
+              };
+
               return (
-                <button
+                <div
                   key={addr.id}
-                  type="button"
-                  onClick={() => handleAddressSelect(addr)}
+                  ref={setCardRef}
                   className={cn(
-                    "group w-full rounded-xl px-4 py-3 text-left flex items-center justify-between gap-3 bg-white",
-                    "transition-all duration-150",
+                    "w-full rounded-xl border bg-white overflow-hidden",
+                    "transition-all duration-300 ease-in-out",
                     isSelected
-                      ? "border-2 border-black"
+                      ? "border-2 border-black shadow-sm"
                       : "border border-slate-200 hover:border-slate-300"
                   )}
+                  style={{
+                    transform: isSelected ? "scale(1)" : "scale(0.998)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">
-                      {addr.label || "Saved address"}
-                    </p>
-                    <p className="mt-0.5 text-sm text-slate-600 truncate">
-                      {formatAddress(addr)}
-                    </p>
+                  {/* Expandable map wrapper - smoother, calmer animation with staggered opacity */}
+                  <div
+                    className={cn(
+                      "overflow-hidden",
+                      isSelected 
+                        ? "max-h-[220px] duration-400" 
+                        : "max-h-0 duration-350"
+                    )}
+                    style={{
+                      transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                  >
+                    {/* Map container with staggered opacity fade-in */}
+                    <div
+                      className="w-full h-[200px] bg-slate-50"
+                      style={{
+                        opacity: isSelected ? 1 : 0,
+                        transition: isSelected
+                          ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                          : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+                      }}
+                    >
+                      <CustomerMapViewport selectedAddress={addr} />
+                    </div>
                   </div>
 
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleManageAddresses();
-                    }}
-                    className="ml-2 flex items-center justify-center shrink-0 cursor-pointer p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+                  {/* Content area - clickable to select/expand */}
+                  <button
+                    type="button"
+                    onClick={() => handleAddressSelect(addr)}
+                    className={cn(
+                      "group w-full px-4 py-3 text-left flex items-center justify-between gap-3 bg-white",
+                      "transition-colors duration-200 ease-in-out",
+                      isSelected && "bg-white"
+                    )}
                   >
-                    <Pencil className="h-4 w-4 text-slate-600 group-hover:text-slate-900" />
-                  </div>
-                </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
+                        {addr.label || "Saved address"}
+                      </p>
+                      <p className="mt-0.5 text-sm text-slate-600 truncate">
+                        {formatAddress(addr)}
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleManageAddresses();
+                      }}
+                      className="ml-2 flex items-center justify-center shrink-0 cursor-pointer p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+                    >
+                      <Pencil className="h-4 w-4 text-slate-600 group-hover:text-slate-900" />
+                    </div>
+                  </button>
+                </div>
               );
             })}
           </div>
         )}
-
       </div>
     );
 
-    return (
-      <>
-        <CustomerScreen
-          flowHeader={flowHeader}
-          fixedContent={addressFixedContent}
-          topContent={addressScrollableContent}
-          customBottomPadding="calc(24px + max(24px, env(safe-area-inset-bottom)) + 132px)"
-        >
-          {/* No children – everything is in fixedContent and topContent */}
-        </CustomerScreen>
+        return (
+          <>
+            <CustomerScreen
+              flowHeader={flowHeader}
+              fixedContent={addressFixedContent}
+              topContent={addressScrollableContent}
+              customBottomPadding="calc(24px + max(24px, env(safe-area-inset-bottom)) + 132px)"
+            >
+              {/* No children – everything is in topContent */}
+            </CustomerScreen>
 
         {/* Add Address Modal - Portal to document.body */}
         {typeof document !== 'undefined' && createPortal(
