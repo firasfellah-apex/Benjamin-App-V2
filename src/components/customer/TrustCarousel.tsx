@@ -128,7 +128,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
     <div className={cn("w-full", className)}>
       <div className="w-full flex justify-center">
         {/* Fixed outer frame */}
-        <div className="w-full max-w-sm rounded-2xl bg-white border border-[#E5E7EB] overflow-hidden">
+              <div className="w-full max-w-sm rounded-2xl bg-white border border-[#F0F0F0] overflow-hidden">
           {/* Horizontal scrolling container inside the frame */}
           <div
             ref={carouselRef}

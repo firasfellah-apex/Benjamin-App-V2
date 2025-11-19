@@ -32,7 +32,7 @@ export function DeliveryModeSelector({
   className,
 }: DeliveryModeSelectorProps) {
   const [isSecurityTipExpanded, setIsSecurityTipExpanded] = useState(false);
-  const securityTipRef = useRef<HTMLDivElement>(null);
+  const securityTipRef = useRef<HTMLButtonElement>(null);
 
   // Scroll adjustment when security tip expands/collapses
   useEffect(() => {
@@ -114,18 +114,18 @@ export function DeliveryModeSelector({
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Pill-shaped toggle with morphing border indicator */}
-      <div className="relative flex rounded-full gap-2 p-[2px] bg-transparent overflow-visible">
-        {/* Morphing border indicator - slides between positions */}
+      {/* Pill-shaped toggle - Minimal Color with Morph Transition */}
+      <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 relative">
+        {/* Morphing white background - only for selected */}
         {modes.map((mode) => {
           const selected = mode.value === value;
           if (!selected) return null;
-          
+
           return (
             <motion.div
               key={mode.value}
-              layoutId="delivery-mode-border"
-              className="absolute rounded-full border-2 border-black bg-white pointer-events-none"
+              layoutId="toggle-bg"
+              className="absolute rounded-full bg-white pointer-events-none"
               initial={false}
               transition={{
                 type: "spring",
@@ -134,10 +134,10 @@ export function DeliveryModeSelector({
                 mass: 0.5,
               }}
               style={{
-                top: "2px",
-                bottom: "2px",
-                width: "calc(50% - 8px)",
-                left: mode.value === modes[0].value ? "2px" : "calc(50% + 6px)",
+                top: "4px",
+                bottom: "4px",
+                left: mode.value === modes[0].value ? "4px" : "calc(50% + 2px)",
+                width: "calc(50% - 6px)",
               }}
             />
           );
@@ -153,20 +153,17 @@ export function DeliveryModeSelector({
               type="button"
               onClick={() => onChange(mode.value)}
               className={cn(
-                "relative flex-1 flex items-center justify-center gap-2 px-4 py-3 z-10",
-                "text-base font-semibold rounded-full bg-white",
-                "transition-colors duration-200",
+                "relative flex-1 h-13 rounded-full flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-200 z-10",
                 selected
-                  ? "border-2 border-transparent text-slate-900"
-                  : "border border-slate-200 text-slate-700 hover:border-slate-300"
+                  ? "text-slate-900"
+                  : "text-slate-500"
               )}
+              style={{ height: '52px' }}
             >
-              <div className="flex items-center gap-2">
-                <Icon 
-                  className={cn("h-5 w-5", selected ? "text-slate-900" : "text-slate-600")} 
-                />
-                <span>{mode.title}</span>
-              </div>
+              <Icon 
+                className={cn("h-5 w-5", selected ? "text-slate-900" : "text-slate-500")} 
+              />
+              <span>{mode.title}</span>
             </button>
           );
         })}
@@ -196,41 +193,29 @@ export function DeliveryModeSelector({
         )}
       </motion.div>
       
-      {/* Security Tip - Tinted Alert Card */}
+      {/* Security Tip - Yellow Background - Entirely clickable */}
       <div className="mt-4">
-        <div
+        <button
+          type="button"
           ref={securityTipRef}
+          onClick={() => setIsSecurityTipExpanded(!isSecurityTipExpanded)}
           className={cn(
-            "w-full rounded-xl px-4 py-3",
-            "bg-amber-50"
+            "w-full text-left rounded-xl px-4 py-3",
+            "bg-[#FEF9C3] active:opacity-80 cursor-pointer"
           )}
         >
-          <button
-            type="button"
-            onClick={() => setIsSecurityTipExpanded(!isSecurityTipExpanded)}
-            className="w-full text-left active:opacity-80"
-          >
-            {/* Top Row */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="mb-1.5 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  <p className="text-xs font-semibold text-slate-900">
-                    Guard your one-time code
-                  </p>
-                </div>
-                <p className="text-xs text-slate-700">
-                  Anyone with the code can receive your envelope.
-                </p>
-              </div>
-              <ChevronDown
-                className={cn(
-                  "mt-0.5 h-4 w-4 text-slate-500 flex-shrink-0 transition-transform duration-200",
-                  isSecurityTipExpanded && "rotate-180"
-                )}
-              />
+          {/* Top Row - Center aligned */}
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-1.5 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-amber-600 flex-shrink-0" />
+              <p className="text-xs font-semibold text-slate-900">
+                Guard Your One-Time Code
+              </p>
             </div>
-          </button>
+            <p className="text-xs text-slate-700">
+              Anyone with the code can receive your cash.
+            </p>
+          </div>
 
           {/* Expanded content */}
           <AnimatePresence initial={false}>
@@ -242,14 +227,24 @@ export function DeliveryModeSelector({
                 transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
                 style={{ overflow: "hidden" }}
               >
-                <div className="mt-2 border-t border-amber-200/60 pt-2.5 text-xs text-slate-800 space-y-1.5">
+                <div className="mt-2 border-t border-amber-200/60 pt-2.5 text-xs text-slate-800 space-y-1.5 text-center">
                   <p>Only share it when your runner is at your door.</p>
                   <p>Benjamin will never ask for it by phone or text.</p>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+
+          {/* Chevron Icon (no white circle) - Same style as fee breakdown */}
+          <div className="flex justify-center items-center mt-3">
+            <motion.div
+              animate={{ rotate: isSecurityTipExpanded ? 180 : 0 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <ChevronDown className="h-4 w-4 text-slate-900" />
+            </motion.div>
+          </div>
+        </button>
       </div>
     </div>
   );

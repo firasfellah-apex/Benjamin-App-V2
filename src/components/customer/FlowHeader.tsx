@@ -31,7 +31,7 @@ export function FlowHeader({
           onClick={onPrimaryNavClick}
           className={cn(
             "inline-flex items-center justify-center",
-            "rounded-full border border-slate-200 bg-white",
+            "rounded-full border border-[#F0F0F0] bg-white",
             "w-12 h-12", // 48x48px circle
             "text-slate-900",
             "hover:bg-slate-50 active:bg-slate-100",

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, X } from "@/lib/icons";
+import { ChevronDown, X } from "@/lib/icons";
 import { Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FlowCard } from "@/components/customer/FlowCard";
@@ -250,20 +250,27 @@ export default function CashRequest() {
     }
   }, [selectedAddress, pricing, profile, amount, deliveryMode, navigate]);
 
-  // Memoize the summary section (everything except breakdown) - stable reference
+  // Memoize the summary section (everything including breakdown) - stable reference
   // MUST be before any conditional returns to follow Rules of Hooks
   const summarySection = useMemo(() => {
     return (
-      <div className="w-full space-y-3">
-        {/* Summary Mini-Card */}
-        <motion.div
-          initial={false}
-          animate={{ backgroundColor: showFeeDetails ? '#fafafa' : '#ffffff' }}
-          transition={{ duration: 0.15 }}
-          className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"
+      <div className="w-full mt-6">
+        {/* Summary Card with Light Green Gradient Background - Entirely clickable */}
+        <button
+          type="button"
+          onClick={() => {
+            const newState = !showFeeDetails;
+            setShowFeeDetails(newState);
+            track('fee_breakdown_toggled', {
+              is_expanded: newState,
+            });
+          }}
+          className="w-full text-left bg-gradient-to-b from-[#ECFDF3] to-[#DCFCE7] rounded-xl cursor-pointer active:opacity-95 transition-opacity"
+          style={{ padding: '18px' }}
         >
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-500">You'll get</span>
+          {/* Top Row - You'll Get */}
+          <div className="flex justify-between items-center" style={{ marginBottom: '12px' }}>
+            <span className="text-sm text-slate-800">You'll Get</span>
             <motion.span
               key={`get-${amount}`}
               initial={{ opacity: 0.6 }}
@@ -275,8 +282,90 @@ export default function CashRequest() {
               ${amount.toFixed(0)}
             </motion.span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-500">You'll pay</span>
+
+          {/* Expanding Divider - 2px white line when collapsed, expands to show breakdown */}
+          <div 
+            className="overflow-hidden"
+            style={{
+              marginBottom: '12px',
+            }}
+          >
+            {/* 2px white divider line - only visible when collapsed */}
+            {!showFeeDetails && (
+              <div
+                style={{
+                  marginLeft: '-16px',
+                  marginRight: '-16px',
+                  height: '2px',
+                  backgroundColor: 'white',
+                  borderRadius: '3px',
+                }}
+              />
+            )}
+            
+            {/* Expandable container for breakdown content */}
+            <div
+              className="overflow-hidden"
+              style={{
+                // ❗ geometry fix:
+                // green card has padding: 18px
+                // pull the content out by 16px on each side
+                // so its edges sit 2px from the green card edge
+                marginLeft: '-16px',
+                marginRight: '-16px',
+                borderRadius: '3px',
+                backgroundColor: 'transparent', // Always transparent - no white background
+                minHeight: showFeeDetails ? 'auto' : '0',
+                maxHeight: showFeeDetails ? '220px' : '0',
+                transition: 'max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxSizing: 'border-box',
+              }}
+            >
+              {/* Breakdown content - fades in when expanded */}
+              {pricing && (
+                <div 
+                  style={{
+                    borderRadius: '3px',
+                    // padding math:
+                    // green edge → content edge: 2px
+                    // content edge → text: 16px
+                    // 2 + 16 = 18 → text lines up with "You'll Get / You'll Pay"
+                    padding: showFeeDetails ? '12px 16px' : '0',
+                    backgroundColor: 'transparent',
+                    opacity: showFeeDetails ? 1 : 0,
+                    transition: showFeeDetails
+                      ? 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.15s'
+                      : 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    pointerEvents: showFeeDetails ? 'auto' : 'none',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                    <div className="flex justify-between items-center text-sm" style={{ marginBottom: '8px' }}>
+                      <span className="text-slate-600">Platform Fee</span>
+                      <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        ${pricing.platformFee.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm" style={{ marginBottom: '8px' }}>
+                      <span className="text-slate-600">Compliance Fee</span>
+                      <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        ${pricing.complianceFee.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">Runner Fee</span>
+                      <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        ${pricing.deliveryFee.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
+
+          {/* Bottom Row - You'll Pay */}
+          <div className="flex justify-between items-center" style={{ marginBottom: '12px' }}>
+            <span className="text-sm text-slate-800">You'll Pay</span>
             <motion.span
               key={`pay-${pricing?.total || 0}`}
               initial={{ opacity: 0.6, scale: 0.98 }}
@@ -288,81 +377,17 @@ export default function CashRequest() {
               ${pricing?.total.toFixed(2) || '0.00'}
             </motion.span>
           </div>
-        </motion.div>
 
-        {/* View breakdown button - better affordance, 12px spacing from summary */}
-        <button
-          onClick={() => {
-            const newState = !showFeeDetails;
-            setShowFeeDetails(newState);
-            track('fee_breakdown_toggled', {
-              is_expanded: newState,
-            });
-          }}
-          className="w-full flex items-center justify-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors touch-manipulation py-1 mt-3"
-        >
-          {showFeeDetails ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-          <span>View full fee breakdown</span>
-        </button>
-
-        {/* Fee Breakdown - Accordion panel */}
-        <AnimatePresence initial={false}>
-          {pricing && showFeeDetails && (
+          {/* Chevron Icon (no white circle) */}
+          <div className="flex justify-center items-center">
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 30,
-                mass: 0.5,
-              }}
-              style={{ overflow: "hidden" }}
+              animate={{ rotate: showFeeDetails ? 180 : 0 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
             >
-              <div className="bg-slate-50/60 rounded-xl p-4 space-y-3 border border-slate-100">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Cash amount</span>
-                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    ${amount.toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-px bg-slate-200" />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Platform fee</span>
-                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    ${pricing.platformFee.toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-px bg-slate-200" />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Compliance fee</span>
-                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    ${pricing.complianceFee.toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-px bg-slate-200" />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Delivery fee</span>
-                  <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    ${pricing.deliveryFee.toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-px bg-slate-300 mt-2" />
-                <div className="flex justify-between items-center text-sm pt-1">
-                  <span className="text-slate-900 font-semibold">Total</span>
-                  <span className="text-slate-900 font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    ${pricing.total.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+              <ChevronDown className="h-4 w-4 text-slate-900" />
             </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </button>
       </div>
     );
   }, [pricing, amount, showFeeDetails]);
@@ -399,30 +424,25 @@ export default function CashRequest() {
   // Premium spacing: 24px padding overall, clear vertical sections
   const topContent = useMemo(() => {
     return (
-    <div className="space-y-6 pb-24" style={{ minHeight: "180px" }}>
+    <div className="space-y-6" style={{ minHeight: "180px" }}>
       {/* Cash Amount Section */}
-      <FlowCard>
-        <div className="w-full space-y-6">
-          {/* Amount Selection Components (Amount Display, Preset Buttons & Slider) */}
-          <CashAmountInput
-            value={amount}
-            onChange={handleAmountChange}
-            min={MIN_AMOUNT}
-            max={MAX_AMOUNT}
-            step={20}
-            hideAmountDisplay={false}
-            hideRangeText={false}
-          />
+      <FlowCard className="space-y-6">
+        {/* Amount Selection Components (Amount Display, Preset Buttons & Slider) */}
+        <CashAmountInput
+          value={amount}
+          onChange={handleAmountChange}
+          min={MIN_AMOUNT}
+          max={MAX_AMOUNT}
+          step={20}
+          hideAmountDisplay={false}
+        />
 
-          {/* Summary Section - 20px spacing from slider (space-y-6 = 24px) */}
-          <div className="w-full">
-            {summarySection}
-          </div>
-        </div>
+        {/* Summary Section */}
+        {summarySection}
       </FlowCard>
 
       {/* Delivery Style Selector */}
-      <FlowCard>
+      <FlowCard className="space-y-4">
         <DeliveryModeSelector
           value={deliveryMode}
           onChange={(mode) => setDeliveryMode(mode)}
@@ -622,7 +642,7 @@ export default function CashRequest() {
       <div className="space-y-4 pb-6">
         {/* 0 addresses – empty state */}
         {addresses.length === 0 && (
-          <div className="w-full rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-3">
+          <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-3">
             <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg">
               +
             </div>
@@ -668,7 +688,7 @@ export default function CashRequest() {
                     "transition-all duration-300 ease-in-out",
                     isSelected
                       ? "border-2 border-black shadow-sm"
-                      : "border border-slate-200 hover:border-slate-300"
+                      : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
                   )}
                   style={{
                     transform: isSelected ? "scale(1)" : "scale(0.998)",
@@ -890,6 +910,7 @@ export default function CashRequest() {
       <CustomerScreen
         flowHeader={flowHeader}
         topContent={topContent}
+        customBottomPadding="calc(24px + max(24px, env(safe-area-inset-bottom)) + 120px)"
       />
 
       {/* Add Address Modal - Portal to document.body */}

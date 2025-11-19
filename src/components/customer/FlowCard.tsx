@@ -23,7 +23,7 @@ export function FlowCard({
   return (
     <div
       className={cn(
-        "bg-white border border-[#E5E7EB] rounded-xl p-5 sm:p-6",
+        "bg-white border border-slate-100 rounded-3xl px-6 py-6",
         className
       )}
     >

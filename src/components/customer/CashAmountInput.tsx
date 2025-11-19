@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface CashAmountInputProps {
@@ -10,7 +10,6 @@ interface CashAmountInputProps {
   step?: number;
   className?: string;
   hideAmountDisplay?: boolean;
-  hideRangeText?: boolean;
   onEditClick?: () => void;
 }
 
@@ -22,18 +21,14 @@ export default function CashAmountInput({
   step = 20,
   className,
   hideAmountDisplay = false,
-  hideRangeText = false,
   onEditClick,
 }: CashAmountInputProps) {
   const [input, setInput] = useState<string>(String(value));
   const [error, setError] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [showPulse, setShowPulse] = useState(false);
-  const [showBubble, setShowBubble] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
 
   // Sync input with value prop when not editing
   useEffect(() => {
@@ -50,13 +45,11 @@ export default function CashAmountInput({
     return str.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
-  // Handle input change - allow free typing, no validation yet
+  // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/,/g, "");
-    // Allow only digits
     if (/^\d*$/.test(raw)) {
       setInput(raw);
-      // Clear error while typing; final decision on blur
       setError("");
     }
   };
@@ -108,18 +101,15 @@ export default function CashAmountInput({
       return;
     }
 
-    // All good
     setError("");
     onChange(num);
     setIsEditing(false);
   };
 
-  // Handle input blur
   const handleBlur = () => {
     validateAndCommit();
   };
 
-  // Handle Enter key
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -155,26 +145,29 @@ export default function CashAmountInput({
     }, 0);
   };
 
-  // Calculate thumb position for bubble
+  // Calculate thumb position
   const thumbPosition = ((value - min) / (max - min)) * 100;
 
   // Quick pick amounts
   const quickPicks = [100, 200, 500, 1000].filter(amt => amt >= min && amt <= max);
 
   return (
-    <div className={cn("w-full space-y-6", className)}>
-      {/* ZONE 1: Amount Focus */}
+    <div className={cn("w-full", className)}>
+      {/* TOP AMOUNT CONTAINER - Large centered amount in soft card */}
       {!hideAmountDisplay && (
-        <div className="w-full text-center space-y-2">
+        <div className="mb-6">
           {!isEditing ? (
-            <div 
+            <div
               onClick={onEditClick || handleDisplayClick}
-              className="text-3xl font-semibold text-slate-900 cursor-text hover:opacity-70 transition-opacity touch-manipulation"
+              className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center cursor-text hover:opacity-80 transition-opacity touch-manipulation"
+              style={{ height: '96px', borderRadius: '12px' }}
             >
-              ${formatWithCommas(value)}
+              <p className="text-4xl font-semibold text-slate-900">
+                ${formatWithCommas(value)}
+              </p>
             </div>
           ) : (
-            <div className="flex justify-center">
+            <div className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center" style={{ height: '96px', borderRadius: '12px' }}>
               <input
                 ref={inputRef}
                 type="tel"
@@ -184,30 +177,86 @@ export default function CashAmountInput({
                 onChange={handleInputChange}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                className="text-3xl font-semibold text-slate-900 text-center w-32 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-1 bg-transparent"
+                className="text-4xl font-semibold text-slate-900 text-center w-32 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-1 bg-transparent"
                 aria-label="Cash amount"
                 autoFocus
               />
             </div>
           )}
-          <p className="text-xs text-slate-500">Cash you'll receive</p>
         </div>
       )}
 
-      {/* ZONE 2: Controls (Quick Picks + Slider) */}
-      <div className="space-y-4">
-        {/* Quick Pick Buttons */}
-        <div className="flex justify-center gap-2 flex-wrap">
-          {quickPicks.map((amt) => (
+      {/* SLIDER - Thick green track + black knob */}
+      <div className="mb-4">
+        <div className="relative w-full mb-2" style={{ height: '10px' }}>
+          {/* Background track - unfilled portion */}
+          <div 
+            className="absolute left-0 right-0 h-full rounded-full"
+            style={{ background: '#F7F7F7' }}
+          />
+          
+          {/* Filled portion - green */}
+          <motion.div 
+            className="absolute left-0 h-full rounded-full pointer-events-none"
+            style={{ 
+              background: '#22C55E', // emerald-500
+              height: '10px'
+            }}
+            initial={false}
+            animate={{ 
+              width: `${thumbPosition}%`
+            }}
+            transition={{ 
+              duration: isDragging ? 0 : 0.2, 
+              ease: "easeOut" 
+            }}
+          />
+
+          {/* Slider input */}
+          <input
+            ref={sliderRef}
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={handleSliderChange}
+            onMouseDown={() => setIsDragging(true)}
+            onMouseUp={() => setIsDragging(false)}
+            onMouseLeave={() => setIsDragging(false)}
+            onTouchStart={() => setIsDragging(true)}
+            onTouchEnd={() => setIsDragging(false)}
+            disabled={isEditing}
+            className="absolute left-0 right-0 w-full h-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-cash-amount"
+            style={{ 
+              height: '10px',
+              touchAction: 'pan-y',
+              margin: 0, 
+              padding: 0,
+            }}
+            aria-label="Cash amount slider"
+          />
+        </div>
+
+        {/* Min/Max labels - below slider */}
+        <div className="flex justify-between mt-2">
+          <span className="text-[12px] text-slate-400">${min.toLocaleString()}</span>
+          <span className="text-[12px] text-slate-400">${max.toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* QUICK AMOUNT PILLS - Equal width across row */}
+      <div className="mt-4 flex gap-3">
+        {quickPicks.map((amt) => (
           <button
             key={amt}
             type="button"
             onClick={() => handleQuickPick(amt)}
             className={cn(
-                "px-4 py-2 rounded-xl border text-sm font-medium transition-colors touch-manipulation shadow-sm",
+              "flex-1 h-11 rounded-full text-sm font-medium text-slate-900 flex items-center justify-center transition-colors touch-manipulation",
               value === amt
-                ? "bg-black border-black text-white"
-                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+                ? "border-2 border-black bg-white"
+                : "border border-slate-200 bg-white"
             )}
           >
             ${amt.toLocaleString()}
@@ -215,280 +264,71 @@ export default function CashAmountInput({
         ))}
       </div>
 
-        {/* Slider Block - Premium Design */}
-        <div className="space-y-3">
-          {/* "Adjust amount" label */}
-          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-            Adjust amount
-          </p>
-
-          {/* Slider Track Row - Min labels, track, max labels */}
-          <div className="relative" style={{ height: '50px' }}>
-            {/* Track container - full width */}
-            <div className="relative w-full" style={{ height: '44px', marginTop: '10px' }}>
-              {/* Min label - left edge */}
-              <span className="absolute left-0 text-xs text-slate-500" style={{ top: '22px' }}>
-                ${min.toLocaleString()}
-              </span>
-
-              {/* Max label - right edge */}
-              <span className="absolute right-0 text-xs text-slate-500" style={{ top: '22px' }}>
-                ${max.toLocaleString()}
-              </span>
-
-              {/* Track area - full width, between labels */}
-              <div className="absolute left-0 right-0" style={{ height: '6px', top: '19px' }}>
-                {/* Background track - right side (slate-200) */}
-                <div 
-                  className="absolute left-0 right-0 h-full rounded-full"
-            style={{ 
-                    background: '#e5e7eb',
-              }}
-            />
-          
-                {/* Dual-tone: Left side (charcoal/black), right side (slate-200) */}
-          <motion.div 
-                  className="absolute left-0 h-full rounded-full pointer-events-none"
-            style={{ 
-                    background: '#111827',
-              height: '6px'
-            }}
-            initial={false}
-            animate={{ 
-                    width: `${thumbPosition}%`
-            }}
-            transition={{ 
-                    duration: isDragging ? 0 : 0.2, 
-              ease: "easeOut" 
-            }}
-                />
-
-                {/* Tick markers at quick pick positions */}
-                {quickPicks.map((amt) => {
-                  const tickPosition = ((amt - min) / (max - min)) * 100;
-                  return (
-                    <div
-                      key={amt}
-                      className="absolute w-px bg-slate-300 pointer-events-none"
-                      style={{
-                        left: `${tickPosition}%`,
-                        top: '-1px',
-                        height: '8px',
-                        opacity: value === amt ? 0.8 : 0.4,
-                      }}
-                    />
-                  );
-                })}
-
-                {/* Floating value bubble - above thumb */}
-                <AnimatePresence>
-                  {(isDragging || showBubble) && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.9 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.9 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${thumbPosition}%`,
-                        top: '-28px',
-                        transform: 'translateX(-50%)',
-                      }}
-                    >
-                      <div className="bg-slate-900 text-white text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap shadow-lg">
-                        ${formatWithCommas(value)}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Slider input - positioned on top */}
-                <input
-                  ref={sliderRef}
-                  type="range"
-                  min={min}
-                  max={max}
-                  step={step}
-                  value={value}
-                  onChange={handleSliderChange}
-                  onTouchStart={(e) => {
-                    e.stopPropagation();
-                    setIsDragging(true);
-                    setShowBubble(true);
-                    setShowPulse(true);
-                    setTimeout(() => setShowPulse(false), 600);
-                  }}
-                  onMouseDown={() => {
-                    setIsDragging(true);
-                    setShowBubble(true);
-                    setShowPulse(true);
-                    setTimeout(() => setShowPulse(false), 600);
-                  }}
-                  onMouseUp={() => {
-                    setIsDragging(false);
-                    setTimeout(() => setShowBubble(false), 300);
-                  }}
-                  onMouseLeave={() => {
-                    setIsDragging(false);
-                    setTimeout(() => setShowBubble(false), 300);
-                  }}
-                  onTouchEnd={() => {
-                    setIsDragging(false);
-                    setTimeout(() => setShowBubble(false), 300);
-                  }}
-                  disabled={isEditing}
-              className={cn(
-                    "absolute left-0 right-0 w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-benjamin",
-                    isDragging && "slider-dragging"
-              )}
-              style={{
-                    height: '44px',
-                    touchAction: 'pan-y',
-                    margin: 0, 
-                    padding: 0,
-                    top: '-13px'
-              }}
-                  aria-label="Cash amount slider"
-                />
-              </div>
-
-              {/* Pulse effect overlay - centered on thumb */}
-              <AnimatePresence>
-                {showPulse && (
-                  <motion.div
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${thumbPosition}%`,
-                      top: '29px',
-                      transform: 'translateX(-50%)',
-                    }}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ 
-                      opacity: [0, 0.4, 0],
-                      scale: [0.9, 2, 2.5]
-                    }}
-                    exit={{ opacity: 0 }}
-                    transition={{ 
-                      duration: 0.6, 
-                      ease: "easeOut",
-                      times: [0, 0.4, 1]
-                    }}
-                  >
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{
-                        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%)'
-                      }}
-                  />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-          
-          {/* Range caption - below slider */}
-          {!hideRangeText && (
-            <p className="text-xs text-slate-400 text-center">
-              ${min.toLocaleString()}–${max.toLocaleString()} range
-            </p>
-          )}
-        </div>
-      </div>
-          
-          <style>{`
-            .slider-benjamin {
-              -webkit-appearance: none;
-              appearance: none;
-              outline: none;
-              touch-action: pan-y;
-            }
-            
-        /* Webkit Thumb - Elegant white circle with scale on drag */
-            .slider-benjamin::-webkit-slider-thumb {
-              -webkit-appearance: none;
-              appearance: none;
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              background: #ffffff;
-              cursor: pointer;
-              border: 2px solid #111827;
-              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-              transition: transform 0.15s ease, box-shadow 0.15s ease;
-            }
-            
-        .slider-benjamin:hover::-webkit-slider-thumb {
-              transform: scale(1.05);
-              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-            
-            .slider-dragging.slider-benjamin::-webkit-slider-thumb {
-          transform: scale(1.1);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            }
-            
-            /* Firefox Thumb */
-            .slider-benjamin::-moz-range-thumb {
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              background: #ffffff;
-              cursor: pointer;
-              border: 2px solid #111827;
-              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
-              transition: transform 0.15s ease, box-shadow 0.15s ease;
-            }
-            
-        .slider-benjamin:hover::-moz-range-thumb {
-              transform: scale(1.05);
-              box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            }
-            
-            .slider-dragging.slider-benjamin::-moz-range-thumb {
-          transform: scale(1.1);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            }
-            
-            /* Track - transparent so we see our custom track */
-            .slider-benjamin::-webkit-slider-runnable-track {
-              background: transparent;
-              height: 6px;
-              border: none;
-            }
-            
-            .slider-benjamin::-moz-range-track {
-              background: transparent;
-              height: 6px;
-              border: none;
-            }
-            
-            /* Focus state */
-            .slider-benjamin:focus {
-              outline: none;
-            }
-            
-            .slider-benjamin:focus::-webkit-slider-thumb {
-              box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(16, 185, 129, 0.15);
-            }
-            
-            /* Disabled state */
-            .slider-benjamin:disabled::-webkit-slider-thumb {
-              background: #f3f4f6;
-              border-color: #9ca3af;
-              cursor: not-allowed;
-            }
-            
-            .slider-benjamin:disabled::-moz-range-thumb {
-              background: #f3f4f6;
-              border-color: #9ca3af;
-              cursor: not-allowed;
-            }
-            
-          `}</style>
+      <style>{`
+        .slider-cash-amount {
+          -webkit-appearance: none;
+          appearance: none;
+          outline: none;
+          touch-action: pan-y;
+        }
+        
+        /* Webkit Thumb - Black center, 28px diameter, white border - centered on track */
+        .slider-cash-amount::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #000000;
+          cursor: pointer;
+          border: 3px solid #ffffff;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+          transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+          margin-top: -9px; /* Center vertically: (28px thumb - 10px track) / 2 = -9px */
+        }
+        
+        .slider-cash-amount:active::-webkit-slider-thumb {
+          transform: scale(1.05);
+        }
+        
+        /* Firefox Thumb - centered on track */
+        .slider-cash-amount::-moz-range-thumb {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #000000;
+          cursor: pointer;
+          border: 3px solid #ffffff;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+          transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+          margin-top: -9px; /* Center vertically */
+        }
+        
+        .slider-cash-amount:active::-moz-range-thumb {
+          transform: scale(1.05);
+        }
+        
+        /* Track - transparent */
+        .slider-cash-amount::-webkit-slider-runnable-track {
+          background: transparent;
+          height: 10px;
+          border: none;
+        }
+        
+        .slider-cash-amount::-moz-range-track {
+          background: transparent;
+          height: 10px;
+          border: none;
+        }
+        
+        .slider-cash-amount:focus {
+          outline: none;
+        }
+      `}</style>
 
       {/* Error message */}
       {error && (
-        <p className="text-red-500 text-sm text-center transition-opacity duration-200">
+        <p className="text-red-500 text-sm text-center mt-4 transition-opacity duration-200">
           {error}
         </p>
       )}

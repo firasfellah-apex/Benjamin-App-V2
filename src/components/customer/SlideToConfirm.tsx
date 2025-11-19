@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Check, ChevronRight } from "lucide-react";
+import { Check } from "lucide-react";
 
 interface SlideToConfirmProps {
   onConfirm: () => void;
   disabled?: boolean;
   className?: string;
-  label?: string;
+  label?: string; // Not used, kept for backwards compatibility
   confirmedLabel?: string;
 }
 
@@ -14,7 +14,7 @@ export function SlideToConfirm({
   onConfirm,
   disabled = false,
   className,
-  label = "Slide to confirm",
+  label: _label, // Not used, kept for backwards compatibility
   confirmedLabel = "Confirmed",
 }: SlideToConfirmProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -23,11 +23,11 @@ export function SlideToConfirm({
   const [progress, setProgress] = useState(0); // 0 → 1
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Match button height: py-4 (16px top + 16px bottom) + text line-height (~24px) = ~58px
-  const PILL_HEIGHT = 58;          // match your button height (58px like other buttons)
-  const PILL_MARGIN = 4;           // spacing inside track
-  const MIN_FILL = PILL_HEIGHT;    // green pill never smaller than height
-  const CONFIRM_THRESHOLD = 0.8;   // 80%
+  const TRACK_HEIGHT = 56; // 56px
+  const HANDLE_HEIGHT = 44; // 44px
+  const HANDLE_WIDTH = 96; // 96px
+  const HANDLE_MARGIN = (TRACK_HEIGHT - HANDLE_HEIGHT) / 2; // 6px top/bottom
+  const CONFIRM_THRESHOLD = 0.8; // 80%
 
   // Measure track width
   useEffect(() => {
@@ -39,28 +39,28 @@ export function SlideToConfirm({
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const maxFillWidth = Math.max(
-    MIN_FILL,
-    trackWidth - PILL_MARGIN * 2 // keep small margin left/right
-  );
+  // Calculate max width for handle (stretches from left, pinned to left edge)
+  const maxHandleWidth = Math.max(HANDLE_WIDTH, trackWidth - HANDLE_MARGIN * 2);
+  const handleWidth = HANDLE_WIDTH + progress * (maxHandleWidth - HANDLE_WIDTH);
 
-  const fillWidth =
-    MIN_FILL + progress * Math.max(0, maxFillWidth - MIN_FILL);
+  // Right edge of the green pill, measured from the left edge of the track
+  const pillRight = HANDLE_MARGIN + handleWidth;
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       if (!isDragging || !trackRef.current) return;
 
       const rect = trackRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - PILL_MARGIN; // relative to inner space
+      const x = e.clientX - rect.left - HANDLE_MARGIN; // Position relative to track (minus left margin)
 
-      const clamped = Math.max(0, Math.min(x, maxFillWidth));
+      // Calculate progress: 0 when at HANDLE_WIDTH, 1 when at maxHandleWidth
+      const availableWidth = maxHandleWidth - HANDLE_WIDTH;
+      const clamped = Math.max(HANDLE_WIDTH, Math.min(x, maxHandleWidth));
+      const nextProgress = availableWidth > 0 ? (clamped - HANDLE_WIDTH) / availableWidth : 0;
 
-      const nextProgress = maxFillWidth > 0 ? clamped / maxFillWidth : 0;
-
-      setProgress(nextProgress);
+      setProgress(Math.min(1, Math.max(0, nextProgress)));
     },
-    [isDragging, maxFillWidth]
+    [isDragging, maxHandleWidth]
   );
 
   const endDrag = useCallback(() => {
@@ -68,11 +68,11 @@ export function SlideToConfirm({
 
     setIsDragging(false);
     if (progress >= CONFIRM_THRESHOLD && !isConfirmed) {
-      setProgress(1);
+      setProgress(1); // Stretch to full width
       setIsConfirmed(true);
       onConfirm();
     } else {
-      setProgress(0);
+      setProgress(0); // Return to initial width
     }
   }, [isDragging, progress, isConfirmed, onConfirm]);
 
@@ -99,6 +99,11 @@ export function SlideToConfirm({
     setIsDragging(true);
   };
 
+  // Padding that keeps the text clear of the initial handle footprint
+  const LABEL_PADDING_LEFT = HANDLE_MARGIN + HANDLE_WIDTH + 12;
+
+  const labelText = isConfirmed ? confirmedLabel : "Slide to Confirm Request";
+
   return (
     <div className={cn("w-full", className)}>
       <div
@@ -123,46 +128,57 @@ export function SlideToConfirm({
           disabled && "opacity-60 cursor-not-allowed",
           !disabled && "cursor-pointer"
         )}
-        style={{ height: PILL_HEIGHT }}
+        style={{ height: TRACK_HEIGHT }}
       >
-        {/* Label over the track */}
-        <span className="pointer-events-none text-sm font-semibold text-white relative z-10">
-          {isConfirmed ? confirmedLabel : label}
-        </span>
+        {/* LABEL LAYERS */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Base layer: white text, full width, centered */}
+          <div
+            className="flex h-full items-center justify-center"
+            style={{ paddingLeft: LABEL_PADDING_LEFT }}
+          >
+            <span className="text-[15px] font-medium text-white">
+              {labelText}
+            </span>
+          </div>
 
-        {/* Green fill pill – chevrons/check live inside this */}
+          {/* Overlay layer: black text, same position, clipped to pillRight */}
+          {handleWidth > 0 && (
+            <div
+              className="absolute top-0 bottom-0 overflow-hidden"
+              style={{
+                left: 0,
+                width: pillRight, // everything under the pill becomes black
+              }}
+            >
+              <div
+                className="flex h-full items-center justify-center"
+                style={{ paddingLeft: LABEL_PADDING_LEFT }}
+              >
+                <span className="text-[15px] font-medium text-black">
+                  {labelText}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Green Pill Handle - pinned to left, stretches right */}
         <div
-          className="absolute inset-y-1 left-1 flex items-center justify-end rounded-full bg-emerald-500 shadow-lg"
+          className="absolute rounded-full bg-[#22C55E] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20"
           style={{
-            width: fillWidth,
+            left: `${HANDLE_MARGIN}px`,
+            top: `${HANDLE_MARGIN}px`,
+            width: handleWidth,
+            height: HANDLE_HEIGHT,
             transition: isDragging ? "none" : "width 0.2s ease-out",
           }}
         >
-          {isConfirmed ? (
-            <Check className="h-4 w-4 text-black" />
-          ) : (
-            !isDragging && (
-              <div className="flex items-center gap-[1px] pr-2">
-                {[0, 1, 2].map((i) => (
-                  <ChevronRight
-                    key={i}
-                    className={cn(
-                      "h-3.5 w-3.5 text-black",
-                      !isDragging && !isConfirmed && "slide-hint-chevron"
-                    )}
-                    style={
-                      !isDragging && !isConfirmed
-                        ? { animationDelay: `${i * 70}ms` }
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            )
+          {isConfirmed && (
+            <Check className="h-4 w-4 text-white" />
           )}
         </div>
       </div>
     </div>
   );
 }
-

@@ -97,7 +97,7 @@ export function CustomerHeader({
         <Button 
           variant="ghost" 
           size="sm" 
-          className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100"
+          className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100"
         >
           <EllipsisVertical className="h-5 w-5 text-slate-900" />
           <span className="sr-only">Open menu</span>

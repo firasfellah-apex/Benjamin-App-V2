@@ -87,7 +87,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
             type="button"
             onClick={onAddAddress}
             className={cn(
-              "w-full rounded-full border border-slate-200 bg-white px-6 py-4 mb-3",
+              "w-full rounded-full border border-[#F0F0F0] bg-white px-6 py-4 mb-3",
               "text-base font-semibold text-slate-900",
               "flex items-center justify-center",
               "active:scale-[0.98] transition-transform duration-150"

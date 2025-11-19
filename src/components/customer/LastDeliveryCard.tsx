@@ -115,7 +115,7 @@ export function LastDeliveryCard({ order, onRateRunner }: LastDeliveryCardProps)
     <>
       {/* Standardized spacing: px-6 (24px) horizontal and vertical */}
       {/* Internal spacing: space-y-6 (24px) for grouped UI blocks */}
-      <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 px-6 py-6">
+      <div className="rounded-2xl border border-[#F0F0F0]/70 bg-slate-50/40 px-6 py-6">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
