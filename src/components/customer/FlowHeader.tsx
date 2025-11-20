@@ -1,6 +1,8 @@
+import React from "react";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, X } from "lucide-react";
 import { MapPinPen } from "@/lib/icons";
+import type { LucideIcon } from "lucide-react";
 
 interface FlowHeaderProps {
   step: number;
@@ -11,6 +13,8 @@ interface FlowHeaderProps {
   subtitle?: string;
   onSecondaryAction?: () => void;
   showSecondaryAction?: boolean;
+  secondaryActionIcon?: LucideIcon;
+  secondaryActionLabel?: string;
   hideProgress?: boolean; // Hide progress dots
 }
 
@@ -23,6 +27,8 @@ export function FlowHeader({
   subtitle,
   onSecondaryAction,
   showSecondaryAction = false,
+  secondaryActionIcon = MapPinPen,
+  secondaryActionLabel = "Manage addresses",
   hideProgress = false,
 }: FlowHeaderProps) {
   const dots = Array.from({ length: totalSteps });
@@ -73,7 +79,7 @@ export function FlowHeader({
           </div>
         )}
 
-        {/* Secondary action button (location pin) or spacer */}
+        {/* Secondary action button (location pin, bank icon, etc.) or spacer */}
         {showSecondaryAction && onSecondaryAction ? (
           <button
             type="button"
@@ -87,9 +93,9 @@ export function FlowHeader({
               "transition-colors",
               "touch-manipulation"
             )}
-            aria-label="Manage addresses"
+            aria-label={secondaryActionLabel}
           >
-            <MapPinPen className="h-5 w-5" strokeWidth={2} />
+            {React.createElement(secondaryActionIcon, { className: "h-5 w-5", strokeWidth: 2 })}
           </button>
         ) : hideProgress ? (
           <div className="w-12 h-12" /> // Match button width when no progress

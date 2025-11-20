@@ -23,7 +23,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { Avatar } from "@/components/common/Avatar";
-import { Clock, MapPinPen, Building2, LogOut, X, Star } from "@/lib/icons";
+import { Clock, MapPinPen, LogOut, X, Star } from "@/lib/icons";
+import { Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function CustomerHeader({
@@ -96,9 +97,14 @@ export function CustomerHeader({
           </SheetClose>
         </div>
 
-        {/* Profile Section */}
+        {/* Profile Section - Clickable */}
         {user && profile && (
-          <div className="px-6 pb-6 flex flex-col items-center border-b border-slate-200">
+          <button
+            onClick={() => {
+              handleMenuItemClick("/account");
+            }}
+            className="w-full px-6 pb-6 flex flex-col items-center border-b border-slate-200 hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+          >
             <Avatar
               src={profile.avatar_url}
               alt={[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
@@ -114,7 +120,7 @@ export function CustomerHeader({
               <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
               <span className="text-sm text-slate-600">5</span>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Menu Items */}
@@ -140,7 +146,7 @@ export function CustomerHeader({
               onClick={() => handleMenuItemClick("/customer/bank-accounts")}
               className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
             >
-              <Building2 className="h-5 w-5 text-slate-900" />
+              <Landmark className="h-5 w-5 text-slate-900" />
               <span>My Bank Accounts</span>
             </button>
           </div>

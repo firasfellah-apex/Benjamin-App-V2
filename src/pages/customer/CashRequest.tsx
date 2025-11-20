@@ -13,6 +13,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, X } from "@/lib/icons";
+import { Landmark } from "lucide-react";
 import { Pencil, Shield } from "lucide-react";
 import { getIconByName } from "@/components/address/IconPicker";
 import { cn } from "@/lib/utils";
@@ -479,6 +480,12 @@ export default function CashRequest() {
     }
   }, [navigate, selectedAddress?.id]);
 
+  // Handle navigate to bank accounts - will eventually lead to banking integrations
+  const handleBankAccounts = useCallback(() => {
+    // For now, navigate to bank accounts page (will be implemented later)
+    navigate('/customer/bank-accounts');
+  }, [navigate]);
+
   // Memoize flow header for both steps
   const flowHeader = useMemo(() => {
     if (step === 1) {
@@ -503,10 +510,14 @@ export default function CashRequest() {
           onPrimaryNavClick={handleBackToAddress}
           title="How much cash do you need?"
           subtitle="Choose an amount and delivery style."
+          onSecondaryAction={handleBankAccounts}
+          showSecondaryAction={true}
+          secondaryActionIcon={Landmark}
+          secondaryActionLabel="My Bank Accounts"
         />
       );
     }
-  }, [step, handleBackToHome, handleBackToAddress, handleManageAddressesFromSelect]);
+  }, [step, handleBackToHome, handleBackToAddress, handleManageAddressesFromSelect, handleBankAccounts]);
 
   // Fixed content for step 2 (cash amount) - divider under title
   const cashAmountFixedContent = step === 2 ? (
