@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { ArrowLeft, X } from "lucide-react";
+import { MapPinPen } from "@/lib/icons";
 
 interface FlowHeaderProps {
   step: number;
@@ -8,6 +9,9 @@ interface FlowHeaderProps {
   onPrimaryNavClick: () => void;
   title: string;
   subtitle?: string;
+  onSecondaryAction?: () => void;
+  showSecondaryAction?: boolean;
+  hideProgress?: boolean; // Hide progress dots
 }
 
 export function FlowHeader({
@@ -17,6 +21,9 @@ export function FlowHeader({
   onPrimaryNavClick,
   title,
   subtitle,
+  onSecondaryAction,
+  showSecondaryAction = false,
+  hideProgress = false,
 }: FlowHeaderProps) {
   const dots = Array.from({ length: totalSteps });
 
@@ -47,25 +54,48 @@ export function FlowHeader({
           )}
         </button>
 
-        <div className="flex items-center gap-1.5">
-          {dots.map((_, idx) => {
-            const active = idx + 1 === step;
-            return (
-              <span
-                key={idx}
-                className={cn(
-                  "inline-block rounded-full transition-all",
-                  active
-                    ? "w-6 h-1.5 bg-slate-900"
-                    : "w-2 h-1.5 bg-slate-300"
-                )}
-              />
-            );
-          })}
-        </div>
+        {!hideProgress && (
+          <div className="flex items-center gap-1.5">
+            {dots.map((_, idx) => {
+              const active = idx + 1 === step;
+              return (
+                <span
+                  key={idx}
+                  className={cn(
+                    "inline-block rounded-full transition-all",
+                    active
+                      ? "w-6 h-1.5 bg-slate-900"
+                      : "w-2 h-1.5 bg-slate-300"
+                  )}
+                />
+              );
+            })}
+          </div>
+        )}
 
-        {/* Spacer to keep dots centered */}
-        <div className="w-[80px]" />
+        {/* Secondary action button (location pin) or spacer */}
+        {showSecondaryAction && onSecondaryAction ? (
+          <button
+            type="button"
+            onClick={onSecondaryAction}
+            className={cn(
+              "inline-flex items-center justify-center",
+              "rounded-full border border-[#F0F0F0] bg-white",
+              "w-12 h-12", // 48x48px circle
+              "text-slate-900",
+              "hover:bg-slate-50 active:bg-slate-100",
+              "transition-colors",
+              "touch-manipulation"
+            )}
+            aria-label="Manage addresses"
+          >
+            <MapPinPen className="h-5 w-5" strokeWidth={2} />
+          </button>
+        ) : hideProgress ? (
+          <div className="w-12 h-12" /> // Match button width when no progress
+        ) : (
+          <div className="w-[80px]" />
+        )}
       </div>
 
       {/* Title & subtitle - aligned with home page */}

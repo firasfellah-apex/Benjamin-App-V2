@@ -16,6 +16,7 @@ export {
   LogOut,
   Package,
   MapPin,
+  MapPinPen,
   Plus,
   X,
   Trash2,
@@ -73,6 +74,7 @@ export {
   DollarSign,
   CreditCard,
   Wallet,
+  Building2,
 } from "lucide-react";
 
 // Time & Calendar

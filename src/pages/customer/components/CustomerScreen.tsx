@@ -21,6 +21,8 @@ interface CustomerScreenProps {
   showBack?: boolean;
   /** Custom back handler – default is history.back() */
   onBack?: () => void;
+  /** Use X button instead of arrow for menu pages */
+  useXButton?: boolean;
   /** Custom bottom padding for scroll container (e.g. for pages with taller bottom nav) */
   customBottomPadding?: string;
   className?: string;
@@ -44,6 +46,7 @@ export function CustomerScreen({
   children,
   showBack = false,
   onBack,
+  useXButton = false,
   customBottomPadding,
   className,
 }: CustomerScreenProps) {
@@ -54,11 +57,14 @@ export function CustomerScreen({
     <div
       className={cn(
         // Treat this as the app viewport for that screen
-        "flex h-screen flex-col bg-white",
+        "flex flex-col bg-white",
         "text-slate-900",
         "pt-safe-top", // respect notch
         className
       )}
+      style={{
+        height: '100dvh', // Use dvh (dynamic viewport height) for better PWA compatibility
+      }}
     >
       {/* Header: logo + menu + optional hero (only show when NOT a flow page) */}
       {!isFlowPage && (
@@ -68,20 +74,21 @@ export function CustomerScreen({
             subtitle={showHero ? subtitle : null}
           showBack={showBack}
           onBack={onBack}
+          useXButton={useXButton}
         />
         </header>
       )}
 
       {/* Flow header (replaces logo/menu row + title/subtitle) */}
         {flowHeader && (
-        <header className="px-6 pt-6 pb-2">
+        <header className="px-6 pt-6">
             {flowHeader}
         </header>
       )}
 
       {/* Fixed content (map, section titles) – not scrollable */}
       {fixedContent && (
-        <div className="px-6 pt-4 bg-white shrink-0">
+        <div className="px-6 bg-white shrink-0 pt-6">
           {fixedContent}
           </div>
         )}
@@ -91,7 +98,7 @@ export function CustomerScreen({
         className={cn(
           "flex-1 min-h-0 px-6 space-y-6",
           "overflow-y-auto",
-          fixedContent ? "pt-2" : "pt-4" // Less top padding when fixedContent is present
+          fixedContent ? "pt-2" : "pt-0" // Less top padding when fixedContent is present, 0 when flowHeader (24px spacing handled in topContent)
         )}
         style={{
           paddingBottom: customBottomPadding || "calc(24px + max(24px, env(safe-area-inset-bottom)) + 96px)",

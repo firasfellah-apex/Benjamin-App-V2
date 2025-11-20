@@ -154,18 +154,11 @@ export default function CustomerDeliveriesHistory() {
 
   return (
     <CustomerScreen
-      loading={isLoading && deliveries.length === 0}
-      title="Deliveries"
-      subtitle="Your past cash deliveries at a glance"
-      headerLeft={
-        <button
-          onClick={handleBack}
-          className="p-2 rounded-full transition-colors -ml-2"
-          aria-label="Back to home"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
-      }
+      title="My Orders"
+      subtitle="Your past cash orders at a glance"
+      showBack={true}
+      onBack={handleBack}
+      useXButton={true}
     >
       <motion.div layout className="space-y-0">
         {isLoading && deliveries.length === 0 ? (

@@ -133,11 +133,23 @@ export function useViewport() {
     
     if (shouldUseMobile) {
       // Customer & Runner: ALWAYS mobile app viewport (phone frame)
-      // Also applies if FORCE_MOBILE is true (but not for admin routes)
-      viewportMeta.setAttribute(
-        'content',
-        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
-      );
+      // Don't mutate viewport-fit=cover - it's already set in index.html to prevent iOS recalculations
+      // Preserve viewport-fit=cover if present, don't add/remove it to avoid iOS recalculation jumps
+      const currentContent = viewportMeta.getAttribute('content') || '';
+      const hasViewportFit = currentContent.includes('viewport-fit=cover');
+      
+      // Build content string preserving viewport-fit=cover status
+      // Only update scaling and user-scalable settings, leave viewport-fit alone
+      const baseContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+      const finalContent = hasViewportFit
+        ? `${baseContent}, viewport-fit=cover`
+        : baseContent;
+      
+      // Only update if content actually changed (avoid unnecessary mutations that trigger iOS recalculation)
+      const currentFinal = viewportMeta.getAttribute('content');
+      if (currentFinal !== finalContent) {
+        viewportMeta.setAttribute('content', finalContent);
+      }
       
       // Add mobile-only class to body for CSS constraints
       document.body.classList.add('mobile-app-viewport');

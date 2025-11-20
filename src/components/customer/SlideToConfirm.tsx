@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 
 interface SlideToConfirmProps {
   onConfirm: () => void;
@@ -174,8 +174,27 @@ export function SlideToConfirm({
             transition: isDragging ? "none" : "width 0.2s ease-out",
           }}
         >
-          {isConfirmed && (
+          {isConfirmed ? (
             <Check className="h-4 w-4 text-white" />
+          ) : (
+            !isDragging && (
+              <div className="flex items-center gap-[1px]">
+                {[0, 1, 2].map((i) => (
+                  <ChevronRight
+                    key={i}
+                    className={cn(
+                      "h-3.5 w-3.5 text-black",
+                      !isDragging && !isConfirmed && "slide-hint-chevron"
+                    )}
+                    style={
+                      !isDragging && !isConfirmed
+                        ? { animationDelay: `${i * 70}ms` }
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>

@@ -167,7 +167,8 @@ export default function CashAmountInput({
               </p>
             </div>
           ) : (
-            <div className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center" style={{ height: '96px', borderRadius: '12px' }}>
+            <div className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center gap-1" style={{ height: '96px', borderRadius: '12px' }}>
+              <span className="text-4xl font-semibold text-slate-900">$</span>
               <input
                 ref={inputRef}
                 type="tel"
@@ -177,7 +178,8 @@ export default function CashAmountInput({
                 onChange={handleInputChange}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                className="text-4xl font-semibold text-slate-900 text-center w-32 border-0 border-b-2 border-black focus:outline-none focus:ring-0 pb-1 bg-transparent"
+                className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
+                style={{ maxWidth: '200px' }}
                 aria-label="Cash amount"
                 autoFocus
               />
