@@ -57,14 +57,12 @@ export function CustomerScreen({
     <div
       className={cn(
         // Treat this as the app viewport for that screen
-        "flex flex-col bg-white",
+        // Use h-screen (100vh) instead of 100dvh to match menu sizing approach
+        "flex h-screen flex-col bg-white",
         "text-slate-900",
         "pt-safe-top", // respect notch
         className
       )}
-      style={{
-        height: '100dvh', // Use dvh (dynamic viewport height) for better PWA compatibility
-      }}
     >
       {/* Header: logo + menu + optional hero (only show when NOT a flow page) */}
       {!isFlowPage && (
