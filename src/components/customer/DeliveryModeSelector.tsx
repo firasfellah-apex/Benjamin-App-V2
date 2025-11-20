@@ -1,6 +1,15 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Zap, ShieldCheck, Heart, DollarSign, Star, RefreshCw, User, CheckCircle } from "lucide-react";
+import { Zap, ShieldCheck } from "lucide-react";
+import {
+  HeartIcon,
+  CurrencyDollarIcon,
+  StarIcon,
+  ArrowPathIcon,
+  UserIcon,
+  CheckCircleIcon,
+  EyeSlashIcon,
+} from "@heroicons/react/24/solid";
 import type { ComponentType, SVGProps } from "react";
 
 export type DeliveryMode = "quick_handoff" | "count_confirm";
@@ -23,9 +32,9 @@ const modes = [
     mainTitle: "You count the cash in front of the runner.",
     subtitle: "For when you want certainty and a moment to double-check every bill.",
     benefits: [
-      { text: "Extra peace of mind", icon: Heart },
-      { text: "Larger amounts", icon: DollarSign },
-      { text: "First-time confidence", icon: Star },
+      { text: "Larger amounts", icon: CurrencyDollarIcon },
+      { text: "Extra peace of mind", icon: HeartIcon },
+      { text: "First-time confidence", icon: StarIcon },
     ] as Benefit[],
     Icon: ShieldCheck,
   },
@@ -35,9 +44,9 @@ const modes = [
     mainTitle: "Fast handoff, no counting together.",
     subtitle: "For when you want the envelope now — quick, discreet, and in-and-out.",
     benefits: [
-      { text: "Momentum and speed", icon: RefreshCw },
-      { text: "Minimal interaction", icon: User },
-      { text: "Regular users who trust the flow", icon: CheckCircle },
+      { text: "Discretion", icon: EyeSlashIcon },
+      { text: "Minimal interaction", icon: UserIcon },
+      { text: "Regular users who trust the flow", icon: CheckCircleIcon },
     ] as Benefit[],
     Icon: Zap,
   },

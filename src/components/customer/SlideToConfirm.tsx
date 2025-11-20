@@ -102,7 +102,7 @@ export function SlideToConfirm({
   // Padding that keeps the text clear of the initial handle footprint
   const LABEL_PADDING_LEFT = HANDLE_MARGIN + HANDLE_WIDTH + 12;
 
-  const labelText = isConfirmed ? confirmedLabel : "Slide to Confirm Request";
+  const labelText = isConfirmed ? confirmedLabel : "Slide to Confirm Order";
 
   return (
     <div className={cn("w-full", className)}>

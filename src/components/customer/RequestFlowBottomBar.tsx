@@ -38,10 +38,10 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
   const primaryLabel =
     customPrimaryLabel ||
     (mode === "home"
-      ? "Request Cash"
+      ? "Order Cash"
       : mode === "address"
       ? "Continue to Amount"
-      : "Confirm Request");
+      : "Confirm Order");
 
   const secondaryLabel =
     mode === "address"

@@ -99,14 +99,17 @@ export function FlowHeader({
       </div>
 
       {/* Title & subtitle - aligned with home page */}
-      <h1 className="text-2xl font-semibold leading-snug tracking-tight text-slate-900">
-        {title}
-      </h1>
-      {subtitle && (
-        <p className="text-slate-500 text-base mt-1 leading-relaxed">
-          {subtitle}
-        </p>
-      )}
+      {/* pb-6 ensures 24px spacing from subtitle to divider (matches CustomerHeader) */}
+      <div className="pb-6">
+        <h1 className="text-2xl font-semibold leading-snug tracking-tight text-slate-900">
+          {title}
+        </h1>
+        {subtitle && (
+          <p className="text-slate-500 text-base mt-1 leading-relaxed">
+            {subtitle}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

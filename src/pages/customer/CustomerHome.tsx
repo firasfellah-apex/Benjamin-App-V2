@@ -230,44 +230,43 @@ export default function CustomerHome() {
     },
   ];
 
+  // Fixed content: divider under title/subtitle (matches cash amount page pattern exactly)
+  const fixedContent = useMemo(() => {
+    return (
+      <>
+        {/* Divider under title/subtitle - 24px spacing from subtitle (fixed, doesn't scroll) */}
+        <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+      </>
+    );
+  }, []);
+
   // Determine what to show in topContent
   // Show skeleton while orders are loading to maintain consistent header height
   // IMPORTANT: This hook must be called before any early returns to follow Rules of Hooks
   const topContent = useMemo(() => {
-    // Divider with 24px spacing from subtitle (matches cash amount and select address pages)
-    // Note: Header has pb-2 (8px), main has pt-0, so we use paddingTop: '16px' to get 24px total (8px + 16px = 24px)
-    const divider = (
-      <div style={{ paddingTop: '16px' }}>
-        <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
-      </div>
-    );
-
     // Show skeleton while orders are loading (but not during initial auth/profile load)
     // This prevents flash of TrustCarousel when orders are still loading
     if (ordersLoading && !authLoading && isReady) {
       return (
-        <>
-          {divider}
-          <div className="space-y-3" style={{ paddingTop: '24px' }}>
-            {/* Header skeleton - matches LastDeliveryCard structure */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                <Skeleton className="h-[11px] w-24" />
-                <Skeleton className="h-[15px] w-48" />
-                <Skeleton className="h-[11px] w-32" />
-              </div>
-              {/* Status pill skeleton */}
-              <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+        <div className="space-y-3" style={{ paddingTop: '24px' }}>
+          {/* Header skeleton - matches LastDeliveryCard structure */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+              <Skeleton className="h-[11px] w-24" />
+              <Skeleton className="h-[15px] w-48" />
+              <Skeleton className="h-[11px] w-32" />
             </div>
-            {/* Divider skeleton */}
-            <div className="border-t border-slate-200" />
-            {/* Actions skeleton */}
-            <div className="flex items-center justify-between gap-3">
-              <Skeleton className="h-10 w-32 rounded-full" />
-              <Skeleton className="h-4 w-36" />
-            </div>
+            {/* Status pill skeleton */}
+            <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
           </div>
-        </>
+          {/* Divider skeleton */}
+          <div className="border-t border-slate-200" />
+          {/* Actions skeleton */}
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-10 w-32 rounded-full" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
       );
     }
     
@@ -276,24 +275,22 @@ export default function CustomerHome() {
     if (lastCompletedOrder) {
       return (
         <>
-          {divider}
-          {/* LastDeliveryCard has its own py-6 (24px top padding), so no extra wrapper needed */}
-          <LastDeliveryCard
-            order={lastCompletedOrder}
-            onRateRunner={handleRateRunner}
-          />
+          {/* 24px spacing from fixed divider to content (matches cash amount page pattern) */}
+          <div style={{ paddingTop: '24px' }}>
+            <LastDeliveryCard
+              order={lastCompletedOrder}
+              onRateRunner={handleRateRunner}
+            />
+          </div>
         </>
       );
     }
     
     // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
     return (
-      <>
-        {divider}
-        <div style={{ paddingTop: '24px' }}>
-          <TrustCarousel cards={trustCards} />
-        </div>
-      </>
+      <div style={{ paddingTop: '24px' }}>
+        <TrustCarousel cards={trustCards} />
+      </div>
     );
   }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, trustCards]);
 
@@ -323,6 +320,7 @@ export default function CustomerHome() {
     <CustomerScreen
       title={title}
       subtitle="Skip the ATM. Request cash in seconds."
+      fixedContent={fixedContent}
       topContent={topContent}
     >
       {/* Show TrustCarousel below View All Deliveries, even when there's a last delivery */}

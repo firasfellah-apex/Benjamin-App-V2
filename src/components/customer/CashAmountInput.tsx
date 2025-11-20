@@ -155,7 +155,7 @@ export default function CashAmountInput({
     <div className={cn("w-full", className)}>
       {/* TOP AMOUNT CONTAINER - Large centered amount in soft card */}
       {!hideAmountDisplay && (
-        <div className="mb-6">
+        <div className="mb-8">
           {!isEditing ? (
             <div
               onClick={onEditClick || handleDisplayClick}
@@ -189,8 +189,9 @@ export default function CashAmountInput({
       )}
 
       {/* SLIDER - Thick green track + black knob */}
-      <div className="mb-4">
-        <div className="relative w-full mb-2" style={{ height: '10px' }}>
+      <div className="mb-6 pt-3">
+        {/* Visual track container - 10px height */}
+        <div className="relative w-full" style={{ height: '10px' }}>
           {/* Background track - unfilled portion */}
           <div 
             className="absolute left-0 right-0 h-full rounded-full"
@@ -214,7 +215,7 @@ export default function CashAmountInput({
             }}
           />
 
-          {/* Slider input */}
+          {/* Slider input - Expanded touch area (44px) for easier activation, visually centered on 10px track */}
           <input
             ref={sliderRef}
             type="range"
@@ -229,10 +230,11 @@ export default function CashAmountInput({
             onTouchStart={() => setIsDragging(true)}
             onTouchEnd={() => setIsDragging(false)}
             disabled={isEditing}
-            className="absolute left-0 right-0 w-full h-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-cash-amount"
+            className="absolute left-0 right-0 w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-cash-amount"
             style={{ 
-              height: '10px',
-              touchAction: 'pan-y',
+              height: '44px',
+              top: '-17px', // Center 44px touch area vertically on 10px visual track
+              touchAction: 'none',
               margin: 0, 
               padding: 0,
             }}
@@ -248,7 +250,7 @@ export default function CashAmountInput({
       </div>
 
       {/* QUICK AMOUNT PILLS - Equal width across row */}
-      <div className="mt-4 flex gap-3">
+      <div className="mt-6 flex gap-3">
         {quickPicks.map((amt) => (
           <button
             key={amt}

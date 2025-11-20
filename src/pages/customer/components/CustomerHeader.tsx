@@ -193,8 +193,9 @@ export function CustomerHeader({
         {menuButton}
       </div>
       {/* Only render hero block when we actually have a title/subtitle */}
+      {/* pb-6 ensures 24px spacing from subtitle to divider (matches FlowHeader) */}
       {(title || subtitle || right) && (
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 pb-6">
           <div>
             {title && (
               <h1 className="text-2xl font-semibold leading-snug tracking-tight text-slate-900">

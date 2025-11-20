@@ -16,6 +16,7 @@ import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapVie
 import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 import { RequestFlowBottomBar } from "@/components/customer/RequestFlowBottomBar";
+import AlertIllustration from "@/assets/illustrations/Alert.png";
 
 // Spring animation for modal (matches CashRequest)
 const iosSpring = {
@@ -690,32 +691,63 @@ export default function ManageAddresses() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Address?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this address? This action cannot be undone.
-              {addressToDelete && (
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900">
-                    {addressToDelete.label || formatAddress(addressToDelete)}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {formatAddress(addressToDelete)}
-                  </p>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 text-white"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent className="p-0 gap-0">
+          {/* Illustration */}
+          <div className="h-48 flex items-center justify-center bg-[#F5F5F4] rounded-t-[24px]">
+            <img
+              src={AlertIllustration}
+              alt="Delete confirmation"
+              className="w-3/4 h-3/4 object-contain"
+            />
+          </div>
+
+          <div className="px-6 py-6 space-y-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
+                Delete Address?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-slate-600">
+                Are you sure you want to delete this address?
+                <br />
+                This action cannot be undone.
+                {addressToDelete && (
+                  <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {addressToDelete.label || "Address"}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-1">
+                      {formatAddress(addressToDelete)}
+                    </p>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className={cn(
+                  "w-full h-12 rounded-full bg-red-600 text-white",
+                  "hover:bg-red-700 active:scale-[0.98]",
+                  "text-base font-semibold",
+                  "transition-all duration-150 touch-manipulation"
+                )}
+                disabled={deletingId === addressToDelete?.id}
+              >
+                {deletingId === addressToDelete?.id ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+              <AlertDialogCancel
+                className={cn(
+                  "w-full h-12 rounded-full border-2 border-black bg-white text-black",
+                  "hover:bg-slate-50 active:scale-[0.98]",
+                  "text-base font-semibold",
+                  "transition-all duration-150 touch-manipulation",
+                  "mt-0"
+                )}
+              >
+                Cancel
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </>

@@ -60,13 +60,12 @@ export function CustomerScreen({
         // Use h-screen (100vh) instead of 100dvh to match menu sizing approach
         "flex h-screen flex-col bg-white",
         "text-slate-900",
-        "pt-safe-top", // respect notch
         className
       )}
     >
       {/* Header: logo + menu + optional hero (only show when NOT a flow page) */}
       {!isFlowPage && (
-        <header className="px-6 pt-6 pb-2">
+        <header className="px-6 pt-6">
         <CustomerHeader
             title={showHero ? title : null}
             subtitle={showHero ? subtitle : null}
@@ -84,9 +83,10 @@ export function CustomerScreen({
         </header>
       )}
 
-      {/* Fixed content (map, section titles) – not scrollable */}
+      {/* Fixed content (divider) – not scrollable */}
+      {/* No pt-6 here - spacing is handled by pb-6 on title/subtitle containers above */}
       {fixedContent && (
-        <div className="px-6 bg-white shrink-0 pt-6">
+        <div className="px-6 bg-white shrink-0">
           {fixedContent}
           </div>
         )}
