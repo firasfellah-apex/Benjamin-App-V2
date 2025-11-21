@@ -23,6 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view messages for orders they're involved in
+DROP POLICY IF EXISTS "Users can view messages for their orders" ON messages;
+
 CREATE POLICY "Users can view messages for their orders"
   ON messages
   FOR SELECT
@@ -50,6 +52,8 @@ CREATE POLICY "Users can view messages for their orders"
   );
 
 -- Policy: Users can send messages for active orders they're involved in
+DROP POLICY IF EXISTS "Users can send messages for their active orders" ON messages;
+
 CREATE POLICY "Users can send messages for their active orders"
   ON messages
   FOR INSERT
@@ -87,10 +91,14 @@ CREATE POLICY "Users can send messages for their active orders"
   );
 
 -- Policy: No updates or deletes (messages are immutable)
+DROP POLICY IF EXISTS "Messages are immutable" ON messages;
+
 CREATE POLICY "Messages are immutable"
   ON messages
   FOR UPDATE
   USING (false);
+
+DROP POLICY IF EXISTS "Messages cannot be deleted" ON messages;
 
 CREATE POLICY "Messages cannot be deleted"
   ON messages
@@ -102,5 +110,18 @@ COMMENT ON TABLE messages IS 'Per-order chat messages between customers, runners
 
 -- Enable realtime for messages table
 -- This allows instant message updates across all connected clients
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+DO $$
+BEGIN
+  -- Only add the table to the publication if it's not already there
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+  END IF;
+END
+$$;
 

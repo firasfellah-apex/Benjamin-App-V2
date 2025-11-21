@@ -53,6 +53,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
     const formRef = useRef<HTMLFormElement>(null);
     const loadingCallbackRef = useRef<((loading: boolean) => void) | null>(null);
     const invalidateAddresses = useInvalidateAddresses();
+    const deliveryNotesRef = useRef<HTMLDivElement>(null);
     
     // Delivery notes section - closed by default
     const [showDeliveryNotes, setShowDeliveryNotes] = useState(false);
@@ -286,27 +287,54 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
   };
 
   const handleIconChange = (iconName: string) => {
-    // Only update the icon, don't override the label if it's already filled
-    // Only auto-populate if the label is empty
-    if (!formData.label || formData.label.trim() === "") {
-      const iconInfo = ALL_ICONS.find(i => i.name === iconName);
-      const iconLabel = iconInfo?.label || iconName;
-      setFormData({ ...formData, icon: iconName, label: iconLabel });
-    } else {
-      // User has filled the label, just update the icon
-      setFormData({ ...formData, icon: iconName });
-    }
+    // Only update the icon, don't auto-fill the label
+    setFormData({ ...formData, icon: iconName });
   };
 
   const handleLabelChange = (label: string) => {
     setFormData({ ...formData, label });
   };
 
-  const handleNoteTemplateClick = (template: string) => {
-    const currentNotes = formData.delivery_notes || "";
-    const newNotes = currentNotes ? `${currentNotes}, ${template}` : template;
-    setFormData({ ...formData, delivery_notes: newNotes });
-  };
+    const handleNoteTemplateClick = (template: string) => {
+      const currentNotes = formData.delivery_notes || "";
+      const newNotes = currentNotes ? `${currentNotes}, ${template}` : template;
+      setFormData({ ...formData, delivery_notes: newNotes });
+    };
+
+    // Auto-scroll to bottom of scrollable container when delivery notes is expanded
+    useEffect(() => {
+      if (showDeliveryNotes && deliveryNotesRef.current) {
+        // Wait for expansion animation to start (150ms delay)
+        const scrollTimeout = setTimeout(() => {
+          if (!deliveryNotesRef.current) return;
+          
+          // Find the scrollable container by looking for overflow-y-auto or checking computed styles
+          let scrollContainer: HTMLElement | null = deliveryNotesRef.current;
+          while (scrollContainer) {
+            const computedStyle = window.getComputedStyle(scrollContainer);
+            if (computedStyle.overflowY === 'auto' || computedStyle.overflowY === 'scroll') {
+              break;
+            }
+            scrollContainer = scrollContainer.parentElement;
+            // Stop at body to avoid going too far up
+            if (scrollContainer === document.body || scrollContainer === null) {
+              scrollContainer = null;
+              break;
+            }
+          }
+          
+          if (scrollContainer) {
+            // Scroll to the absolute maximum bottom of the scrollable container
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth'
+            });
+          }
+        }, 150);
+        
+        return () => clearTimeout(scrollTimeout);
+      }
+    }, [showDeliveryNotes]);
 
     return (
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
@@ -334,7 +362,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
             placeholder={addAddressCopy.addressPlaceholder}
             value={formData.label}
             onChange={(e) => handleLabelChange(e.target.value)}
-            className="flex-1"
+            className="flex-1 h-11 rounded-xl border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0"
           />
         </div>
       </div>
@@ -419,6 +447,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   placeholder="Apt 4B (optional)"
                   value={formData.line2}
                   onChange={(e) => setFormData({ ...formData, line2: e.target.value })}
+                  className="h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
                 />
               </div>
 
@@ -436,7 +465,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                       if (errors.city) setErrors({ ...errors, city: undefined });
                     }}
                     className={cn(
-                      errors.city && "border-[#FF5A5F] bg-[#FFF7F7]"
+                      "h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
+                      errors.city && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]"
                     )}
                   />
                   {errors.city && (
@@ -460,7 +490,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                     }}
                     maxLength={2}
                     className={cn(
-                      errors.state && "border-[#FF5A5F] bg-[#FFF7F7]"
+                      "h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
+                      errors.state && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]"
                     )}
                   />
                   {errors.state && (
@@ -484,9 +515,10 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                     if (errors.postal_code) setErrors({ ...errors, postal_code: undefined });
                   }}
                   maxLength={10}
-                  className={cn(
-                    errors.postal_code && "border-[#FF5A5F] bg-[#FFF7F7]"
-                  )}
+                    className={cn(
+                      "h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
+                      errors.postal_code && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]"
+                    )}
                 />
                 {errors.postal_code && (
                   <p className="text-xs text-[#FF5A5F] mt-1">
@@ -510,7 +542,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               Verify your address on the map
             </p>
           </div>
-          <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: "200px" }}>
+          <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: "200px" }}>
             <BenjaminMap
               center={
                 formData.latitude && formData.longitude
@@ -532,28 +564,28 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
 
       {/* Delivery Notes Section */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <Label className="text-sm font-semibold text-gray-900 cursor-pointer" onClick={() => setShowDeliveryNotes(!showDeliveryNotes)}>
+        <button
+          type="button"
+          onClick={() => setShowDeliveryNotes(!showDeliveryNotes)}
+          className="w-full flex items-center justify-between transition-colors touch-manipulation rounded-lg -mx-1 px-1 py-1"
+          aria-label={showDeliveryNotes ? "Hide delivery notes" : "Show delivery notes"}
+        >
+          <div className="space-y-1 text-left">
+            <Label className="text-sm font-semibold text-gray-900 cursor-pointer pointer-events-none">
               {addAddressCopy.deliveryNotesTitle}
             </Label>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 pointer-events-none">
               {addAddressCopy.deliveryNotesHint}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowDeliveryNotes(!showDeliveryNotes)}
-            className="ml-4 text-gray-500 hover:text-gray-700 transition-colors touch-manipulation"
-            aria-label={showDeliveryNotes ? "Hide delivery notes" : "Show delivery notes"}
-          >
+          <div className="ml-4 text-gray-500 flex-shrink-0 pointer-events-none">
             {showDeliveryNotes ? (
               <Minus className="h-5 w-5" />
             ) : (
               <Plus className="h-5 w-5" />
             )}
-          </button>
-        </div>
+          </div>
+        </button>
         
         {formData.delivery_notes && !showDeliveryNotes && (
           <div className="px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
@@ -566,6 +598,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
         )}
         
         <div
+          ref={deliveryNotesRef}
           className={cn(
             "overflow-hidden transition-all duration-300 ease-in-out",
             showDeliveryNotes ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
@@ -592,7 +625,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               value={formData.delivery_notes}
               onChange={(e) => setFormData({ ...formData, delivery_notes: e.target.value })}
               rows={3}
-              className="resize-none"
+              className="resize-none rounded-xl border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0"
             />
             <p className="text-xs text-gray-500">
               {addAddressCopy.deliveryNotesFooter}

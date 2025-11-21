@@ -30,7 +30,10 @@ import AdminOrderDetail from './pages/admin/AdminOrderDetail';
 import RunnerTraining from './pages/admin/RunnerTraining';
 
 import ProfileOnboarding from './pages/customer/OnboardingProfile';
+import ConnectBankOnboarding from './pages/customer/ConnectBankOnboarding';
+import BankAccounts from './pages/customer/BankAccounts';
 import DebugMapPage from './pages/debug/DebugMapPage';
+import PlaidLinkTest from './pages/customer/PlaidLinkTest';
 import { GoogleMapsProvider } from './components/maps/GoogleMapsProvider';
 
 export interface RouteConfig {
@@ -101,6 +104,24 @@ const routes: RouteConfig[] = [
     name: 'Customer Chat',
     path: '/customer/chat/:orderId',
     element: <CustomerLayout><CustomerChat /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Connect Bank Onboarding',
+    path: '/customer/onboarding/bank',
+    element: <CustomerLayout><ConnectBankOnboarding /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Bank Accounts',
+    path: '/customer/banks',
+    element: <CustomerLayout><BankAccounts /></CustomerLayout>,
+    visible: false
+  },
+  {
+    name: 'Plaid Link Test',
+    path: '/customer/debug/plaid-link',
+    element: <CustomerLayout><PlaidLinkTest /></CustomerLayout>,
     visible: false
   },
   {

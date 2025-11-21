@@ -8,6 +8,7 @@ export async function saveProfile(userId: string, patch: Partial<{
   last_name: string;
   phone: string | null;
   avatar_url: string | null;
+  fun_fact: string | null;
 }>) {
   const { data, error } = await supabase
     .from('profiles')

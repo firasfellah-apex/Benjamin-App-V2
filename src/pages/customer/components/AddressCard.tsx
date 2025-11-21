@@ -51,7 +51,7 @@ export function AddressCard({
     if (mode === "carousel") {
       if (isSelected) {
         // Selected: green stroke + light green gradient
-        return "bg-gradient-to-br from-green-50/80 to-emerald-50/60 border-2 border-green-500/60";
+        return "bg-gradient-to-br from-green-50/80 to-emerald-50/60 border border-green-500/60";
       }
       return "bg-slate-50/40 border border-slate-200/70";
     }

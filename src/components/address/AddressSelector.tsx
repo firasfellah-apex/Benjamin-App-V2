@@ -104,7 +104,7 @@ function AddressFormModal({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
               transition={iosSpring}
-              className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+              className="relative w-full max-w-2xl mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col pointer-events-auto"
               style={{
                 marginTop: '15vh', // Start 15% from top (more space for modal)
                 height: 'calc(100vh - 15vh)', // Fill remaining space
@@ -114,7 +114,7 @@ function AddressFormModal({
               {/* Header - Fixed to top of modal */}
               <motion.div
                 layout
-                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-3xl z-10"
+                className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-2xl z-10"
               >
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">
@@ -127,10 +127,10 @@ function AddressFormModal({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="ml-4 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors touch-manipulation"
+                  className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
                   aria-label="Close"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5 text-slate-900" />
                 </button>
               </motion.div>
               

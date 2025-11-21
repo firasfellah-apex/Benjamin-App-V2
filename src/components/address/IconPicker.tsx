@@ -73,7 +73,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
         <button
           type="button"
           className={cn(
-            "flex items-center justify-center w-12 h-12 rounded-xl border-2 border-gray-200 bg-white hover:border-[#22C55E] hover:bg-green-50 transition-colors touch-manipulation",
+            "flex items-center justify-center w-12 h-12 rounded-full border border-slate-200 bg-white hover:border-[#22C55E] hover:bg-green-50 transition-colors touch-manipulation",
             className
           )}
         >
@@ -83,7 +83,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
       <PopoverContent className="w-80 p-4 z-[100]" align="start">
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Preset Locations</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Select Icon</h3>
             <div className="grid grid-cols-4 gap-2">
               {PRESET_ADDRESS_ICONS.map(({ icon: Icon, name, label }) => {
                 const isSelected = value === name;
@@ -96,11 +96,11 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex items-center justify-center p-3 rounded-xl border-2 transition-all touch-manipulation",
+                      "flex items-center justify-center w-12 h-12 rounded-full border border-slate-200 transition-all touch-manipulation",
                       "hover:scale-105 active:scale-95",
                       isSelected
                         ? "border-[#22C55E] bg-green-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
+                        : "bg-white hover:border-slate-300"
                     )}
                     title={label}
                   >
@@ -111,12 +111,6 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">More Icons</h3>
-            <div className="grid grid-cols-4 gap-2">
               {LOCATION_ICONS.map(({ icon: Icon, name, label }) => {
                 const isSelected = value === name;
                 return (
@@ -128,11 +122,11 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex items-center justify-center p-3 rounded-xl border-2 transition-all touch-manipulation",
+                      "flex items-center justify-center w-12 h-12 rounded-full border border-slate-200 transition-all touch-manipulation",
                       "hover:scale-105 active:scale-95",
                       isSelected
                         ? "border-[#22C55E] bg-green-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
+                        : "bg-white hover:border-slate-300"
                     )}
                     title={label}
                   >

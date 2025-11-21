@@ -18,7 +18,7 @@ Add a field to track which admin user cancelled an order, supporting the admin o
 
 -- Add cancelled_by column to orders table
 ALTER TABLE orders 
-ADD COLUMN cancelled_by uuid REFERENCES profiles(id);
+ADD COLUMN IF NOT EXISTS cancelled_by uuid REFERENCES profiles(id);
 
 -- Add index for performance
 CREATE INDEX idx_orders_cancelled_by ON orders(cancelled_by);

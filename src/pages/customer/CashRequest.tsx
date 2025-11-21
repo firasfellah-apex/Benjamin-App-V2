@@ -52,6 +52,8 @@ export default function CashRequest() {
   const stepParam = searchParams.get('step');
   const initialStep = stepParam === '2' ? 2 : 1;
   const [step, setStep] = useState<Step>(initialStep);
+  // Ref to track if we're updating step internally (to avoid sync conflicts)
+  const isInternalStepUpdate = useRef(false);
   const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
   const [amount, setAmount] = useState(300);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
@@ -60,13 +62,29 @@ export default function CashRequest() {
 
   // Map center is now computed inside CustomerMapViewport using computeCustomerMapCenter
 
-  // Sync step with URL param (for navigation back from ManageAddresses)
+  // Sync step with URL param (for navigation back from ManageAddresses or Bank Accounts)
+  // This effect only syncs URL -> state when returning from other pages
+  // Internal step changes (handleBackToAddress, handleNextStep) update both state and URL directly
   useEffect(() => {
+    // Skip sync if we just updated step internally
+    if (isInternalStepUpdate.current) {
+      isInternalStepUpdate.current = false;
+      return;
+    }
+    
     const stepParam = searchParams.get('step');
     if (stepParam === '1' || stepParam === '2') {
       const urlStep = stepParam === '2' ? 2 : 1;
+      // Only update if URL step differs from current step
+      // This handles returning from other pages where URL has step param
       if (urlStep !== step) {
         setStep(urlStep);
+      }
+    } else if (!stepParam) {
+      // If URL has no step param, default to step 1
+      // This handles cases where user navigates directly to /customer/request
+      if (step !== 1) {
+        setStep(1);
       }
     }
   }, [searchParams, step]);
@@ -161,11 +179,9 @@ export default function CashRequest() {
   const [editAddressLoading, setEditAddressLoading] = useState(false);
 
   // Auto-select first address when addresses load or when returning from Manage Addresses
-  // Also update selectedAddress if it was edited/deleted in Manage Addresses
+  // Also restore address when returning from Bank Accounts on step 2
   // Use URL param to persist selection across navigation (same mechanism as cash amount -> address select)
   useEffect(() => {
-    if (step !== 1) return;
-
     // No addresses at all → clear selection
     if (addresses.length === 0) {
       if (selectedAddress) setSelectedAddress(null);
@@ -176,9 +192,10 @@ export default function CashRequest() {
     const hasValidSelection = selectedAddress && addresses.some(a => a.id === selectedAddress.id);
 
     // Priority 1: Restore from URL param if it exists and we don't have a valid selection
-    // This handles both cases:
+    // This handles:
     // 1. Returning from Manage Addresses (component remounts, selectedAddress is null, URL param preserved)
     // 2. Returning from Cash Amount (step changes, selectedAddress might be stale, URL param preserved)
+    // 3. Returning from Bank Accounts on step 2 (selectedAddress might be lost, URL param preserved)
     if (selectedAddressIdFromUrl && !hasValidSelection) {
       const restored = addresses.find(a => a.id === selectedAddressIdFromUrl);
       if (restored && (!selectedAddress || selectedAddress.id !== restored.id)) {
@@ -192,13 +209,17 @@ export default function CashRequest() {
       return;
     }
 
-    // Priority 3: No valid selection and no URL param - select first address
-    // This handles initial load when no address is selected yet
-    // Only set if it's different from current selection to avoid infinite loops
-    if (!selectedAddress || !addresses.some(a => a.id === selectedAddress.id)) {
-      const firstAddress = addresses[0];
-      if (firstAddress && (!selectedAddress || selectedAddress.id !== firstAddress.id)) {
-        setSelectedAddress(firstAddress);
+    // Priority 3: Only auto-select first address on step 1 (not step 2)
+    // Step 2 should only be accessible after selecting an address, so we shouldn't auto-select here
+    if (step === 1) {
+      // No valid selection and no URL param - select first address
+      // This handles initial load when no address is selected yet
+      // Only set if it's different from current selection to avoid infinite loops
+      if (!selectedAddress || !addresses.some(a => a.id === selectedAddress.id)) {
+        const firstAddress = addresses[0];
+        if (firstAddress && (!selectedAddress || selectedAddress.id !== firstAddress.id)) {
+          setSelectedAddress(firstAddress);
+        }
       }
     }
   }, [
@@ -286,12 +307,29 @@ export default function CashRequest() {
     // Save the current carousel index before moving to next step
     // This will be restored when returning to address selection
     // Note: The index is saved via onCarouselIndexChange callback
+    isInternalStepUpdate.current = true;
     setStep(2);
-  }, [selectedAddress]);
+    // Update URL to reflect step 2
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('step', '2');
+    if (selectedAddress.id) {
+      newParams.set('address_id', selectedAddress.id);
+    }
+    setSearchParams(newParams, { replace: true });
+  }, [selectedAddress, searchParams, setSearchParams]);
   
   const handleBackToAddress = useCallback(() => {
+    // Update both state and URL when going back to address selection
+    isInternalStepUpdate.current = true;
     setStep(1);
-  }, []);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('step', '1');
+    // Preserve address_id if we have a selected address
+    if (selectedAddress?.id) {
+      newParams.set('address_id', selectedAddress.id);
+    }
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams, selectedAddress?.id]);
   
   const handleBackToHome = useCallback(() => {
     // Reset selected address when going back to home (starting a new request)
@@ -482,9 +520,13 @@ export default function CashRequest() {
 
   // Handle navigate to bank accounts - will eventually lead to banking integrations
   const handleBankAccounts = useCallback(() => {
-    // For now, navigate to bank accounts page (will be implemented later)
-    navigate('/customer/bank-accounts');
-  }, [navigate]);
+    // Navigate to bank accounts page with return path to cash request
+    // Ensure step=2 is included in the return path so we return to cash amount step
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('step', '2');
+    const returnPath = `/customer/request?${newParams.toString()}`;
+    navigate('/customer/banks', { state: { returnPath } });
+  }, [navigate, searchParams]);
 
   // Memoize flow header for both steps
   const flowHeader = useMemo(() => {
@@ -582,7 +624,7 @@ export default function CashRequest() {
               </p>
             </div>
             <div className="h-[1px] bg-orange-500 mb-3 w-full" />
-            <div className="space-y-1.5 text-sm text-slate-900">
+            <div className="space-y-1.5 text-sm text-slate-600">
               <p>Anyone with the code can receive your envelope.</p>
               <p>Only share it when your runner is with you.</p>
               <p>Benjamin will never ask for it by phone or text.</p>
@@ -844,7 +886,7 @@ export default function CashRequest() {
                     "w-full rounded-xl border bg-white overflow-hidden",
                     "transition-all duration-300 ease-in-out",
                     isSelected
-                      ? "border-2 border-black shadow-sm"
+                      ? "border border-black"
                       : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
                   )}
                   style={{
@@ -884,14 +926,14 @@ export default function CashRequest() {
                             e.stopPropagation();
                             handleEditAddress(addr);
                           }}
-                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#F0F0F0] shadow-sm hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black hover:bg-black/90 active:bg-black/80 transition-colors touch-manipulation"
                           style={{
                             top: '12px',
                             right: '12px',
                           }}
                           aria-label="Edit address"
                         >
-                          <Pencil className="h-4 w-4 text-slate-900" />
+                          <Pencil className="h-4 w-4 text-white" />
                         </button>
                       )}
                     </div>
@@ -976,7 +1018,7 @@ export default function CashRequest() {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: "100%", opacity: 0 }}
                     transition={iosSpring}
-                    className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+                    className="relative w-full max-w-2xl mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col pointer-events-auto"
                     style={{
                       marginTop: '15vh', // Start 15% from top (more space for modal)
                       height: 'calc(100vh - 15vh)', // Fill remaining space
@@ -986,7 +1028,7 @@ export default function CashRequest() {
                     {/* Header - Fixed to top of modal */}
                     <motion.div
                       layout
-                      className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-3xl z-10"
+                      className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-2xl z-10"
                     >
                       <div className="flex-1">
                         <h2 className="text-xl font-bold text-gray-900">
@@ -999,10 +1041,10 @@ export default function CashRequest() {
                       <button
                         type="button"
                         onClick={handleCloseAddAddressModal}
-                        className="ml-4 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors touch-manipulation"
+                        className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
                         aria-label="Close"
                       >
-                        <X className="h-5 w-5" />
+                        <X className="h-5 w-5 text-slate-900" />
                       </button>
                     </motion.div>
                     
@@ -1107,7 +1149,7 @@ export default function CashRequest() {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: "100%", opacity: 0 }}
                     transition={iosSpring}
-                    className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col pointer-events-auto"
+                    className="relative w-full max-w-2xl mx-auto bg-white rounded-t-2xl shadow-2xl flex flex-col pointer-events-auto"
                     style={{
                       marginTop: '15vh', // Start 15% from top (more space for modal)
                       height: 'calc(100vh - 15vh)', // Fill remaining space
@@ -1117,7 +1159,7 @@ export default function CashRequest() {
                     {/* Header - Fixed to top of modal */}
                     <motion.div
                       layout
-                      className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-3xl z-10"
+                      className="flex-shrink-0 bg-white border-b border-gray-200 px-6 pt-6 pb-4 flex items-center justify-between rounded-t-2xl z-10"
                     >
                       <div className="flex-1">
                         <h2 className="text-xl font-bold text-gray-900">
@@ -1130,10 +1172,10 @@ export default function CashRequest() {
                       <button
                         type="button"
                         onClick={handleCloseEditAddressModal}
-                        className="ml-4 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors touch-manipulation"
+                        className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
                         aria-label="Close"
                       >
-                        <X className="h-5 w-5" />
+                        <X className="h-5 w-5 text-slate-900" />
                       </button>
                     </motion.div>
                     

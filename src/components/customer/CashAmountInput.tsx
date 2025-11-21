@@ -230,7 +230,7 @@ export default function CashAmountInput({
             onTouchStart={() => setIsDragging(true)}
             onTouchEnd={() => setIsDragging(false)}
             disabled={isEditing}
-            className="absolute left-0 right-0 w-full appearance-none cursor-pointer disabled:opacity-50 bg-transparent z-10 slider-cash-amount"
+            className="absolute left-0 right-0 w-full appearance-none cursor-pointer bg-transparent z-10 slider-cash-amount"
             style={{ 
               height: '44px',
               top: '-17px', // Center 44px touch area vertically on 10px visual track
@@ -259,7 +259,7 @@ export default function CashAmountInput({
             className={cn(
               "flex-1 h-11 rounded-full text-sm font-medium text-slate-900 flex items-center justify-center transition-colors touch-manipulation",
               value === amt
-                ? "border-2 border-black bg-white"
+                ? "border border-black bg-white"
                 : "border border-slate-200 bg-white"
             )}
           >

@@ -73,7 +73,7 @@ export function DeliveryModeSelector({
               className={cn(
                 "relative flex-1 h-13 rounded-full flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200 z-10",
                 selected
-                  ? "bg-white text-slate-900 border-2 border-black"
+                  ? "bg-white text-slate-900 border border-black"
                   : "bg-transparent text-slate-900 border-transparent"
               )}
               style={{ height: '52px' }}

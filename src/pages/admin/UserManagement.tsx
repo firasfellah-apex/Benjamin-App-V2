@@ -206,7 +206,7 @@ export default function UserManagement() {
 
   const handleApproveKYC = async (userId: string) => {
     try {
-      await updateProfile(userId, { kyc_status: 'Approved' });
+      await updateProfile(userId, { kyc_status: 'verified' });
       toast.success("KYC approved");
       loadProfiles();
     } catch (error) {
@@ -312,7 +312,7 @@ export default function UserManagement() {
           <CardHeader className="pb-3 p-0">
             <CardDescription className="text-[#A7A9AC] mb-1">Pending KYC</CardDescription>
             <CardTitle className="text-3xl font-semibold text-[#FBBF24]">
-              {profiles.filter(p => p.kyc_status === 'Pending').length}
+              {profiles.filter(p => p.kyc_status?.toLowerCase() === 'pending').length}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -485,11 +485,34 @@ export default function UserManagement() {
                                     Suspended
                                   </Badge>
                                 )}
-                                {runner.kyc_status === 'Pending' && (
-                                  <Badge variant="secondary" className="w-fit text-xs bg-[#FBBF24]/10 text-[#FBBF24]">
-                                    KYC Pending
-                                  </Badge>
-                                )}
+                                {(() => {
+                                  const kycStatus = runner.kyc_status?.toLowerCase();
+                                  if (kycStatus === 'verified') {
+                                    return (
+                                      <Badge variant="default" className="w-fit text-xs bg-[#3CD5A0]/10 text-[#3CD5A0] border-[#3CD5A0]/20">
+                                        KYC Verified
+                                      </Badge>
+                                    );
+                                  } else if (kycStatus === 'pending') {
+                                    return (
+                                      <Badge variant="secondary" className="w-fit text-xs bg-[#FBBF24]/10 text-[#FBBF24]">
+                                        KYC Pending
+                                      </Badge>
+                                    );
+                                  } else if (kycStatus === 'failed') {
+                                    return (
+                                      <Badge variant="destructive" className="w-fit text-xs">
+                                        KYC Failed
+                                      </Badge>
+                                    );
+                                  } else {
+                                    return (
+                                      <Badge variant="outline" className="w-fit text-xs text-[#6C6E73]">
+                                        KYC Unverified
+                                      </Badge>
+                                    );
+                                  }
+                                })()}
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
@@ -603,18 +626,56 @@ export default function UserManagement() {
                                         </Button>
                                       </div>
                                     </div>
-                                    {runner.kyc_status === 'Pending' && (
-                                      <div className="space-y-2">
-                                        <h4 className="font-medium text-[#F1F3F5]">KYC Verification</h4>
-                                        <Button
-                                          size="sm"
-                                          onClick={() => handleApproveKYC(runner.id)}
-                                          className="bg-[#3CD5A0] hover:bg-[#3CD5A0]/80 text-white"
-                                        >
-                                          Approve KYC
-                                        </Button>
+                                    {/* KYC Status for Runner */}
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-[#F1F3F5]">KYC Status</h4>
+                                      <div className="flex items-center gap-2">
+                                        {(() => {
+                                          const kycStatus = runner.kyc_status?.toLowerCase();
+                                          if (kycStatus === 'verified') {
+                                            return (
+                                              <Badge variant="default" className="bg-[#3CD5A0]/10 text-[#3CD5A0] border-[#3CD5A0]/20">
+                                                Verified
+                                              </Badge>
+                                            );
+                                          } else if (kycStatus === 'pending') {
+                                            return (
+                                              <Badge variant="secondary" className="bg-[#FBBF24]/10 text-[#FBBF24]">
+                                                Pending
+                                              </Badge>
+                                            );
+                                          } else if (kycStatus === 'failed') {
+                                            return (
+                                              <Badge variant="destructive">
+                                                Failed
+                                              </Badge>
+                                            );
+                                          } else {
+                                            return (
+                                              <Badge variant="outline" className="text-[#6C6E73]">
+                                                Unverified
+                                              </Badge>
+                                            );
+                                          }
+                                        })()}
+                                        {runner.kyc_verified_at && (
+                                          <span className="text-xs text-[#A7A9AC]">
+                                            {new Date(runner.kyc_verified_at).toLocaleDateString('en-US', {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })}
+                                          </span>
+                                        )}
                                       </div>
-                                    )}
+                                      {runner.plaid_item_id && (
+                                        <div className="text-xs text-[#6C6E73] font-mono">
+                                          Plaid: {runner.plaid_item_id.substring(0, 12)}...
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                   <DialogFooter>
                                     <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-[#2F3238] text-[#A7A9AC] hover:bg-[#2D3036]">
@@ -732,11 +793,34 @@ export default function UserManagement() {
                                     Suspended
                                   </Badge>
                                 )}
-                                {customer.kyc_status === 'Pending' && (
-                                  <Badge variant="secondary" className="w-fit text-xs bg-[#FBBF24]/10 text-[#FBBF24]">
-                                    KYC Pending
-                                  </Badge>
-                                )}
+                                {(() => {
+                                  const kycStatus = customer.kyc_status?.toLowerCase();
+                                  if (kycStatus === 'verified') {
+                                    return (
+                                      <Badge variant="default" className="w-fit text-xs bg-[#3CD5A0]/10 text-[#3CD5A0] border-[#3CD5A0]/20">
+                                        KYC Verified
+                                      </Badge>
+                                    );
+                                  } else if (kycStatus === 'pending') {
+                                    return (
+                                      <Badge variant="secondary" className="w-fit text-xs bg-[#FBBF24]/10 text-[#FBBF24]">
+                                        KYC Pending
+                                      </Badge>
+                                    );
+                                  } else if (kycStatus === 'failed') {
+                                    return (
+                                      <Badge variant="destructive" className="w-fit text-xs">
+                                        KYC Failed
+                                      </Badge>
+                                    );
+                                  } else {
+                                    return (
+                                      <Badge variant="outline" className="w-fit text-xs text-[#6C6E73]">
+                                        KYC Unverified
+                                      </Badge>
+                                    );
+                                  }
+                                })()}
                               </div>
                             </TableCell>
                             <TableCell className="text-sm text-[#6C6E73]">
@@ -853,18 +937,56 @@ export default function UserManagement() {
                                         </Button>
                                       </div>
                                     </div>
-                                    {customer.kyc_status === 'Pending' && (
-                                      <div className="space-y-2">
-                                        <h4 className="font-medium text-[#F1F3F5]">KYC Verification</h4>
-                                        <Button
-                                          size="sm"
-                                          onClick={() => handleApproveKYC(customer.id)}
-                                          className="bg-[#3CD5A0] hover:bg-[#3CD5A0]/80 text-white"
-                                        >
-                                          Approve KYC
-                                        </Button>
+                                    {/* KYC Status */}
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-[#F1F3F5]">KYC Status</h4>
+                                      <div className="flex items-center gap-2">
+                                        {(() => {
+                                          const kycStatus = customer.kyc_status?.toLowerCase();
+                                          if (kycStatus === 'verified') {
+                                            return (
+                                              <Badge variant="default" className="bg-[#3CD5A0]/10 text-[#3CD5A0] border-[#3CD5A0]/20">
+                                                Verified
+                                              </Badge>
+                                            );
+                                          } else if (kycStatus === 'pending') {
+                                            return (
+                                              <Badge variant="secondary" className="bg-[#FBBF24]/10 text-[#FBBF24]">
+                                                Pending
+                                              </Badge>
+                                            );
+                                          } else if (kycStatus === 'failed') {
+                                            return (
+                                              <Badge variant="destructive">
+                                                Failed
+                                              </Badge>
+                                            );
+                                          } else {
+                                            return (
+                                              <Badge variant="outline" className="text-[#6C6E73]">
+                                                Unverified
+                                              </Badge>
+                                            );
+                                          }
+                                        })()}
+                                        {customer.kyc_verified_at && (
+                                          <span className="text-xs text-[#A7A9AC]">
+                                            {new Date(customer.kyc_verified_at).toLocaleDateString('en-US', {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })}
+                                          </span>
+                                        )}
                                       </div>
-                                    )}
+                                      {customer.plaid_item_id && (
+                                        <div className="text-xs text-[#6C6E73] font-mono">
+                                          Plaid: {customer.plaid_item_id.substring(0, 12)}...
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                   <DialogFooter>
                                     <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-[#2F3238] text-[#A7A9AC] hover:bg-[#2D3036]">

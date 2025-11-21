@@ -378,7 +378,7 @@ export function AddressAutocomplete({
           value={query}
           onChange={handleInputChange}
           disabled={disabled}
-          className={cn(error && "border-[#FF5A5F] bg-[#FFF7F7]", className)}
+          className={cn("h-11 rounded-xl border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0", error && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]", className)}
         />
       </div>
     );
@@ -397,7 +397,7 @@ export function AddressAutocomplete({
           value={query}
           onChange={handleInputChange}
           disabled={disabled}
-          className={cn(error && "border-[#FF5A5F] bg-[#FFF7F7]", className)}
+          className={cn("h-11 rounded-xl border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0", error && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]", className)}
         />
         <p className="text-xs text-gray-500">Loading address autocomplete...</p>
       </div>
@@ -436,8 +436,9 @@ export function AddressAutocomplete({
             }, 200);
           }}
           disabled={disabled}
-          className={cn(
-            error && "border-[#FF5A5F] bg-[#FFF7F7]",
+              className={cn(
+            "h-11 rounded-xl border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0",
+            error && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]",
             className
           )}
         />

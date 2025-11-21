@@ -22,9 +22,21 @@
 -- This ensures UPDATE events include all column values, not just the primary key
 ALTER TABLE public.profiles REPLICA IDENTITY FULL;
 
--- Add profiles table to the realtime publication
+-- Add profiles table to the realtime publication (idempotent)
 -- This enables Supabase to broadcast INSERT/UPDATE/DELETE events
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname   = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'profiles'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+  END IF;
+END
+$$;
 
 -- Note: After running this migration, you must also enable Realtime in the
 -- Supabase Dashboard:

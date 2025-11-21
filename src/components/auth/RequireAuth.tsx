@@ -25,7 +25,8 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
 
   // Check if current path is whitelisted
   const isWhitelisted = whitelist.some(path => location.pathname === path || location.pathname.startsWith(path));
-  const isOnboardingPath = location.pathname === '/onboarding/profile';
+  const isProfileOnboardingPath = location.pathname === '/onboarding/profile';
+  const isBankOnboardingPath = location.pathname === '/customer/onboarding/bank';
 
   // If whitelisted, render children
   if (isWhitelisted) {
@@ -40,15 +41,16 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
   // If authenticated and profile is ready, check if onboarding is needed
   // Only require onboarding for customer users, not runners
   const isCustomer = profile?.role?.includes('customer') && !profile?.role?.includes('admin');
-  const needsOnboarding = isReady && user && shouldOnboard(profile) && isCustomer;
+  const needsProfileOnboarding = isReady && user && shouldOnboard(profile) && isCustomer;
   
-  if (needsOnboarding && !isOnboardingPath) {
+  // If customer needs profile onboarding and not on profile onboarding path, redirect
+  if (needsProfileOnboarding && !isProfileOnboardingPath) {
     return <Navigate to="/onboarding/profile" replace />;
   }
 
-  // If on onboarding path but profile is complete, redirect to home
+  // If on profile onboarding path but profile is complete, redirect to bank onboarding or home
   // Also redirect non-customers away from onboarding
-  if (isOnboardingPath) {
+  if (isProfileOnboardingPath) {
     if (isReady && user && profile && (!shouldOnboard(profile) || !isCustomer)) {
       // Redirect based on user role
       if (profile.role?.includes('admin')) {
@@ -56,8 +58,28 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
       } else if (profile.role?.includes('runner')) {
         return <Navigate to="/runner/work" replace />;
       } else {
-        return <Navigate to="/customer/home" replace />;
+        // Customer with complete profile - allow them to proceed to bank onboarding or home
+        // Don't redirect here, let them access the page if they navigate to it manually
+        // But if they're already here and profile is complete, they should go to bank onboarding
+        return <Navigate to="/customer/onboarding/bank" replace />;
       }
+    }
+  }
+
+  // Bank onboarding path: allow access if profile is complete (even if bank not connected)
+  // Only redirect non-customers away
+  if (isBankOnboardingPath) {
+    if (isReady && user && profile && !isCustomer) {
+      // Redirect non-customers based on role
+      if (profile.role?.includes('admin')) {
+        return <Navigate to="/admin/dashboard" replace />;
+      } else if (profile.role?.includes('runner')) {
+        return <Navigate to="/runner/work" replace />;
+      }
+    }
+    // If customer needs profile onboarding, redirect to profile onboarding first
+    if (needsProfileOnboarding) {
+      return <Navigate to="/onboarding/profile" replace />;
     }
   }
 

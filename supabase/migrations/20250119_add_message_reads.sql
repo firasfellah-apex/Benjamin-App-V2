@@ -22,12 +22,16 @@ CREATE INDEX IF NOT EXISTS idx_message_reads_user_message ON message_reads(user_
 ALTER TABLE message_reads ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view their own read receipts
+DROP POLICY IF EXISTS "Users can view their own read receipts" ON message_reads;
+
 CREATE POLICY "Users can view their own read receipts"
   ON message_reads
   FOR SELECT
   USING (auth.uid() = user_id);
 
 -- Policy: Users can mark messages as read for orders they're involved in
+DROP POLICY IF EXISTS "Users can mark messages as read" ON message_reads;
+
 CREATE POLICY "Users can mark messages as read"
   ON message_reads
   FOR INSERT
@@ -55,7 +59,19 @@ CREATE POLICY "Users can mark messages as read"
 -- Add comment
 COMMENT ON TABLE message_reads IS 'Tracks which messages have been read by which users for unread count calculations';
 
--- Enable realtime for message_reads table
+-- Enable realtime for message_reads table (idempotent)
 -- This allows instant updates when messages are marked as read
-ALTER PUBLICATION supabase_realtime ADD TABLE public.message_reads;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname   = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'message_reads'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.message_reads;
+  END IF;
+END
+$$;
 

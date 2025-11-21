@@ -8,17 +8,20 @@
 import { Navigate } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import type React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
 import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar';
 import { TrustCarousel } from '@/components/customer/TrustCarousel';
 import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
+import { KycReminderCard } from '@/components/customer/KycReminderCard';
 import { useLocation } from '@/contexts/LocationContext';
 import { getCustomerOrders } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
+import { useQueryClient } from '@tanstack/react-query';
 import type { OrderWithDetails, Order } from '@/types/types';
 import bankIllustration from '@/assets/illustrations/Bank.png';
 import atmIllustration from '@/assets/illustrations/ATM.png';
@@ -42,6 +45,7 @@ export default function CustomerHome() {
   const { location } = useLocation();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const queryClient = useQueryClient();
   
   // Load orders function
   const loadOrders = useCallback(async () => {
@@ -240,10 +244,19 @@ export default function CustomerHome() {
     );
   }, []);
 
+  // Check if user needs KYC reminder
+  const needsKycReminder = useMemo(() => {
+    if (!profile || !isReady) return false;
+    const isCustomer = profile.role?.includes('customer') && !profile.role?.includes('admin');
+    return isCustomer && profile.kyc_status !== 'verified';
+  }, [profile, isReady]);
+
   // Determine what to show in topContent
   // Show skeleton while orders are loading to maintain consistent header height
   // IMPORTANT: This hook must be called before any early returns to follow Rules of Hooks
   const topContent = useMemo(() => {
+    const content: React.ReactNode[] = [];
+    
     // Show skeleton while orders are loading (but not during initial auth/profile load)
     // This prevents flash of TrustCarousel when orders are still loading
     if (ordersLoading && !authLoading && isReady) {
@@ -270,29 +283,47 @@ export default function CustomerHome() {
       );
     }
     
+    // 24px spacing from fixed divider to content (matches cash amount page pattern)
+    const spacing = <div style={{ paddingTop: '24px' }} />;
+    
+    // Show KYC reminder card if needed (before other content)
+    if (needsKycReminder && !ordersLoading) {
+      content.push(
+        <div key="kyc-reminder" style={{ paddingTop: '24px' }}>
+          <KycReminderCard
+            onCompleted={async () => {
+              // Profile will be refetched by the hook
+              await queryClient.invalidateQueries({ queryKey: ['profile'] });
+            }}
+          />
+        </div>
+      );
+    }
+    
     // Show actual card if we have a last delivery (completed or cancelled)
     // Show it even if there's an active order
-    if (lastCompletedOrder) {
-      return (
-        <>
-          {/* 24px spacing from fixed divider to content (matches cash amount page pattern) */}
-          <div style={{ paddingTop: '24px' }}>
-            <LastDeliveryCard
-              order={lastCompletedOrder}
-              onRateRunner={handleRateRunner}
-            />
-          </div>
-        </>
+    if (lastCompletedOrder && !ordersLoading) {
+      content.push(
+        <div key="last-delivery" style={{ paddingTop: needsKycReminder ? '24px' : '24px' }}>
+          <LastDeliveryCard
+            order={lastCompletedOrder}
+            onRateRunner={handleRateRunner}
+          />
+        </div>
       );
     }
     
     // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
-    return (
-      <div style={{ paddingTop: '24px' }}>
-        <TrustCarousel cards={trustCards} />
-      </div>
-    );
-  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, trustCards]);
+    if (!lastCompletedOrder && !ordersLoading) {
+      content.push(
+        <div key="trust-carousel" style={{ paddingTop: needsKycReminder ? '24px' : '24px' }}>
+          <TrustCarousel cards={trustCards} />
+        </div>
+      );
+    }
+    
+    return content.length > 0 ? <>{content}</> : null;
+  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, trustCards, needsKycReminder, queryClient]);
 
   // If no user, redirect to landing
   if (!user) {

@@ -21,7 +21,9 @@ interface AvatarUploaderProps {
   userName?: string;
   onUploadComplete?: (url: string) => void;
   onRemoveComplete?: () => void;
+  onCancel?: () => void;
   className?: string;
+  mode?: "full" | "compact"; // compact = buttons only, no avatar
 }
 
 export function AvatarUploader({
@@ -29,7 +31,9 @@ export function AvatarUploader({
   userName,
   onUploadComplete,
   onRemoveComplete,
-  className
+  onCancel,
+  className,
+  mode = "full"
 }: AvatarUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -143,12 +147,96 @@ export function AvatarUploader({
     }
   };
 
+  // Compact mode: buttons only (no avatar)
+  if (mode === "compact") {
+    return (
+      <>
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp"
+          className="hidden"
+          onChange={handleFileInputChange}
+          disabled={uploading}
+        />
+
+        {/* Action Buttons - compact size matching edit button height */}
+        {/* Start from same position as edit button, then expand rightwards */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="h-9 px-3 rounded-full border border-black bg-white text-black hover:bg-slate-50 text-xs font-semibold whitespace-nowrap transition-all duration-300 ease-out origin-right"
+            onClick={handleClick}
+            disabled={uploading}
+            style={{ 
+              animation: 'morphIn 0.3s ease-out 0ms both',
+            }}
+          >
+            {currentAvatarUrl ? 'Change' : 'Upload'}
+          </button>
+
+          {currentAvatarUrl && (
+            <button
+              type="button"
+              className="h-9 px-3 rounded-full border border-black bg-white text-black hover:bg-slate-50 text-xs font-semibold whitespace-nowrap transition-all duration-300 ease-out origin-right"
+              onClick={handleRemove}
+              disabled={uploading}
+              style={{ 
+                animation: 'morphIn 0.3s ease-out 50ms both',
+              }}
+            >
+              Remove
+            </button>
+          )}
+
+          {onCancel && (
+            <button
+              type="button"
+              className="h-9 px-3 rounded-full border border-black bg-white text-black hover:bg-slate-50 text-xs font-semibold whitespace-nowrap transition-all duration-300 ease-out origin-right"
+              onClick={onCancel}
+              disabled={uploading}
+              style={{ 
+                animation: 'morphIn 0.3s ease-out 100ms both',
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        
+        <style>{`
+          @keyframes morphIn {
+            from {
+              opacity: 0;
+              transform: scale(0.8) translateX(-8px);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1) translateX(0);
+            }
+          }
+        `}</style>
+
+        {/* Crop Modal */}
+        {showCropModal && selectedImageSrc && (
+          <AvatarCropModal
+            imageSrc={selectedImageSrc}
+            onCropComplete={handleCropComplete}
+            onCancel={handleCropCancel}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Full mode: avatar + buttons
   return (
-    <div className={cn('flex flex-col items-center gap-4', className)}>
+    <div className={cn('flex items-center gap-4', className)}>
       {/* Avatar Preview */}
       <div
         className={cn(
-          'relative cursor-pointer transition-all',
+          'relative flex-shrink-0 transition-all',
           isDragging && 'scale-105 ring-2 ring-primary',
           uploading && 'opacity-50 pointer-events-none'
         )}
@@ -187,37 +275,39 @@ export function AvatarUploader({
         disabled={uploading}
       />
 
-      {/* Action Buttons */}
-      <div className="flex gap-2">
+      {/* Action Buttons - morph out to the right */}
+      <div className="flex gap-3">
         <Button
           variant="outline"
-          size="sm"
+          className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50"
           onClick={handleClick}
           disabled={uploading}
         >
-          <Upload className="h-4 w-4 mr-2" />
           {currentAvatarUrl ? 'Change' : 'Upload'}
         </Button>
 
         {currentAvatarUrl && (
           <Button
             variant="outline"
-            size="sm"
+            className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50"
             onClick={handleRemove}
             disabled={uploading}
           >
-            <X className="h-4 w-4 mr-2" />
             Remove
           </Button>
         )}
-      </div>
 
-      {/* Help Text */}
-      <p className="text-xs text-muted-foreground text-center max-w-xs">
-        Click or drag & drop to upload. JPG, PNG, or WebP. Max 5MB.
-        <br />
-        You'll be able to select the crop area.
-      </p>
+        {onCancel && (
+          <Button
+            variant="outline"
+            className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50"
+            onClick={onCancel}
+            disabled={uploading}
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
 
       {/* Crop Modal */}
       {showCropModal && selectedImageSrc && (

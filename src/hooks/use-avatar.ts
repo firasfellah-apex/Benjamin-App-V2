@@ -118,18 +118,23 @@ export function useAvatar(): UseAvatarReturn {
 
       console.log('[Avatar Upload] File uploaded successfully:', uploadData);
 
-      // Get public URL
+      // Get public URL - store WITHOUT cache-busting params
+      // Cache-busting will be added when rendering, not when storing
       const { data: { publicUrl } } = supabase.storage
         .from(bucketId)
         .getPublicUrl(filePath);
 
       console.log('[Avatar Upload] Public URL:', publicUrl);
 
-      // Update profile
+      // Update profile with base URL (no query params)
+      // Also update updated_at to ensure cache invalidation
       console.log('[Avatar Upload] Updating profile with new avatar URL...');
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ 
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id);
 
       if (updateError) {

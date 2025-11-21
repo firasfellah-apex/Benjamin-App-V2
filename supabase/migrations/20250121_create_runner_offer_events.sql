@@ -23,12 +23,16 @@ CREATE INDEX IF NOT EXISTS idx_runner_offer_events_created_at ON runner_offer_ev
 ALTER TABLE runner_offer_events ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Runners can view their own offer events
+DROP POLICY IF EXISTS "Runners can view their own offer events" ON runner_offer_events;
+
 CREATE POLICY "Runners can view their own offer events"
   ON runner_offer_events
   FOR SELECT
   USING (auth.uid() = runner_id);
 
 -- Policy: Runners can insert their own offer events
+DROP POLICY IF EXISTS "Runners can insert their own offer events" ON runner_offer_events;
+
 CREATE POLICY "Runners can insert their own offer events"
   ON runner_offer_events
   FOR INSERT

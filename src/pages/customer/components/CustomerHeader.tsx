@@ -9,6 +9,9 @@ import {
   SheetContent,
   SheetClose,
   SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -26,6 +29,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { Clock, MapPinPen, LogOut, X, Star } from "@/lib/icons";
 import { Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logoutIllustration from "@/assets/illustrations/Logout.png";
 
 export function CustomerHeader({
   title,
@@ -82,8 +86,14 @@ export function CustomerHeader({
       </SheetTrigger>
       <SheetContent 
         side="right" 
-        className="w-[85vw] max-w-sm p-0 flex flex-col rounded-tl-3xl rounded-bl-3xl [&>button]:hidden"
+        className="w-[85vw] max-w-sm p-0 flex flex-col rounded-tl-3xl rounded-bl-3xl [&>button:first-child]:hidden"
       >
+        {/* Accessibility: Hidden title and description for screen readers */}
+        <SheetHeader className="sr-only">
+          <SheetTitle>Menu</SheetTitle>
+          <SheetDescription>Navigation menu and account settings</SheetDescription>
+        </SheetHeader>
+
         {/* Close Button - aligned exactly with kebab menu button position */}
         <div className="px-6 pt-6 pb-2 flex items-center justify-end">
           <SheetClose asChild>
@@ -98,29 +108,35 @@ export function CustomerHeader({
         </div>
 
         {/* Profile Section - Clickable */}
-        {user && profile && (
-          <button
-            onClick={() => {
-              handleMenuItemClick("/account");
-            }}
-            className="w-full px-6 pb-6 flex flex-col items-center border-b border-slate-200 hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
-          >
+        {user && (
+          <>
+            <button
+              onClick={() => {
+                handleMenuItemClick("/account");
+              }}
+              className="w-full px-6 pb-6 flex flex-col items-center hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+            >
             <Avatar
-              src={profile.avatar_url}
-              alt={[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
-              fallback={[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
+              src={profile?.avatar_url}
+              alt={profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User' : 'User'}
+              fallback={profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User' : 'User'}
               size="2xl"
               className="mb-3"
             />
             <p className="font-semibold text-base text-slate-900 mb-1">
-              {[profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User'}
+              {profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User' : 'Loading...'}
             </p>
             {/* Rating with star - placeholder for now */}
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-              <span className="text-sm text-slate-600">5</span>
-            </div>
+            {profile && (
+              <div className="flex items-center gap-1">
+                <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                <span className="text-sm text-slate-600">5</span>
+              </div>
+            )}
           </button>
+          {/* Divider under account button */}
+          <div className="h-[6px] bg-[#F7F7F7] mx-6" />
+          </>
         )}
 
         {/* Menu Items */}
@@ -143,7 +159,7 @@ export function CustomerHeader({
             </button>
 
             <button
-              onClick={() => handleMenuItemClick("/customer/bank-accounts")}
+              onClick={() => handleMenuItemClick("/customer/banks")}
               className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
             >
               <Landmark className="h-5 w-5 text-slate-900" />
@@ -154,15 +170,19 @@ export function CustomerHeader({
 
         {/* Log Out Button */}
         {user && (
-          <div className="px-6 pt-4 pb-6 border-t border-slate-200">
+          <>
+            {/* Divider above logout button */}
+            <div className="h-[6px] bg-[#F7F7F7] mx-6" />
+            <div className="px-6 pt-4 pb-6">
             <button
               onClick={handleLogoutClick}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-base font-semibold rounded-lg transition-all bg-red-50 text-red-600 hover:bg-red-100 active:bg-red-200"
+              className="w-full flex items-center justify-center gap-2 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border border-red-500 text-red-600 bg-transparent hover:bg-red-50 active:bg-red-100 transition-all"
             >
               <LogOut className="h-5 w-5 text-red-600" />
               <span>Log Out</span>
             </button>
           </div>
+          </>
         )}
       </SheetContent>
     </Sheet>
@@ -219,16 +239,37 @@ export function CustomerHeader({
       )}
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to log out? You'll need to log in again to access your account.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLogout}>
+        <AlertDialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center text-center space-y-4">
+            {/* Logout Illustration */}
+            <div className="flex justify-center mb-2">
+              <img 
+                src={logoutIllustration} 
+                alt="Logout" 
+                className="w-32 h-32 object-contain"
+              />
+            </div>
+            
+            <AlertDialogHeader className="space-y-2">
+              <AlertDialogTitle className="text-xl font-semibold">
+                Confirm Logout
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-base text-slate-600">
+                Are you sure you want to log out? You'll need to log in again to access your account.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          </div>
+          
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-6">
+            <AlertDialogCancel 
+              className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50 w-full sm:w-auto"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmLogout}
+              className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90 w-full sm:w-auto"
+            >
               Log Out
             </AlertDialogAction>
           </AlertDialogFooter>

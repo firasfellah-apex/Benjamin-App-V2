@@ -18,7 +18,7 @@ export type ExtendedOrderStatus = OrderStatus | 'OTP Generated' | 'Enroute Custo
 
 export type InvitationStatus = 'Pending' | 'Accepted' | 'Expired' | 'Revoked';
 
-export type KYCStatus = 'Pending' | 'Approved' | 'Failed';
+export type KYCStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
 // Order Event for audit trail
 export interface OrderEvent {
@@ -58,6 +58,8 @@ export interface Profile {
   is_active: boolean;
   is_suspended: boolean;
   kyc_status: KYCStatus;
+  kyc_verified_at: string | null;
+  plaid_item_id: string | null;
   invited_by: string | null;
   invitation_accepted_at: string | null;
   daily_limit: number;
