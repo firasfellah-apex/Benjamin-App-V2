@@ -60,7 +60,11 @@ export function ActiveDeliverySheet({
   const lastCheckedOrderRef = useRef<string | null>(null);
   const unreadCount = useUnreadMessages(order.id);
   const sheetRef = useRef<HTMLDivElement | null>(null);
+  const progressTimelineRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [collapsedHeight, setCollapsedHeight] = useState<number>(260); // sensible default
+  const [dragY, setDragY] = useState(0);
+  const dragStartY = useRef<number>(0);
   
   // Check for runner arrival when status is Pending Handoff
   // Re-check whenever order updates (including when order_events change)
@@ -333,6 +337,28 @@ export function ActiveDeliverySheet({
 
   const estimatedArrival = calculateEstimatedArrival();
 
+  // Auto-scroll to Delivery Progress when expanding
+  useEffect(() => {
+    if (!isExpanded) return;
+    
+    // Small delay to ensure content is rendered and refs are set
+    const timeoutId = setTimeout(() => {
+      if (progressTimelineRef.current && scrollContainerRef.current) {
+        try {
+          progressTimelineRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start',
+            inline: 'nearest'
+          });
+        } catch (error) {
+          console.warn('[ActiveDeliverySheet] Auto-scroll failed:', error);
+        }
+      }
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
+  }, [isExpanded]);
+
   // Measure collapsed height and notify parent for map padding
   useEffect(() => {
     if (!sheetRef.current || isExpanded) {
@@ -377,14 +403,95 @@ export function ActiveDeliverySheet({
     };
   }, [isExpanded, onCollapsedHeightChange, collapsedHeight, order.status, order.otp_code, customerStatus]);
 
+  // Handle drag gestures for swipe to expand/collapse
+  const handleDragStart = (event: any, info: any) => {
+    if (!info?.point?.y) return;
+    dragStartY.current = info.point.y;
+  };
+
+  const handleDrag = (event: any, info: any) => {
+    if (!info?.point?.y) return;
+    
+    if (!isExpanded) {
+      // When collapsed: only allow dragging up (negative deltaY)
+      const deltaY = info.point.y - dragStartY.current;
+      if (deltaY < 0) {
+        // Clamp to prevent dragging too far
+        setDragY(Math.max(deltaY, -100));
+      } else {
+        setDragY(0);
+      }
+    } else {
+      // When expanded: only allow dragging down if at top of scroll
+      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
+      if (scrollTop === 0) {
+        const deltaY = info.point.y - dragStartY.current;
+        if (deltaY > 0) {
+          // Clamp to prevent dragging too far
+          setDragY(Math.min(deltaY, 100));
+        } else {
+          setDragY(0);
+        }
+      } else {
+        setDragY(0);
+      }
+    }
+  };
+
+  const handleDragEnd = (event: any, info: any) => {
+    if (!info?.point?.y) {
+      setDragY(0);
+      return;
+    }
+    
+    const deltaY = info.point.y - dragStartY.current;
+    const threshold = 50; // Minimum drag distance to trigger expand/collapse
+    
+    if (!isExpanded) {
+      // Swiped up when collapsed - expand
+      if (deltaY < -threshold) {
+        onToggleExpand();
+      }
+    } else {
+      // Swiped down when expanded - only collapse if at top of scroll
+      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
+      if (deltaY > threshold && scrollTop === 0) {
+        onToggleExpand();
+      }
+    }
+    
+    // Reset drag position
+    setDragY(0);
+  };
+
+  // Handle scroll to check if we're at top (for collapse gesture)
+  const handleScroll = () => {
+    // When scroll position changes, reset drag if needed
+    if (isExpanded && scrollContainerRef.current) {
+      const scrollTop = scrollContainerRef.current.scrollTop ?? 0;
+      if (scrollTop > 0) {
+        setDragY(0);
+      }
+    }
+  };
+
   return (
     <motion.div
       ref={sheetRef}
       layout
+      drag={!isExpanded ? "y" : false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.2}
+      dragDirectionLock={true}
+      onDragStart={!isExpanded ? handleDragStart : () => {}}
+      onDrag={!isExpanded ? handleDrag : () => {}}
+      onDragEnd={!isExpanded ? handleDragEnd : () => {}}
+      style={!isExpanded ? { y: dragY } : undefined}
       className={cn(
         "absolute inset-x-0 bottom-0 z-20 bg-white rounded-t-[24px] shadow-2xl",
         "pointer-events-auto flex flex-col",
-        isExpanded ? "h-[85vh] overflow-hidden" : "overflow-visible"
+        isExpanded ? "h-[85vh] overflow-hidden" : "overflow-visible",
+        !isExpanded && "cursor-grab active:cursor-grabbing"
       )}
       initial={false}
       transition={{
@@ -394,22 +501,35 @@ export function ActiveDeliverySheet({
         mass: 0.8,
       }}
     >
-      {/* Grab Handle - Fixed at top */}
-      <button
+      {/* Grab Handle - Fixed at top - Handles drag when expanded and at top of scroll */}
+      <motion.button
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           onToggleExpand();
         }}
-        className="w-full py-3 flex justify-center items-center cursor-pointer bg-white rounded-t-[24px] transition-colors active:bg-neutral-50 flex-shrink-0 relative z-10 touch-manipulation"
+        drag={isExpanded ? "y" : false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.2}
+        dragDirectionLock={true}
+        onDragStart={isExpanded ? handleDragStart : () => {}}
+        onDrag={isExpanded ? handleDrag : () => {}}
+        onDragEnd={isExpanded ? handleDragEnd : () => {}}
+        className={cn(
+          "w-full py-3 flex justify-center items-center cursor-pointer bg-white rounded-t-[24px] transition-colors active:bg-neutral-50 flex-shrink-0 relative z-10 touch-manipulation",
+          isExpanded && "cursor-grab active:cursor-grabbing"
+        )}
         aria-label={isExpanded ? "Collapse details" : "Expand details"}
         type="button"
+        whileTap={{ scale: 0.98 }}
       >
         <div className="w-12 h-1.5 bg-neutral-300 rounded-full" />
-      </button>
+      </motion.button>
 
       {/* Sheet Content - Scrollable when expanded */}
       <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
         className={cn(
           "px-6 w-full",
           isExpanded ? "overflow-y-auto overflow-x-hidden flex-1 pb-6" : "pb-8"
@@ -707,7 +827,7 @@ export function ActiveDeliverySheet({
             )}
 
             {/* Delivery Progress Timeline */}
-            <div className="space-y-2">
+            <div ref={progressTimelineRef} className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">Delivery Progress</h3>
               <OrderProgressTimeline
                 currentStatus={order.status}
