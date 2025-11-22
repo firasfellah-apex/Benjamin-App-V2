@@ -63,8 +63,6 @@ export function ActiveDeliverySheet({
   const progressTimelineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [collapsedHeight, setCollapsedHeight] = useState<number>(260); // sensible default
-  const [dragY, setDragY] = useState(0);
-  const dragStartY = useRef<number>(0);
   
   // Check for runner arrival when status is Pending Handoff
   // Re-check whenever order updates (including when order_events change)
@@ -403,95 +401,65 @@ export function ActiveDeliverySheet({
     };
   }, [isExpanded, onCollapsedHeightChange, collapsedHeight, order.status, order.otp_code, customerStatus]);
 
+  // Track if user is at top of scroll (for collapse gesture)
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Handle scroll to check if we're at top (for collapse gesture)
+  const handleScroll = () => {
+    if (!scrollContainerRef.current || isDragging) return;
+    const scrollTop = scrollContainerRef.current.scrollTop ?? 0;
+    setIsAtTop(scrollTop === 0);
+  };
+
+  // Handle drag start
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
+
   // Handle drag gestures for swipe to expand/collapse
-  const handleDragStart = (event: any, info: any) => {
-    if (!info?.point?.y) return;
-    dragStartY.current = info.point.y;
-  };
-
-  const handleDrag = (event: any, info: any) => {
-    if (!info?.point?.y) return;
-    
-    if (!isExpanded) {
-      // When collapsed: only allow dragging up (negative deltaY)
-      const deltaY = info.point.y - dragStartY.current;
-      if (deltaY < 0) {
-        // Clamp to prevent dragging too far
-        setDragY(Math.max(deltaY, -100));
-      } else {
-        setDragY(0);
-      }
-    } else {
-      // When expanded: only allow dragging down if at top of scroll
-      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
-      if (scrollTop === 0) {
-        const deltaY = info.point.y - dragStartY.current;
-        if (deltaY > 0) {
-          // Clamp to prevent dragging too far
-          setDragY(Math.min(deltaY, 100));
-        } else {
-          setDragY(0);
-        }
-      } else {
-        setDragY(0);
-      }
-    }
-  };
-
+  // Use framer-motion's built-in drag with proper constraints
   const handleDragEnd = (event: any, info: any) => {
-    if (!info?.point?.y) {
-      setDragY(0);
-      return;
-    }
+    setIsDragging(false);
+    if (!info?.offset?.y) return;
     
-    const deltaY = info.point.y - dragStartY.current;
     const threshold = 50; // Minimum drag distance to trigger expand/collapse
     
     if (!isExpanded) {
       // Swiped up when collapsed - expand
-      if (deltaY < -threshold) {
+      if (info.offset.y < -threshold) {
         onToggleExpand();
       }
     } else {
       // Swiped down when expanded - only collapse if at top of scroll
-      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
-      if (deltaY > threshold && scrollTop === 0) {
+      if (info.offset.y > threshold && isAtTop) {
         onToggleExpand();
       }
     }
-    
-    // Reset drag position
-    setDragY(0);
   };
 
-  // Handle scroll to check if we're at top (for collapse gesture)
-  const handleScroll = () => {
-    // When scroll position changes, reset drag if needed
-    if (isExpanded && scrollContainerRef.current) {
-      const scrollTop = scrollContainerRef.current.scrollTop ?? 0;
-      if (scrollTop > 0) {
-        setDragY(0);
-      }
-    }
-  };
+  // Determine if drag should be enabled on the entire sheet
+  // When collapsed: allow dragging anywhere on sheet
+  // When expanded: only allow dragging if at top of scroll
+  const shouldEnableDrag = !isExpanded || isAtTop;
 
   return (
     <motion.div
       ref={sheetRef}
-      layout
-      drag={!isExpanded ? "y" : false}
-      dragConstraints={{ top: 0, bottom: 0 }}
-      dragElastic={0.2}
+      drag={shouldEnableDrag ? "y" : false}
+      dragConstraints={isExpanded 
+        ? { top: 0, bottom: 150 } // Allow dragging down when expanded
+        : { top: -200, bottom: 0 } // Allow dragging up when collapsed
+      }
+      dragElastic={0.15}
       dragDirectionLock={true}
-      onDragStart={!isExpanded ? handleDragStart : () => {}}
-      onDrag={!isExpanded ? handleDrag : () => {}}
-      onDragEnd={!isExpanded ? handleDragEnd : () => {}}
-      style={!isExpanded ? { y: dragY } : undefined}
+      onDragStart={shouldEnableDrag ? handleDragStart : undefined}
+      onDragEnd={shouldEnableDrag ? handleDragEnd : undefined}
       className={cn(
         "absolute inset-x-0 bottom-0 z-20 bg-white rounded-t-[24px] shadow-2xl",
         "pointer-events-auto flex flex-col",
         isExpanded ? "h-[85vh] overflow-hidden" : "overflow-visible",
-        !isExpanded && "cursor-grab active:cursor-grabbing"
+        shouldEnableDrag && "cursor-grab active:cursor-grabbing"
       )}
       initial={false}
       transition={{
@@ -500,31 +468,29 @@ export function ActiveDeliverySheet({
         damping: 30,
         mass: 0.8,
       }}
+      style={{
+        touchAction: shouldEnableDrag ? 'pan-y' : 'auto',
+      }}
     >
-      {/* Grab Handle - Fixed at top - Handles drag when expanded and at top of scroll */}
-      <motion.button
+      {/* Grab Handle - Fixed at top */}
+      <button
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           onToggleExpand();
         }}
-        drag={isExpanded ? "y" : false}
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.2}
-        dragDirectionLock={true}
-        onDragStart={isExpanded ? handleDragStart : () => {}}
-        onDrag={isExpanded ? handleDrag : () => {}}
-        onDragEnd={isExpanded ? handleDragEnd : () => {}}
         className={cn(
-          "w-full py-3 flex justify-center items-center cursor-pointer bg-white rounded-t-[24px] transition-colors active:bg-neutral-50 flex-shrink-0 relative z-10 touch-manipulation",
-          isExpanded && "cursor-grab active:cursor-grabbing"
+          "w-full py-3 flex justify-center items-center cursor-pointer bg-white rounded-t-[24px] transition-colors active:bg-neutral-50 flex-shrink-0 relative z-10",
+          shouldEnableDrag && "cursor-grab active:cursor-grabbing"
         )}
         aria-label={isExpanded ? "Collapse details" : "Expand details"}
         type="button"
-        whileTap={{ scale: 0.98 }}
+        style={{
+          touchAction: 'none', // Prevent default touch behavior - let parent handle drag
+        }}
       >
         <div className="w-12 h-1.5 bg-neutral-300 rounded-full" />
-      </motion.button>
+      </button>
 
       {/* Sheet Content - Scrollable when expanded */}
       <div
@@ -534,6 +500,10 @@ export function ActiveDeliverySheet({
           "px-6 w-full",
           isExpanded ? "overflow-y-auto overflow-x-hidden flex-1 pb-6" : "pb-8"
         )}
+        style={{
+          // Disable touch handling when parent is dragging, allow scrolling otherwise
+          touchAction: isDragging ? 'none' : isExpanded ? 'pan-y' : 'auto',
+        }}
       >
         {!isExpanded ? (
             /* COLLAPSED STATE */
