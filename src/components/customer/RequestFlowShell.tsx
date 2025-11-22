@@ -91,7 +91,7 @@ export function RequestFlowShell({
           rounded-b-3xl
           px-6 pt-6 pb-4
           max-w-md mx-auto
-          max-h-[70vh] overflow-y-auto
+          shrink-0
         "
       >
         <h1 className="text-[24px] font-semibold leading-snug text-[#0F172A]">

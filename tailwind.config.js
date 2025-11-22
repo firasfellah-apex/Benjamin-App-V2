@@ -130,12 +130,30 @@ export default {
             transform: 'translateX(0)',
           },
         },
+        'gradient-pulse': {
+          '0%, 100%': {
+            opacity: '0.4',
+          },
+          '50%': {
+            opacity: '0.6',
+          },
+        },
+        'gradient-sweep': {
+          '0%, 100%': {
+            backgroundPosition: '0% 0%',
+          },
+          '50%': {
+            backgroundPosition: '100% 100%',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.5s ease-out',
         'slide-in': 'slide-in 0.5s ease-out',
+        'gradient-pulse': 'gradient-pulse 3s ease-in-out infinite',
+        'gradient-sweep': 'gradient-sweep 8s ease-in-out infinite',
       },
     },
   },

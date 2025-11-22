@@ -143,7 +143,7 @@ export function CustomerScreenLayout({
         // Clear any timeouts stored on the observer
         const timeouts = (resizeObserver as any).__timeouts;
         if (timeouts) {
-          timeouts.forEach((timeout: NodeJS.Timeout) => clearTimeout(timeout));
+          timeouts.forEach((timeout: ReturnType<typeof setTimeout>) => clearTimeout(timeout));
         }
         resizeObserver.disconnect();
       }
@@ -169,7 +169,7 @@ export function CustomerScreenLayout({
             "bg-white rounded-b-[32px]",
             "shadow-[0_8px_24px_rgba(15,23,42,0.06)]",
             "px-6 pt-4 pb-6",
-            "max-h-[70vh] overflow-y-auto"
+            "shrink-0"
           )}
         >
           {topContent}

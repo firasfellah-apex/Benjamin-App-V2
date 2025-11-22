@@ -120,37 +120,44 @@ export default function RunnerHome() {
 
   // Handle new available orders (for interruptive alert)
   const handleNewAvailableOrder = useCallback((order: Order) => {
-    console.log('[RunnerHome] New available order received:', {
+    console.log('[RunnerHome] 🎉 New available order callback triggered:', {
       orderId: order.id,
       status: order.status,
       runnerId: order.runner_id,
       isOnline,
+      requestedAmount: order.requested_amount,
+      customerAddress: order.customer_address,
+      timestamp: new Date().toISOString(),
     });
 
     // Only process if order is truly available (Pending, no runner, and we're online)
-    if (order.status === 'Pending' && !order.runner_id && isOnline) {
-      console.log('[RunnerHome] Adding new order to available list and showing alert');
+    if (order.status === 'Pending' && (order.runner_id === null || order.runner_id === undefined) && isOnline) {
+      console.log('[RunnerHome] ✅ Order is available - Adding to list and showing alert');
       
       // Show interruptive alert
       setNewJobAlert(order as OrderWithDetails);
+      console.log('[RunnerHome] ✅ New job alert displayed');
       
       // Also add to available orders list
       setAvailableOrders((prev) => {
         // Check if order already exists
         if (prev.some((o) => o.id === order.id)) {
-          console.log('[RunnerHome] Order already in available list, skipping');
+          console.log('[RunnerHome] ⚠️ Order already in available list, skipping duplicate');
           return prev;
         }
-        console.log('[RunnerHome] Adding order to available list');
+        console.log('[RunnerHome] ✅ Adding order to available list. Previous count:', prev.length);
         const updated = [order as OrderWithDetails, ...prev].sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
+        console.log('[RunnerHome] ✅ Updated available orders count:', updated.length);
         return updated;
       });
     } else {
-      console.log('[RunnerHome] Filtered out order (not available):', {
+      console.log('[RunnerHome] ⚠️ Filtered out order (not available or offline):', {
         status: order.status,
+        statusMatch: order.status === 'Pending',
         runnerId: order.runner_id,
+        runnerIdIsNull: order.runner_id === null || order.runner_id === undefined,
         isOnline,
       });
     }
@@ -207,6 +214,16 @@ export default function RunnerHome() {
     onUpdate: handleAvailableOrderUpdate,
     enabled: isOnline,
   });
+
+  // Log subscription status
+  useEffect(() => {
+    if (isOnline) {
+      console.log('[RunnerHome] 📡 Realtime subscription enabled - Listening for new orders');
+      console.log('[RunnerHome] 💡 When a customer creates an order, it should appear here immediately');
+    } else {
+      console.log('[RunnerHome] ⏸️ Realtime subscription disabled - Runner is offline');
+    }
+  }, [isOnline]);
 
   // Handle accepting an order
   const handleAccept = async (orderId: string) => {

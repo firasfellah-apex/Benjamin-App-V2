@@ -7,11 +7,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Clock, DollarSign, Navigation } from 'lucide-react';
+import { MapPin, Clock, DollarSign, Flag, Link } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRunnerJobs } from '../state/runnerJobsStore';
 import { Button } from '@/components/ui/button';
+import { SlideToConfirm } from '@/components/customer/SlideToConfirm';
 import { toast } from 'sonner';
+import { getOrderDeliveryStyle, getDeliveryStyleLabel, getDeliveryStyleShortHint } from '@/lib/deliveryStyle';
 
 export function NewJobModal() {
   const { pendingOffer, acceptOffer, skipOffer, online } = useRunnerJobs();
@@ -66,11 +68,6 @@ export function NewJobModal() {
     await skipOffer("manual");
   }, [skipOffer]);
 
-  // Don't show if offline or no pending offer
-  if (!online || !pendingOffer) {
-    return null;
-  }
-
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -83,15 +80,17 @@ export function NewJobModal() {
   const percentage = (timeRemaining / totalTime) * 100;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-        // Backdrop click disabled - runner must explicitly choose Accept or Skip
-      >
+    <AnimatePresence mode="wait">
+      {online && pendingOffer && (
+        <motion.div
+          key="new-job-modal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          // Backdrop click disabled - runner must explicitly choose Accept or Skip
+        >
         <motion.div
           initial={{ scale: 0.95, y: 20 }}
           animate={{ scale: 1, y: 0 }}
@@ -101,9 +100,9 @@ export function NewJobModal() {
           onClick={(e) => e.stopPropagation()} // Prevent backdrop click
         >
           {/* Header */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold mb-2">New Delivery Request</h2>
-            <p className="text-sm text-slate-400">You have a new delivery opportunity</p>
+          <div className="mb-6 text-center">
+            <h2 className="text-2xl font-bold mb-2">New Job Available</h2>
+            <p className="text-sm text-slate-400">Please accept or skip as soon as possible.</p>
           </div>
 
           {/* Countdown Timer */}
@@ -142,80 +141,131 @@ export function NewJobModal() {
 
           {/* Offer Details */}
           <div className="space-y-4 mb-6">
-            {/* Cash Amount & Payout */}
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-emerald-400" />
-                <div>
-                  <div className="text-xs text-slate-400">Cash Amount</div>
-                  <div className="text-xl font-bold">${pendingOffer.cashAmount.toFixed(2)}</div>
+            {/* Earnings Only - Security: Do not show cash amount */}
+            <div className="flex items-center justify-center p-8 rounded-xl bg-white/5">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <DollarSign className="h-5 w-5 text-emerald-400" />
+                  <div className="text-xs text-slate-400">Your Earnings</div>
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-slate-400">You Earn</div>
-                <div className="text-xl font-bold text-emerald-400">${pendingOffer.payout.toFixed(2)}</div>
+                <div className="text-3xl font-bold text-emerald-400">${pendingOffer.payout.toFixed(2)}</div>
               </div>
             </div>
 
-            {/* Pickup Location */}
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
-              <Navigation className="h-5 w-5 text-indigo-400 mt-0.5" />
-              <div className="flex-1">
-                <div className="text-xs text-slate-400 mb-1">Pickup</div>
-                <div className="text-sm font-medium">{pendingOffer.pickup.name}</div>
-              </div>
-            </div>
-
-            {/* Delivery Area */}
-            {pendingOffer.dropoffApprox.neighborhood && (
+            {/* ATM Location and Delivery Area - Side by side */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* ATM Location */}
               <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
-                <MapPin className="h-5 w-5 text-rose-400 mt-0.5" />
-                <div className="flex-1">
-                  <div className="text-xs text-slate-400 mb-1">Delivery Area</div>
-                  <div className="text-sm font-medium">{pendingOffer.dropoffApprox.neighborhood}</div>
+                <Flag className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 mb-1">ATM Location</div>
+                  <div className="text-sm font-medium text-white">{pendingOffer.pickup.name}</div>
                 </div>
               </div>
-            )}
 
-            {/* Distance & ETA */}
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5">
-              <div className="flex items-center gap-2">
-                <Navigation className="h-4 w-4 text-slate-400" />
-                <div>
-                  <div className="text-xs text-slate-400">Distance</div>
-                  <div className="text-sm font-medium">{pendingOffer.distanceKm.toFixed(1)} km</div>
+              {/* Delivery Area */}
+              {pendingOffer.dropoffApprox.neighborhood ? (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
+                  <MapPin className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-slate-400 mb-1">Delivery Area</div>
+                    <div className="text-sm font-medium text-white">{pendingOffer.dropoffApprox.neighborhood}</div>
+                    {/* Delivery Style Pill */}
+                    {(() => {
+                      const deliveryStyle = getOrderDeliveryStyle(pendingOffer.order);
+                      return (
+                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
+                          <span className="text-[11px] font-medium text-slate-200">
+                            {getDeliveryStyleLabel(deliveryStyle)}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
+                  <MapPin className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-slate-400 mb-1">Delivery Area</div>
+                    <div className="text-sm font-medium text-white">—</div>
+                    {/* Delivery Style Pill */}
+                    {(() => {
+                      const deliveryStyle = getOrderDeliveryStyle(pendingOffer.order);
+                      return (
+                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
+                          <span className="text-[11px] font-medium text-slate-200">
+                            {getDeliveryStyleLabel(deliveryStyle)}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Delivery Style Short Hint */}
+            {(() => {
+              const deliveryStyle = getOrderDeliveryStyle(pendingOffer.order);
+              return (
+                <div className="mt-2 text-center">
+                  <p className="text-[11px] text-slate-400">
+                    {getDeliveryStyleShortHint(deliveryStyle)}
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* Total Travel and Est. Time - Side by side */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Total Travel Component */}
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
+                <Link className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 mb-1">Total Travel</div>
+                  <div className="text-sm font-medium text-white">{(pendingOffer.distanceKm * 0.621371).toFixed(1)} miles</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-slate-400" />
-                <div>
-                  <div className="text-xs text-slate-400">Est. Time</div>
-                  <div className="text-sm font-medium">{pendingOffer.etaMinutes} min</div>
+
+              {/* Est. Time Component */}
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
+                <Clock className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 mb-1">Est. Time</div>
+                  <div className="text-sm font-medium text-white">{pendingOffer.etaMinutes} min</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="space-y-3">
+            {/* Skip Button - Red, above Accept */}
             <Button
               onClick={handleSkip}
               disabled={isAccepting}
               variant="ghost"
-              className="flex-1 h-12 rounded-full px-5 bg-white/10 text-white border border-white/15 hover:bg-white/20"
+              className="w-full h-[56px] rounded-[12px] px-5 bg-red-500/20 text-white border border-red-500/30 hover:bg-red-500/30 hover:border-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Skip
+              <span className="text-[15px] font-medium">Skip</span>
             </Button>
-            <Button
-              onClick={handleAccept}
+
+            {/* Slide-to-Confirm Accept Button */}
+            <SlideToConfirm
+              onConfirm={handleAccept}
               disabled={isAccepting || timeRemaining === 0}
-              className="flex-[1.4] h-12 rounded-full px-5 bg-emerald-500 text-[#051016] font-semibold hover:bg-emerald-600 disabled:opacity-50"
-            >
-              {isAccepting ? "Accepting..." : "Accept"}
-            </Button>
+              label="Slide to Accept Job"
+              confirmedLabel="Accepting..."
+              trackClassName="rounded-[12px] bg-gradient-to-r from-green-500/20 to-emerald-500/30 border border-green-500/30"
+              handleClassName="rounded-[12px]"
+            />
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

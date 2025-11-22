@@ -4,7 +4,7 @@
  * Simple profile management: avatar, name, email, phone
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, Edit2, X, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,15 @@ import { Avatar } from "@/components/common/Avatar";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import CustomerCard from "@/pages/customer/components/CustomerCard";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAvatar } from "@/hooks/use-avatar";
+import { AvatarCropModal } from "@/components/common/AvatarCropModal";
 
 export default function Account() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile, isReady } = useProfile(user?.id);
   const queryClient = useQueryClient();
+  const { uploading: avatarUploading, uploadAvatar, removeAvatar } = useAvatar();
   
   const [isAvatarEditing, setIsAvatarEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -32,6 +35,9 @@ export default function Account() {
     last_name: "",
     phone: "",
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -86,13 +92,141 @@ export default function Account() {
   };
 
   const handleAvatarDelete = async () => {
-    // TODO: wire this to your existing avatar remove logic
-    toast.error("Avatar delete not wired yet");
+    try {
+      await removeAvatar();
+
+      const updatedAt = new Date().toISOString();
+
+      // Optimistically clear avatar in react-query
+      queryClient.setQueryData(["profile", user?.id], (old: any) =>
+        old
+          ? {
+              ...old,
+              avatar_url: null,
+              updated_at: updatedAt,
+            }
+          : old
+      );
+
+      // Clear any localStorage cache
+      try {
+        localStorage.removeItem("benjamin:profile:v1");
+      } catch {
+        // ignore
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["profile", user?.id],
+      });
+
+      toast.success("Avatar removed successfully");
+      setIsAvatarEditing(false);
+    } catch (error) {
+      console.error("Error removing avatar:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to remove avatar"
+      );
+    }
   };
 
-  const handleAvatarReplace = async () => {
-    // TODO: wire this to your existing avatar replace logic
-    toast("Open avatar picker here");
+  const handleAvatarReplace = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('File must be a JPEG, PNG, or WebP image');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    // Create object URL and show crop modal
+    const imageUrl = URL.createObjectURL(file);
+    setSelectedImageSrc(imageUrl);
+    setShowCropModal(true);
+  };
+
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    try {
+      const croppedFile = new File([croppedImageBlob], "avatar.jpg", {
+        type: "image/jpeg",
+      });
+
+      // Upload and get the new public URL
+      const publicUrl = await uploadAvatar(croppedFile);
+
+      // New timestamp for cache-busting
+      const updatedAt = new Date().toISOString();
+
+      // Optimistically update profile in react-query
+      queryClient.setQueryData(["profile", user?.id], (old: any) =>
+        old
+          ? {
+              ...old,
+              avatar_url: publicUrl,
+              updated_at: updatedAt,
+            }
+          : old
+      );
+
+      // Clear any localStorage profile cache
+      try {
+        localStorage.removeItem("benjamin:profile:v1");
+      } catch {
+        // ignore
+      }
+
+      // Also invalidate to keep everything in sync with Supabase
+      await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["profile", user?.id],
+      });
+
+      toast.success("Profile picture updated successfully");
+
+      // Clean up object URL & state - only after upload completes
+      if (selectedImageSrc) {
+        URL.revokeObjectURL(selectedImageSrc);
+      }
+      setShowCropModal(false);
+      setSelectedImageSrc(null);
+      setIsAvatarEditing(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload avatar"
+      );
+      // Re-throw so the modal can handle the error state
+      throw error;
+    }
+  };
+
+  const handleCropCancel = () => {
+    if (selectedImageSrc) {
+      URL.revokeObjectURL(selectedImageSrc);
+    }
+    setShowCropModal(false);
+    setSelectedImageSrc(null);
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // Loading state
@@ -121,6 +255,8 @@ export default function Account() {
     const fullName =
       [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "";
 
+    const hasAvatar = !!profile.avatar_url;
+
     const initialData = {
       first_name: profile.first_name || "",
       last_name: profile.last_name || "",
@@ -137,76 +273,103 @@ export default function Account() {
     };
 
     return (
-      <CustomerScreen
-        title="My Account"
-        subtitle="Manage your profile and settings"
-        showBack
-        onBack={handleBack}
-        fixedContent={fixedContent}
-        topContent={
-          <div className="pt-6 space-y-6">
-            {/* IDENTITY: avatar + name + email */}
-            <div className="flex flex-col items-start gap-3">
+      <>
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp"
+          className="hidden"
+          onChange={handleFileInputChange}
+          disabled={avatarUploading}
+        />
+
+        <CustomerScreen
+          title="My Account"
+          subtitle="Manage your profile and settings"
+          showBack
+          onBack={handleBack}
+          fixedContent={fixedContent}
+          topContent={
+            <div className="pt-6 space-y-6">
+              {/* IDENTITY: avatar + name + email */}
+              <div className="flex flex-col items-start gap-3">
               <div className="relative">
                 <Avatar
                   src={profile.avatar_url}
                   alt={fullName || "User"}
                   fallback={fullName || "User"}
                   size="2xl"
+                  cacheKey={profile.updated_at}
                 />
-                
-                {/* Morphing avatar controls: pen → X, row opens to the RIGHT (outside the avatar) */}
-                <div className="absolute bottom-0 right-0">
-                  <div className="relative flex items-center">
-                    {/* Anchor button – pen/X always in the exact same spot */}
-                    <button
-                      type="button"
-                      aria-label={
-                        isAvatarEditing ? "Close avatar options" : "Edit profile photo"
-                      }
-                      onClick={() => setIsAvatarEditing((prev) => !prev)}
-                      className="h-10 w-10 rounded-full bg-black text-white flex items-center justify-center shadow-sm border border-white"
-                    >
-                      {isAvatarEditing ? (
-                        <X className="h-5 w-5" />
-                      ) : profile.avatar_url ? (
-                        <Edit2 className="h-5 w-5" />
-                      ) : (
-                        <Camera className="h-5 w-5" />
-                      )}
-                    </button>
-
-                    {/* Sliding row: Delete / Replace – always to the RIGHT of the anchor */}
-                    <div
-                      className={`
-                        absolute bottom-0 left-full ml-2
-                        flex items-center gap-2
-                        transition-all duration-500 ease-out
-                        ${isAvatarEditing ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2 pointer-events-none"}
-                      `}
-                    >
+                  
+                  {/* Morphing avatar controls: pen → X, row opens to the RIGHT (outside the avatar) */}
+                  <div className="absolute bottom-0 right-0">
+                    <div className="relative flex items-center">
+                      {/* Anchor button – pen/X always in the exact same spot */}
                       <button
                         type="button"
-                        onClick={handleAvatarDelete}
-                        aria-label="Remove avatar"
-                        className="h-10 w-10 rounded-full border border-red-500 text-red-500 bg-white flex items-center justify-center shadow-sm"
+                        aria-label={
+                          isAvatarEditing
+                            ? "Close avatar options"
+                            : hasAvatar
+                              ? "Edit profile photo"
+                              : "Upload profile photo"
+                        }
+                        onClick={() => {
+                          // If no avatar exists, go straight to upload
+                          if (!hasAvatar) {
+                            handleAvatarReplace();
+                            return;
+                          }
+                          // If avatar exists, toggle the right-hand menu
+                          setIsAvatarEditing((prev) => !prev);
+                        }}
+                        className="h-10 w-10 rounded-full bg-black text-white flex items-center justify-center shadow-sm border border-white"
+                        disabled={avatarUploading}
                       >
-                        <Trash2 className="h-5 w-5" />
+                        {isAvatarEditing ? (
+                          <X className="h-5 w-5" />
+                        ) : hasAvatar ? (
+                          <Edit2 className="h-5 w-5" />
+                        ) : (
+                          <Camera className="h-5 w-5" />
+                        )}
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={handleAvatarReplace}
-                        aria-label="Replace avatar"
-                        className="h-10 w-10 rounded-full border border-slate-900 text-slate-900 bg-white flex items-center justify-center shadow-sm"
+                      {/* Sliding row: Delete / Replace – always to the RIGHT of the anchor */}
+                      <div
+                        className={`
+                          absolute bottom-0 left-full ml-2
+                          flex items-center gap-2
+                          transition-all duration-500 ease-out
+                          ${isAvatarEditing ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2 pointer-events-none"}
+                        `}
                       >
-                        <RefreshCw className="h-5 w-5" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={handleAvatarDelete}
+                          aria-label="Remove avatar"
+                          className="h-10 w-10 rounded-full border border-red-500 text-red-500 bg-white flex items-center justify-center shadow-sm disabled:opacity-50"
+                          disabled={avatarUploading}
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleAvatarReplace}
+                          aria-label="Replace avatar"
+                          className="h-10 w-10 rounded-full border border-slate-900 text-slate-900 bg-white flex items-center justify-center shadow-sm disabled:opacity-50"
+                          disabled={avatarUploading}
+                        >
+                          <RefreshCw className="h-5 w-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* PROFILE FORM: always-on inputs */}
             <CustomerCard className="space-y-5 px-0">
@@ -304,6 +467,16 @@ export default function Account() {
           </div>
         }
       />
+
+        {/* Crop Modal */}
+        {showCropModal && selectedImageSrc && (
+          <AvatarCropModal
+            imageSrc={selectedImageSrc}
+            onCropComplete={handleCropComplete}
+            onCancel={handleCropCancel}
+          />
+        )}
+      </>
     );
   }
 

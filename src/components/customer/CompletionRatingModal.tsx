@@ -7,8 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, Phone } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { X, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/common/Avatar';
 import { rateRunner } from '@/db/api';
@@ -16,6 +15,7 @@ import { toast } from 'sonner';
 import type { OrderWithDetails } from '@/types/types';
 import { getRunnerDisplayName } from '@/lib/reveal';
 import OnTimeIllustration from '@/assets/illustrations/OnTime.png';
+import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
 
 interface CompletionRatingModalProps {
   order: OrderWithDetails | null;
@@ -33,6 +33,7 @@ export function CompletionRatingModal({
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
+  const [showReportSheet, setShowReportSheet] = useState(false);
 
   // Reset rating when modal opens/closes
   useEffect(() => {
@@ -80,9 +81,14 @@ export function CompletionRatingModal({
     onClose();
   };
 
+  // Close rating modal when issue sheet opens
+  const handleReportIssue = () => {
+    setShowReportSheet(true);
+  };
+
   return (
     <AnimatePresence>
-      {open && (
+      {open && !showReportSheet && (
         <>
           {/* Backdrop */}
           <motion.div
@@ -90,7 +96,7 @@ export function CompletionRatingModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleSkip}
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 bg-black/50 z-[100]"
           />
 
           {/* Slide-up Modal */}
@@ -103,26 +109,26 @@ export function CompletionRatingModal({
               stiffness: 300,
               damping: 30,
             }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="fixed bottom-0 left-0 right-0 z-[100] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
           >
             {/* Close Button */}
             <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={handleSkip}
-                className="h-8 w-8 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition-colors"
+                className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
                 aria-label="Close"
               >
-                <X className="h-4 w-4 text-white" />
+                <X className="h-5 w-5 text-slate-900" />
               </button>
             </div>
 
             <div className="relative">
               {/* Illustration Section */}
-              <div className="h-80 flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: '#F5F5F4' }}>
+              <div className="h-48 flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: 'rgb(242, 171, 88)' }}>
                 <img
                   src={OnTimeIllustration}
                   alt="Delivery completed"
-                  className="w-full h-full object-contain object-center"
+                  className="w-3/4 h-3/4 object-contain object-center"
                 />
               </div>
 
@@ -130,46 +136,59 @@ export function CompletionRatingModal({
               <div className="px-6 py-6 space-y-6">
                 {/* Success Message */}
                 <div className="text-center space-y-2">
-                  <h2 className="text-2xl font-bold text-slate-900">Right on time</h2>
-                  <p className="text-sm text-slate-600">
-                    {runnerName} delivered your cash right on time. Take a minute to rate and say thanks.
+                  <h2 className="text-2xl font-bold text-slate-900">Right on Time</h2>
+                  <p className="text-sm text-slate-600 whitespace-pre-line">
+                    {runnerName} delivered your cash safely.{'\n'}Mind taking a second to rate the experience?
                   </p>
                 </div>
 
                 {/* Runner Info Card */}
-                {runner && (
-                  <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar
-                        src={(runner as any)?.avatar_url || undefined}
-                        fallback={runnerName}
-                        size="md"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">
-                              Delivered by {runnerName}
+                {runner && (() => {
+                  const runnerAny = runner as any;
+                  const deliveriesCount =
+                    runnerAny?.completed_deliveries ??
+                    runnerAny?.total_deliveries ??
+                    runnerAny?.deliveries_completed ??
+                    runnerAny?.completed_runs ??
+                    null;
+                  
+                  return (
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-5">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={runnerAny?.avatar_url || undefined}
+                          fallback={runnerName}
+                          size="md"
+                        />
+                        <div className="flex flex-col">
+                          <p className="text-sm font-semibold text-slate-900">
+                            Delivered by {runnerName}
+                          </p>
+                          {/* Meta row: rating + deliveries */}
+                          {(runnerAny?.avg_runner_rating || deliveriesCount) && (
+                            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                              {runnerAny?.avg_runner_rating && (
+                                <p className="text-xs text-slate-500">
+                                  ⭐ {runnerAny.avg_runner_rating.toFixed(1)} average rating
+                                </p>
+                              )}
+                              {deliveriesCount && !Number.isNaN(Number(deliveriesCount)) && (
+                                <p className="text-xs text-slate-500">
+                                  • {deliveriesCount} deliveries completed
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {runnerAny?.fun_fact && (
+                            <p className="text-xs text-slate-500 mt-1 italic">
+                              {runnerAny.fun_fact}
                             </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              Ring {runnerName} if you can't find your order
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              // TODO: Implement call functionality
-                              toast.info('Call feature coming soon');
-                            }}
-                            className="p-2 rounded-full bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
-                            aria-label="Call runner"
-                          >
-                            <Phone className="h-4 w-4 text-slate-600" />
-                          </button>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Rating Section */}
                 <div className="space-y-4">
@@ -191,8 +210,8 @@ export function CompletionRatingModal({
                           <Star
                             className="h-10 w-10 transition-colors"
                             style={{
-                              color: star <= (hoveredRating || rating) ? '#DFB300' : '#E5E7EB',
-                              fill: star <= (hoveredRating || rating) ? '#DFB300' : '#E5E7EB'
+                              color: star <= (hoveredRating || rating) ? '#F2AB58' : '#E5E7EB',
+                              fill: star <= (hoveredRating || rating) ? '#F2AB58' : '#E5E7EB'
                             }}
                           />
                         </button>
@@ -200,14 +219,18 @@ export function CompletionRatingModal({
                     </div>
                     {rating > 0 && (
                       <p className="text-sm text-slate-600 mt-3">
-                        {rating === 5 && "Excellent! ⭐"}
-                        {rating === 4 && "Great! 👍"}
+                        {rating === 5 && "Excellent"}
+                        {rating === 4 && "Great"}
                         {rating === 3 && "Good"}
                         {rating === 2 && "Fair"}
                         {rating === 1 && "Poor"}
                       </p>
                     )}
                   </div>
+                  {/* Rating Importance Note */}
+                  <p className="text-xs text-slate-500 text-center px-4">
+                    Great runners earn more on Benjamin. Your rating helps keep the experience sharp, safe, and premium.
+                  </p>
                 </div>
 
                 {/* Action Buttons */}
@@ -215,22 +238,39 @@ export function CompletionRatingModal({
                   <Button
                     onClick={handleSubmit}
                     disabled={submitting || rating === 0}
-                    className="w-full h-12 rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
+                    className="w-full h-[56px] rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
                   >
                     {submitting ? 'Submitting...' : 'Rate your order'}
                   </Button>
-                  <button
-                    onClick={handleSkip}
-                    disabled={submitting}
-                    className="w-full text-sm text-slate-500 hover:text-slate-700 py-2"
-                  >
-                    Maybe later
-                  </button>
+                  {order && (
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={handleReportIssue}
+                      className="w-full text-[11px] text-slate-400 hover:text-slate-600 pb-1"
+                    >
+                      Something felt off? Report an issue
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
+            
           </motion.div>
         </>
+      )}
+      
+      {/* Report Issue Sheet - Separate from rating modal */}
+      {order && (
+        <ReportIssueSheet
+          open={showReportSheet}
+          order={order}
+          onClose={() => {
+            setShowReportSheet(false);
+            // Close the rating modal too when issue sheet closes
+            onClose();
+          }}
+        />
       )}
     </AnimatePresence>
   );

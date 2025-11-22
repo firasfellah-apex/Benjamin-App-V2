@@ -84,37 +84,37 @@ export function getCustomerFacingStatus(
   switch (internalStatus) {
     case 'Pending':
       return {
-        label: 'Request received',
+        label: 'Request Received',
         step: 'REQUESTED',
-        description: "Request received. Benjamin's on it."
+        description: "Benjamin's on it."
       };
     
     case 'Runner Accepted':
       return {
-        label: 'Runner assigned',
+        label: 'Runner Assigned',
         step: 'ASSIGNED',
         description: 'Your request has been assigned to a vetted Benjamin runner.'
       };
     
     case 'Runner at ATM':
       return {
-        label: 'Preparing your cash',
+        label: 'Preparing Cash',
         step: 'PREPARING',
         description: 'Your runner is preparing your cash.'
       };
     
     case 'Cash Withdrawn':
       return {
-        label: 'Heading Your Way',
+        label: 'On The Way',
         step: 'ON_THE_WAY',
         description: 'Your runner has your cash and is heading your way.'
       };
     
     case 'Pending Handoff':
-      // Default to "Heading Your Way" - components should check for arrival separately
+      // Default to "On The Way" - components should check for arrival separately
       // This avoids async issues in synchronous status mapping
       return {
-        label: 'Heading Your Way',
+        label: 'On The Way',
         step: 'ON_THE_WAY',
         description: 'Your runner has your cash and is heading your way.'
       };
@@ -158,13 +158,13 @@ export async function getCustomerFacingStatusWithArrival(
     const runnerArrived = await hasRunnerArrivedFromOrder(order);
     if (runnerArrived) {
       return {
-        label: 'Runner has arrived',
+        label: 'Runner Arrived',
         step: 'ARRIVED',
         description: 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
       };
     } else {
       return {
-        label: 'Heading Your Way',
+        label: 'On The Way',
         step: 'ON_THE_WAY',
         description: 'Your runner has your cash and is heading your way.'
       };
@@ -178,27 +178,27 @@ export async function getCustomerFacingStatusWithArrival(
 export const CUSTOMER_TIMELINE_STEPS = [
   {
     step: 'REQUESTED' as CustomerFacingStep,
-    label: 'Request received',
+    label: 'Request Received',
     description: "Benjamin's on it"
   },
   {
     step: 'ASSIGNED' as CustomerFacingStep,
-    label: 'Runner assigned',
+    label: 'Runner Assigned',
     description: 'Vetted runner confirmed'
   },
   {
     step: 'PREPARING' as CustomerFacingStep,
-    label: 'Preparing cash',
+    label: 'Preparing Cash',
     description: 'Securing your funds'
   },
   {
     step: 'ON_THE_WAY' as CustomerFacingStep,
-    label: 'On the way',
+    label: 'On The Way',
     description: 'En route to you'
   },
   {
     step: 'ARRIVED' as CustomerFacingStep,
-    label: 'Runner has arrived',
+    label: 'Runner Arrived',
     description: 'Ready for handoff'
   },
   {

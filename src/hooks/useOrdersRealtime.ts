@@ -61,7 +61,10 @@ export function useOrdersRealtime({
   }, [onInsert, onUpdate, onDelete]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      console.log(`[Realtime] ${filter.mode === 'runner' && filter.availableOnly ? 'runner-available-orders' : 'channel'} - Subscription disabled, skipping setup`);
+      return;
+    }
 
     const channelName = 
       filter.mode === 'single' 
@@ -86,12 +89,21 @@ export function useOrdersRealtime({
         // For available orders: status = 'Pending' AND runner_id IS NULL
         // Note: We can't use AND in a single filter, so we'll filter client-side
         // But we can still filter by status to reduce events
+        // This filter will match all INSERT/UPDATE/DELETE events for Pending orders
+        // We then check runner_id === null in the client-side handler
         filterString = `status=eq.Pending`;
       } else if (filter.runnerId) {
         filterString = `runner_id=eq.${filter.runnerId}`;
       }
     }
     // Admin mode: no filter (subscribe to all orders)
+
+    console.log(`[Realtime] Setting up subscription for ${channelName}`, {
+      filter: filterString || 'all orders',
+      mode: filter.mode,
+      availableOnly: filter.mode === 'runner' ? filter.availableOnly : undefined,
+      enabled,
+    });
 
     const channel = supabase
       .channel(channelName)
@@ -150,15 +162,26 @@ export function useOrdersRealtime({
                 // These are orders available for runners to accept
                 // For INSERT events: check if newOrder is available
                 if (eventType === 'INSERT' && newOrder) {
-                  if (newOrder.status !== 'Pending' || newOrder.runner_id !== null) {
+                  // Check if order is available: status must be 'Pending' AND runner_id must be NULL
+                  const isAvailable = newOrder.status === 'Pending' && (newOrder.runner_id === null || newOrder.runner_id === undefined);
+                  
+                  if (!isAvailable) {
                     console.log(`[Realtime] ${channelName} - Filtered out INSERT (not available):`, {
                       status: newOrder.status,
                       runnerId: newOrder.runner_id,
+                      isNull: newOrder.runner_id === null,
+                      isUndefined: newOrder.runner_id === undefined,
                     });
                     return;
                   }
                   // This is a new available order - process it
-                  console.log(`[Realtime] ${channelName} - New available order INSERT:`, newOrder.id);
+                  console.log(`[Realtime] ${channelName} - ✅ New available order INSERT detected:`, {
+                    orderId: newOrder.id,
+                    status: newOrder.status,
+                    runnerId: newOrder.runner_id,
+                    customerId: newOrder.customer_id,
+                    requestedAmount: newOrder.requested_amount,
+                  });
                 }
                 // For UPDATE events: check if order became unavailable
                 if (eventType === 'UPDATE' && newOrder) {
@@ -206,7 +229,17 @@ export function useOrdersRealtime({
             // Call appropriate callback
             const callbacks = callbacksRef.current;
 
-            if (eventType === 'INSERT' && newOrder && callbacks.onInsert) {
+            if (eventType === 'INSERT' && newOrder) {
+              if (!callbacks.onInsert) {
+                console.warn(`[Realtime] ${channelName} - ⚠️ INSERT event received but no onInsert callback registered`, {
+                  orderId: newOrder.id,
+                  hasOnInsert: !!callbacks.onInsert,
+                  hasOnUpdate: !!callbacks.onUpdate,
+                  hasOnDelete: !!callbacks.onDelete,
+                });
+                return;
+              }
+              
               console.log(`[Realtime] ${channelName} - 🎯 INSERT event - Calling onInsert for order ${newOrder.id}`, {
                 orderId: newOrder.id,
                 status: newOrder.status,
@@ -214,7 +247,13 @@ export function useOrdersRealtime({
                 customerId: newOrder.customer_id,
                 timestamp: new Date().toISOString(),
               });
-              callbacks.onInsert(newOrder);
+              
+              try {
+                callbacks.onInsert(newOrder);
+                console.log(`[Realtime] ${channelName} - ✅ onInsert callback executed successfully for order ${newOrder.id}`);
+              } catch (callbackError) {
+                console.error(`[Realtime] ${channelName} - ❌ Error in onInsert callback:`, callbackError);
+              }
             } else if (eventType === 'UPDATE' && newOrder && callbacks.onUpdate) {
               console.log(`[Realtime] ${channelName} - 🔄 UPDATE event - Calling onUpdate for order ${newOrder.id}`, {
                 orderId: newOrder.id,
@@ -243,7 +282,7 @@ export function useOrdersRealtime({
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log(`[Realtime] ✅ Subscribed to ${channelName}`, {
+          console.log(`[Realtime] ✅ Successfully subscribed to ${channelName}`, {
             filter: filterString || 'all orders',
             mode: filter.mode,
             availableOnly: filter.mode === 'runner' ? filter.availableOnly : undefined,
@@ -257,12 +296,17 @@ export function useOrdersRealtime({
           if (filter.mode === 'runner' && filter.availableOnly) {
             console.log(`[Realtime] ${channelName} - 👀 Watching for new Pending orders (runner_id IS NULL)`);
             console.log(`[Realtime] ${channelName} - 💡 When a customer creates an order, you should see an INSERT event here`);
+            console.log(`[Realtime] ${channelName} - 🔍 To verify Realtime is enabled, check: Supabase Dashboard → Database → Replication → orders table`);
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.error(`[Realtime] ❌ Subscription error for ${channelName}:`, status);
-          console.error(`[Realtime] ${channelName} - ⚠️ Make sure Realtime is enabled in Supabase Dashboard → Database → Replication`);
+          console.error(`[Realtime] ${channelName} - ⚠️ TROUBLESHOOTING STEPS:`);
+          console.error(`[Realtime] ${channelName} - 1. Check if Realtime is enabled: Supabase Dashboard → Database → Replication → orders table`);
+          console.error(`[Realtime] ${channelName} - 2. Verify migration was applied: Check if orders table is in supabase_realtime publication`);
+          console.error(`[Realtime] ${channelName} - 3. Check RLS policies: Runners should be able to SELECT orders with status='Pending'`);
+          console.error(`[Realtime] ${channelName} - 4. Check browser console for network errors`);
         } else if (status === 'CLOSED') {
-          console.log(`[Realtime] ${channelName} - Channel closed`);
+          console.warn(`[Realtime] ${channelName} - ⚠️ Channel closed. This may indicate a connection issue.`);
         } else {
           console.log(`[Realtime] Subscription status for ${channelName}:`, status);
         }

@@ -1,7 +1,14 @@
-import React, { memo } from "react";
+import React, { memo, useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SlideToConfirm } from "@/components/customer/SlideToConfirm";
+import { DeliveryProgressBar } from "@/components/customer/DeliveryProgressBar";
+import { getCustomerFacingStatus, getCustomerFacingStatusWithArrival, type CustomerFacingStep, type CustomerFacingStatus } from "@/lib/customerStatus";
+import { canRevealRunnerIdentity, getRunnerDisplayName } from "@/lib/reveal";
+import { shouldShowCustomerOtpToCustomer } from "@/lib/revealRunnerView";
+import { OtpDisplay } from "@/components/customer/OtpDisplay";
+import type { OrderWithDetails, OrderStatus } from "@/types/types";
+import { supabase } from "@/db/supabase";
 
 type Mode =
   | "home"           // Home: single "Request Cash"
@@ -19,6 +26,7 @@ interface RequestFlowBottomBarProps {
   primaryLabel?: string;      // optional custom label (overrides mode-based label)
   termsContent?: React.ReactNode; // optional terms text/content to show above buttons
   useSliderButton?: boolean;   // if true, use slider button instead of regular button (amount page only)
+  activeOrder?: OrderWithDetails | null; // Active order for progress display
 }
 
 export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
@@ -32,12 +40,84 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
   primaryLabel: customPrimaryLabel,
   termsContent,
   useSliderButton = false, // default to false to keep current behavior
+  activeOrder = null,
 }) => {
+  const [customerStatus, setCustomerStatus] = useState<CustomerFacingStatus | null>(null);
+
+  // Get customer status - same logic as ActiveDeliverySheet
+  useEffect(() => {
+    const updateCustomerStatus = async () => {
+      if (!activeOrder) {
+        setCustomerStatus(null);
+        return;
+      }
+
+      if (activeOrder.status === 'Pending Handoff') {
+        const status = await getCustomerFacingStatusWithArrival(activeOrder.status, activeOrder);
+        setCustomerStatus(status);
+      } else {
+        const status = getCustomerFacingStatus(activeOrder.status);
+        setCustomerStatus(status);
+      }
+    };
+
+    updateCustomerStatus();
+
+    // Poll for arrival status periodically when in Pending Handoff
+    if (activeOrder?.status === 'Pending Handoff' && activeOrder?.id) {
+      const checkArrival = async () => {
+        const status = await getCustomerFacingStatusWithArrival(activeOrder.status, activeOrder);
+        setCustomerStatus(status);
+      };
+      
+      checkArrival();
+      const interval = setInterval(checkArrival, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [activeOrder?.status, activeOrder?.id, activeOrder]);
+
+  // Subscribe to order_events for runner arrival updates
+  useEffect(() => {
+    if (!activeOrder || activeOrder.status !== 'Pending Handoff' || !activeOrder.id) return;
+
+    const channel = supabase
+      .channel(`order-events:${activeOrder.id}:runner-arrived`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'order_events',
+          filter: `order_id=eq.${activeOrder.id}`,
+        },
+        async (payload: any) => {
+          if (payload.new?.client_action_id === 'runner_arrived') {
+            const { getOrderById } = await import('@/db/api');
+            try {
+              const freshOrder = await getOrderById(activeOrder.id);
+              if (freshOrder) {
+                const status = await getCustomerFacingStatusWithArrival('Pending Handoff', freshOrder);
+                setCustomerStatus(status);
+              }
+            } catch (error) {
+              console.error('Error fetching fresh order after arrival:', error);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [activeOrder?.status, activeOrder?.id]);
 
   // Label logic
   const primaryLabel =
     customPrimaryLabel ||
-    (mode === "home"
+    (activeOrder && customerStatus
+      ? "Track Order"
+      : mode === "home"
       ? "Order Cash"
       : mode === "address"
       ? "Continue to Amount"
@@ -51,6 +131,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
       : "";
 
   const isSingleMode = mode === "home";
+  const showActiveOrderProgress = activeOrder && customerStatus && mode === "home";
 
   return (
     <nav
@@ -64,6 +145,49 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
       {/* Standardized spacing: px-6 py-6 (24px all around) */}
       {/* Bottom padding includes safe area inset for devices with home indicator */}
       <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+        {/* Active Order Progress - shown when there's an active order - matches collapsed modal */}
+        {showActiveOrderProgress && customerStatus && activeOrder && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="mb-4 space-y-4"
+          >
+            {/* Title and Sub Label - Grouped together (same as collapsed modal) */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">{customerStatus.label}...</h3>
+              <p className="text-sm text-slate-600 pt-[6px]">
+                {customerStatus.step === 'ON_THE_WAY'
+                  ? (() => {
+                      const showRunnerIdentity = canRevealRunnerIdentity(activeOrder.status);
+                      const runnerName = showRunnerIdentity && activeOrder.runner 
+                        ? getRunnerDisplayName(
+                            (activeOrder.runner as any)?.first_name,
+                            (activeOrder.runner as any)?.last_name,
+                            activeOrder.status
+                          )
+                        : 'Your runner';
+                      return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
+                    })()
+                  : customerStatus.step === 'ARRIVED'
+                  ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+                  : customerStatus.description}
+              </p>
+            </div>
+
+            {/* Progress Bar (same as collapsed modal) */}
+            <div className="py-3">
+              <DeliveryProgressBar currentStep={customerStatus.step} />
+            </div>
+
+            {/* OTP Code Display - Compact summary for bottom nav */}
+            {shouldShowCustomerOtpToCustomer(activeOrder.status, !!activeOrder.otp_code) && activeOrder.otp_code && customerStatus && (
+              <OtpDisplay otpCode={activeOrder.otp_code} customerStatusStep={customerStatus.step} />
+            )}
+          </motion.div>
+        )}
+
         {/* Terms content - only on amount page, above primary CTA */}
         {termsContent && (
           <motion.div
@@ -210,8 +334,8 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                 <SlideToConfirm
                   onConfirm={onPrimary}
                   disabled={isLoading || primaryDisabled}
-                  label="Slide to confirm request"
-                  confirmedLabel="Request confirmed"
+                  label="Slide to Confirm Order"
+                  confirmedLabel="Order confirmed"
                 />
               ) : (
                 <motion.button

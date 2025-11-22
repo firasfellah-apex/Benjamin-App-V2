@@ -504,7 +504,8 @@ export async function createOrder(
   requestedAmount: number,
   customerAddress: string,
   customerNotes?: string,
-  addressId?: string
+  addressId?: string,
+  deliveryStyle?: 'COUNTED' | 'SPEED'
 ): Promise<Order | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -532,25 +533,47 @@ export async function createOrder(
     }
   }
 
-  const { data, error } = await supabase
+  // Build insert payload - conditionally include delivery_style for backward compatibility
+  const insertPayload: Record<string, any> = {
+    customer_id: user.id,
+    requested_amount: fees.requestedAmount,
+    profit: fees.profit,
+    compliance_fee: fees.complianceFee,
+    delivery_fee: fees.deliveryFee,
+    total_service_fee: fees.totalServiceFee,
+    total_payment: fees.totalPayment,
+    address_id: addressId || null,
+    address_snapshot: addressSnapshot,
+    customer_address: customerAddress, // Legacy field for backward compatibility
+    customer_name: customerName,
+    customer_notes: customerNotes || null,
+    status: "Pending"
+  };
+
+  // Include delivery_style if provided (will be omitted if column doesn't exist yet)
+  if (deliveryStyle) {
+    insertPayload.delivery_style = deliveryStyle;
+  }
+
+  let { data, error } = await supabase
     .from("orders")
-    .insert({
-      customer_id: user.id,
-      requested_amount: fees.requestedAmount,
-      profit: fees.profit,
-      compliance_fee: fees.complianceFee,
-      delivery_fee: fees.deliveryFee,
-      total_service_fee: fees.totalServiceFee,
-      total_payment: fees.totalPayment,
-      address_id: addressId || null,
-      address_snapshot: addressSnapshot,
-      customer_address: customerAddress, // Legacy field for backward compatibility
-      customer_name: customerName,
-      customer_notes: customerNotes || null,
-      status: "Pending"
-    })
+    .insert(insertPayload)
     .select()
     .maybeSingle();
+
+  // If error is due to missing delivery_style column, retry without it (backward compatibility)
+  if (error && error.message?.includes("delivery_style")) {
+    console.warn("[Order Creation] delivery_style column not found, retrying without it");
+    const { delivery_style, ...payloadWithoutStyle } = insertPayload;
+    const retryResult = await supabase
+      .from("orders")
+      .insert(payloadWithoutStyle)
+      .select()
+      .maybeSingle();
+    
+    data = retryResult.data;
+    error = retryResult.error;
+  }
 
   if (error) {
     console.error("[Order Creation] ❌ Error creating order:", error);
@@ -617,14 +640,14 @@ export async function getRunnerOrders(): Promise<OrderWithDetails[]> {
 }
 
 /**
- * Get runner order history including Completed, Skipped, and Timed-Out orders
- * Completed orders come from orders table, Skipped/Timed-Out from runner_offer_events
+ * Get runner order history including Completed, Skipped, Missed, and Cancelled orders
+ * Completed orders come from orders table, Skipped/Missed from runner_offer_events
  */
-export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' | 'Cancelled' }>> {
+export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Missed' | 'Cancelled' }>> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const history: Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' | 'Cancelled' }> = [];
+  const history: Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Missed' | 'Cancelled' }> = [];
 
   // Get all terminal status orders (Completed, Cancelled)
   const { data: terminalOrders, error: ordersError } = await supabase
@@ -651,7 +674,8 @@ export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & 
     });
   }
 
-  // Get skipped and timed-out orders from runner_offer_events
+  // Get skipped and missed orders from runner_offer_events
+  // Use runner_offer_events as the single source of truth - always include events even if order data is inaccessible
   try {
     const { data: offerEvents, error: eventsError } = await supabase
       .from('runner_offer_events')
@@ -671,54 +695,114 @@ export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & 
     } else if (offerEvents && offerEvents.length > 0) {
       console.log(`[getRunnerOrderHistory] Found ${offerEvents.length} offer events for runner`);
       
+      // Group events by order ID and get the most recent event for each order
+      const orderEventMap = new Map<string, { offer_id: string; event: string; created_at: string }>();
+      offerEvents.forEach(event => {
+        const existing = orderEventMap.get(event.offer_id);
+        if (!existing || new Date(event.created_at) > new Date(existing.created_at)) {
+          orderEventMap.set(event.offer_id, event);
+        }
+      });
+
+      const uniqueOrderEvents = Array.from(orderEventMap.values());
+      console.log(`[getRunnerOrderHistory] Unique order events:`, uniqueOrderEvents.length);
+      
       // Get unique order IDs from events
-      const orderIds = [...new Set(offerEvents.map(e => e.offer_id))];
+      const orderIds = [...new Set(uniqueOrderEvents.map(e => e.offer_id))];
       console.log(`[getRunnerOrderHistory] Unique order IDs from events:`, orderIds);
       
-      if (orderIds.length > 0) {
-        // Fetch order details for skipped/timed-out orders
-        // Exclude orders that are already in history (Completed/Cancelled)
-        const existingOrderIds = new Set(history.map(h => h.id));
-        const newOrderIds = orderIds.filter(id => !existingOrderIds.has(id));
-        console.log(`[getRunnerOrderHistory] New order IDs (not in history):`, newOrderIds);
-        
-        if (newOrderIds.length > 0) {
-          const { data: skippedOrders, error: skippedError } = await supabase
-            .from("orders")
-            .select(`
-              *,
-              customer:customer_id(*),
-              runner:runner_id(*)
-            `)
-            .in("id", newOrderIds);
+      // Exclude orders that are already in history (Completed/Cancelled)
+      const existingOrderIds = new Set(history.map(h => h.id));
+      const newOrderIds = orderIds.filter(id => !existingOrderIds.has(id));
+      console.log(`[getRunnerOrderHistory] New order IDs (not in history):`, newOrderIds);
+      
+      if (newOrderIds.length > 0) {
+        // Try to fetch order details for skipped/missed orders
+        // Use multiple queries if needed to handle RLS restrictions
+        const skippedOrders: OrderWithDetails[] = [];
+        const inaccessibleOrderIds: string[] = [];
 
-          if (skippedError) {
-            console.error('[getRunnerOrderHistory] Error fetching skipped orders:', skippedError);
-          } else if (skippedOrders && skippedOrders.length > 0) {
-            console.log(`[getRunnerOrderHistory] Found ${skippedOrders.length} skipped/timed-out orders`);
-            
-            skippedOrders.forEach(order => {
-              // Find the most recent event for this order
-              const orderEvents = offerEvents.filter(e => e.offer_id === order.id);
-              const mostRecentEvent = orderEvents.sort((a, b) => 
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              )[0];
+        // Try to fetch all orders at once first
+        const { data: fetchedOrders, error: skippedError } = await supabase
+          .from("orders")
+          .select(`
+            *,
+            customer:customer_id(*),
+            runner:runner_id(*)
+          `)
+          .in("id", newOrderIds);
 
-              if (mostRecentEvent) {
-                const historyStatus = mostRecentEvent.event === 'timeout' 
-                  ? 'Timed-Out' as const 
-                  : 'Skipped' as const;
-                
-                history.push({
-                  ...order,
-                  historyStatus
-                });
-              }
-            });
-          } else {
-            console.log('[getRunnerOrderHistory] No skipped orders found (may have been deleted or runner lacks permission)');
-          }
+        if (skippedError) {
+          console.warn('[getRunnerOrderHistory] Error fetching skipped orders (may be RLS restricted):', skippedError);
         }
+
+        if (fetchedOrders) {
+          skippedOrders.push(...fetchedOrders);
+        }
+
+        // Identify which orders we couldn't fetch (due to RLS or deletion)
+        const fetchedOrderIds = new Set(fetchedOrders?.map(o => o.id) || []);
+        inaccessibleOrderIds.push(...newOrderIds.filter(id => !fetchedOrderIds.has(id)));
+
+        // Process successfully fetched orders
+        skippedOrders.forEach(order => {
+          const event = orderEventMap.get(order.id);
+          if (event) {
+            const historyStatus = event.event === 'timeout' 
+              ? 'Missed' as const 
+              : 'Skipped' as const;
+            
+            history.push({
+              ...order,
+              historyStatus
+            });
+          }
+        });
+
+        // For inaccessible orders, create minimal history entries from event data
+        // This ensures orders don't disappear from history even if they become inaccessible
+        inaccessibleOrderIds.forEach(orderId => {
+          const event = orderEventMap.get(orderId);
+          if (event) {
+            const historyStatus = event.event === 'timeout' 
+              ? 'Missed' as const 
+              : 'Skipped' as const;
+            
+            // Create a minimal order object from event data
+            // Use event.created_at as created_at since we don't have order data
+            const minimalOrder: OrderWithDetails & { historyStatus: 'Skipped' | 'Missed' } = {
+              id: orderId,
+              requested_amount: 0, // Will be hidden in UI anyway
+              status: 'Pending' as any, // Placeholder
+              created_at: event.created_at, // Use event timestamp as fallback
+              updated_at: event.created_at,
+              historyStatus,
+              customer_id: '', // Placeholder
+              runner_id: null,
+              // Add other required fields as placeholders
+              profit: 0,
+              compliance_fee: 0,
+              delivery_fee: 0,
+              total_service_fee: 0,
+              total_payment: 0,
+              address_id: null,
+              address_snapshot: null,
+              customer_address: null,
+              customer_name: 'Customer',
+              customer_notes: null,
+              customer_rating_by_runner: null,
+              runner_rating: null,
+              cash_withdrawn_at: null,
+              handoff_completed_at: null,
+              customer: null,
+              runner: null,
+            };
+
+            history.push(minimalOrder);
+          }
+        });
+
+        console.log(`[getRunnerOrderHistory] Added ${skippedOrders.length} skipped/missed orders with full data, ${inaccessibleOrderIds.length} with event data only`);
       }
     } else {
       console.log('[getRunnerOrderHistory] No offer events found for runner');
@@ -1131,8 +1215,12 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
       return { success: false, error: "Incorrect code. Please try again." };
     }
 
-    // Check delivery mode to determine flow
-    const deliveryMode = (order as any).delivery_mode;
+    // Check delivery style to determine flow (source of truth is delivery_style, with fallback to delivery_mode)
+    const deliveryStyle = (order as any).delivery_style;
+    const deliveryMode = (order as any).delivery_mode; // Legacy fallback
+    
+    // Determine if this is COUNTED mode (check delivery_style first, then fallback to delivery_mode)
+    const isCounted = deliveryStyle === 'COUNTED' || (deliveryStyle !== 'SPEED' && deliveryMode === 'count_confirm');
 
     // OTP is correct - update verified_at timestamp (if column exists)
     try {
@@ -1161,10 +1249,14 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
       }
     }
 
-    // For "Speed" mode (quick_handoff): Complete immediately
-    // For "Counted" mode (count_confirm): Stay in Pending Handoff, wait for count confirmation
-    if (deliveryMode === 'quick_handoff' || !deliveryMode) {
-      // Speed mode: Complete the order immediately
+    // For "Speed" mode: Complete immediately
+    // For "Counted" mode: Stay in Pending Handoff, wait for count confirmation
+    if (isCounted) {
+      // Counted mode: OTP verified, but stay in Pending Handoff
+      // Runner will need to confirm count separately
+      return { success: true, requiresCountConfirmation: true };
+    } else {
+      // Speed mode (default): Complete the order immediately
       const updatedOrder = await advanceOrderStatus(
         orderId,
         "Completed",
@@ -1181,10 +1273,6 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
       }
 
       return { success: true };
-    } else if (deliveryMode === 'count_confirm') {
-      // Counted mode: OTP verified, but stay in Pending Handoff
-      // Runner will need to confirm count separately
-      return { success: true, requiresCountConfirmation: true };
     }
 
     // Default: Complete the order (backward compatibility)
@@ -2009,6 +2097,161 @@ export function subscribeToOrder(orderId: string, callback: (payload: any) => vo
   return channel;
 }
 
+// Order Issue Reporting
+export type OrderIssueCategory =
+  | 'CASH_AMOUNT'
+  | 'LATE_ARRIVAL'
+  | 'SAFETY_CONCERN'
+  | 'UNPROFESSIONAL'
+  | 'OTHER';
+
+export async function createOrderIssue(params: {
+  orderId: string;
+  customerId: string;
+  runnerId?: string | null;
+  category: OrderIssueCategory;
+  notes?: string;
+}) {
+  const { orderId, customerId, runnerId, category, notes } = params;
+
+  // First, try to insert into order_issues table if it exists
+  const { data, error } = await supabase
+    .from('order_issues')
+    .insert({
+      order_id: orderId,
+      customer_id: customerId,
+      runner_id: runnerId ?? null,
+      category,
+      notes: notes?.trim() || null,
+      status: 'OPEN',
+    })
+    .select()
+    .single();
+
+  // If order_issues table doesn't exist, fall back to order_events
+  if (error && error.code === 'PGRST205') {
+    console.warn('[createOrderIssue] order_issues table not found, falling back to order_events');
+    
+    // Get current user for actor_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Get current order status for the event
+    const { data: order } = await supabase
+      .from('orders')
+      .select('status')
+      .eq('id', orderId)
+      .single();
+
+    // Store issue as an order_event with metadata
+    const { data: eventData, error: eventError } = await supabase
+      .from('order_events')
+      .insert({
+        order_id: orderId,
+        from_status: order?.status || null,
+        to_status: order?.status || 'Completed', // Keep same status
+        actor_id: user.id,
+        actor_role: 'customer',
+        client_action_id: `issue_report_${orderId}_${Date.now()}`,
+        metadata: {
+          type: 'customer_issue_report',
+          category,
+          notes: notes?.trim() || null,
+          runner_id: runnerId ?? null,
+        },
+      })
+      .select()
+      .single();
+
+    if (eventError) {
+      console.error('[createOrderIssue] error creating event', eventError);
+      throw eventError;
+    }
+
+    return eventData;
+  }
+
+  if (error) {
+    console.error('[createOrderIssue] error', error);
+    throw error;
+  }
+
+  return data;
+}
+
+// Check if an order has a reported issue
+// Cache table existence check to avoid repeated 404s
+let orderIssuesTableExists: boolean | null = null;
+
+export async function hasOrderIssue(orderId: string): Promise<boolean> {
+  try {
+    // First check order_issues table if we haven't determined it doesn't exist
+    if (orderIssuesTableExists !== false) {
+      const { data: issueData, error: issueError } = await supabase
+        .from('order_issues')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      // If table exists and we found an issue, return true
+      if (issueData && !issueError) {
+        orderIssuesTableExists = true;
+        return true;
+      }
+
+      // If table doesn't exist (PGRST205), mark it and skip future checks
+      if (issueError && issueError.code === 'PGRST205') {
+        orderIssuesTableExists = false;
+        // Continue to check order_events
+      } else if (issueError) {
+        // Other error, but table might exist - log and continue
+        console.warn('[hasOrderIssue] Error checking order_issues:', issueError);
+      } else if (!issueData && !issueError) {
+        // Table exists but no issue found
+        orderIssuesTableExists = true;
+        return false;
+      }
+    }
+
+    // Fall back to checking order_events for customer_issue_report
+    // Check by metadata type first (more reliable)
+    const { data: metadataData, error: metadataError } = await supabase
+      .from('order_events')
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('metadata->>type', 'customer_issue_report')
+      .limit(1);
+
+    if (!metadataError && metadataData && metadataData.length > 0) {
+      return true;
+    }
+
+    // Fallback to checking client_action_id pattern if metadata check failed
+    if (metadataError) {
+      console.warn('[hasOrderIssue] Error checking metadata, trying client_action_id:', metadataError);
+    }
+
+    const { data: actionData, error: actionError } = await supabase
+      .from('order_events')
+      .select('id')
+      .eq('order_id', orderId)
+      .like('client_action_id', `issue_report_${orderId}_%`)
+      .limit(1);
+
+    if (actionError) {
+      console.error('[hasOrderIssue] Error checking client_action_id:', actionError);
+      return false;
+    }
+
+    return (actionData && actionData.length > 0) || false;
+  } catch (error) {
+    console.error('[hasOrderIssue] Unexpected error:', error);
+    return false;
+  }
+}
+
 // Admin: Create a test/mock order for runner training
 export async function createTestOrder(): Promise<{ success: boolean; orderId?: string; message: string }> {
   try {
@@ -2361,10 +2604,11 @@ export async function skipRunnerOffer(
       return { success: false, error: "Unauthorized: Only runners can skip offers" };
     }
 
-    // Log the skip event (this creates a record that the runner skipped this order)
+    // Log the skip or timeout event (this creates a record that the runner skipped/missed this order)
+    // Use 'timeout' event when the timer expired, 'skipped' when manually skipped
     await logRunnerOfferEvent({
       offerId,
-      event: 'skipped',
+      event: reason === 'timeout' ? 'timeout' : 'skipped',
       reason,
     });
 

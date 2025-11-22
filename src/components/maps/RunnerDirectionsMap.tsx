@@ -13,7 +13,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getEnv } from '@/lib/env';
 import { cn } from '@/lib/utils';
-import { Navigation } from 'lucide-react';
+import { applyBenjaminTheme, getBenjaminMapStyle, BENJAMIN_COLORS } from '@/lib/mapboxTheme';
 
 export interface Location {
   lat: number;
@@ -32,6 +32,10 @@ interface RunnerDirectionsMapProps {
   className?: string;
   /** Map height */
   height?: string;
+  /** Bottom padding for map fitting (to account for bottom sheet) */
+  bottomPadding?: number;
+  /** Whether the map is interactive (default: true for runner, false for customer) */
+  interactive?: boolean;
 }
 
 // Dummy locations for testing (Miami area)
@@ -59,6 +63,8 @@ export function RunnerDirectionsMap({
   title,
   className,
   height = '400px',
+  bottomPadding = 50,
+  interactive = true,
 }: RunnerDirectionsMapProps) {
   console.log('[RunnerDirectionsMap] Component rendered with props:', { origin, destination, title, height });
   
@@ -87,9 +93,28 @@ export function RunnerDirectionsMap({
 
   // Function to initialize the map (extracted so it can be called from ref callback)
   const initializeMap = useCallback(() => {
-    // Prevent multiple initialization attempts
+    // Check if map already exists and is valid
+    if (mapRef.current) {
+      // Check if map container is still attached to the map instance
+      if (mapRef.current.getContainer() && mapRef.current.getContainer().parentNode) {
+        console.log('[RunnerDirectionsMap] Map already exists and is valid, skipping initialization');
+        return;
+      } else {
+        // Map instance exists but container is detached - clean up and recreate
+        console.warn('[RunnerDirectionsMap] Map exists but container is detached, cleaning up...');
+        try {
+          mapRef.current.remove();
+        } catch (e) {
+          console.error('[RunnerDirectionsMap] Error removing detached map:', e);
+        }
+        mapRef.current = null;
+        initializationAttemptedRef.current = false;
+      }
+    }
+    
+    // Prevent multiple simultaneous initialization attempts
     if (initializationAttemptedRef.current) {
-      console.log('[RunnerDirectionsMap] Initialization already attempted, skipping');
+      console.log('[RunnerDirectionsMap] Initialization already in progress, skipping');
       return;
     }
     
@@ -102,8 +127,9 @@ export function RunnerDirectionsMap({
       return;
     }
     
-    if (mapRef.current) {
-      console.log('[RunnerDirectionsMap] Map already exists, skipping initialization');
+    // Verify container is in DOM
+    if (!mapContainerRef.current.parentNode) {
+      console.warn('[RunnerDirectionsMap] Container not in DOM, cannot initialize');
       return;
     }
     
@@ -169,7 +195,7 @@ export function RunnerDirectionsMap({
     try {
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/navigation-night-v1', // Dark theme for runner app
+        style: getBenjaminMapStyle(), // Light theme with Benjamin brand colors
         center: [origin.lng, origin.lat],
         zoom: 13,
         antialias: true,
@@ -181,18 +207,33 @@ export function RunnerDirectionsMap({
 
       mapRef.current = map;
 
+      // Disable interactions for non-interactive maps (customer view)
+      if (!interactive) {
+        map.scrollZoom.disable();
+        map.boxZoom.disable();
+        map.dragRotate.disable();
+        map.dragPan.disable();
+        map.keyboard.disable();
+        map.doubleClickZoom.disable();
+        map.touchZoomRotate.disable();
+        map.touchPitch.disable();
+      }
+
       // Add error handler
       map.on('error', (e) => {
         console.error('[RunnerDirectionsMap] Map error:', e);
         if (e.error?.message) {
           console.error('[RunnerDirectionsMap] Error message:', e.error.message);
         }
+        // Don't hide the map on error - keep showing what we have
         setMapLoaded(true);
         setLoading(false);
       });
 
-      // Add navigation controls
-      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      // Add navigation controls only if interactive
+      if (interactive) {
+        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      }
 
       // Function to mark map as loaded
       const markMapLoaded = () => {
@@ -212,6 +253,8 @@ export function RunnerDirectionsMap({
         console.log('[RunnerDirectionsMap] Map "load" event fired');
         clearTimeout(loadTimeout);
         markMapLoaded();
+        // Apply Benjamin theme after map loads
+        applyBenjaminTheme(map);
       });
 
       // Alternative: 'idle' event fires when map is fully rendered
@@ -221,10 +264,19 @@ export function RunnerDirectionsMap({
         markMapLoaded();
       });
 
-      // Style loaded event
-      map.on('style.load', () => {
-        console.log('[RunnerDirectionsMap] Map style loaded');
-      });
+      // Style loaded event - handle separately from load event
+      const handleStyleLoad = () => {
+        console.log('[RunnerDirectionsMap] Map style loaded successfully');
+        // Apply Benjamin theme when style loads
+        applyBenjaminTheme(map);
+        // Ensure map is marked as loaded
+        if (!mapLoaded) {
+          setMapLoaded(true);
+          setLoading(false);
+        }
+      };
+      
+      map.on('style.load', handleStyleLoad);
 
       // Style error - try fallback
       map.on('style.error', (e) => {
@@ -235,6 +287,55 @@ export function RunnerDirectionsMap({
         } catch (styleErr) {
           console.error('[RunnerDirectionsMap] Failed to set fallback style:', styleErr);
         }
+      });
+      
+      // Style loaded successfully
+      map.on('style.load', () => {
+        console.log('[RunnerDirectionsMap] Map style loaded successfully');
+        // Apply Benjamin theme when style loads
+        applyBenjaminTheme(map);
+        // Ensure map is marked as loaded
+        if (!mapLoaded) {
+          setMapLoaded(true);
+          setLoading(false);
+        }
+        // Re-add markers after style loads (markers are removed when style changes)
+        setTimeout(() => {
+          if (mapRef.current === map && origin && destination) {
+            // Clear existing markers
+            markersRef.current.forEach(m => {
+              try {
+                m.remove();
+              } catch (e) {
+                // Ignore errors
+              }
+            });
+            markersRef.current = [];
+            
+            // Add markers again
+            try {
+              const originMarker = new mapboxgl.Marker({ color: BENJAMIN_COLORS.emeraldGreen })
+                .setLngLat([origin.lng, origin.lat])
+                .setPopup(new mapboxgl.Popup().setText(origin.address || 'Origin'))
+                .addTo(map);
+              markersRef.current.push(originMarker);
+            } catch (e) {
+              console.error('[RunnerDirectionsMap] Error recreating origin marker:', e);
+            }
+            
+            try {
+              const destMarker = new mapboxgl.Marker({ color: BENJAMIN_COLORS.charcoal })
+                .setLngLat([destination.lng, destination.lat])
+                .setPopup(new mapboxgl.Popup().setText(destination.address || 'Destination'))
+                .addTo(map);
+              markersRef.current.push(destMarker);
+            } catch (e) {
+              console.error('[RunnerDirectionsMap] Error recreating destination marker:', e);
+            }
+            
+            console.log('[RunnerDirectionsMap] Markers re-added after style load:', markersRef.current.length);
+          }
+        }, 100);
       });
 
       // Data event - fires when map data is loaded
@@ -273,7 +374,7 @@ export function RunnerDirectionsMap({
       }
       setLoading(false);
     }
-  }, [origin.lat, origin.lng, origin.address, destination.lat, destination.lng, destination.address]);
+  }, [origin.lat, origin.lng, origin.address, destination.lat, destination.lng, destination.address, interactive]);
 
   // Initialize map - retry until ref is available
   useEffect(() => {
@@ -282,48 +383,70 @@ export function RunnerDirectionsMap({
     console.log('[RunnerDirectionsMap] Effect - mapRef.current:', mapRef.current);
     console.log('[RunnerDirectionsMap] Effect - initializationAttemptedRef.current:', initializationAttemptedRef.current);
     
-    // If already initialized or map exists, skip
-    if (mapRef.current || initializationAttemptedRef.current) {
-      console.log('[RunnerDirectionsMap] Effect - already initialized or map exists, skipping');
-      return;
+    // Check if map already exists and is valid
+    if (mapRef.current) {
+      try {
+        const container = mapRef.current.getContainer();
+        if (container && container.parentNode) {
+          console.log('[RunnerDirectionsMap] Effect - Map already exists and is valid, skipping');
+          return;
+        }
+      } catch (e) {
+        // Map is invalid, clean up
+        console.warn('[RunnerDirectionsMap] Effect - Map exists but is invalid, will reinitialize');
+        mapRef.current = null;
+        initializationAttemptedRef.current = false;
+      }
     }
     
     // If ref is ready, initialize immediately
-    if (mapContainerRef.current) {
+    if (mapContainerRef.current && mapContainerRef.current.parentNode) {
       console.log('[RunnerDirectionsMap] Effect - ref is ready, calling initializeMap');
       initializeMap();
       return;
     }
     
-    // Ref not ready - retry with exponential backoff
+    // Ref not ready - retry with backoff
     console.log('[RunnerDirectionsMap] Effect - ref not ready, starting retry loop...');
     let retryCount = 0;
-    const maxRetries = 10;
-    const retryInterval = 100; // Start with 100ms
+    const maxRetries = 30; // Increased retries
+    const retryInterval = 100;
     
     const retryTimer = setInterval(() => {
       retryCount++;
-      console.log(`[RunnerDirectionsMap] Effect - retry attempt ${retryCount}/${maxRetries}`);
-      console.log('[RunnerDirectionsMap] Effect - mapContainerRef.current:', mapContainerRef.current);
       
-      if (mapContainerRef.current && !mapRef.current && !initializationAttemptedRef.current) {
+      // Check if map was created in the meantime
+      if (mapRef.current) {
+        try {
+          const container = mapRef.current.getContainer();
+          if (container && container.parentNode) {
+            console.log('[RunnerDirectionsMap] Effect - Map now exists, stopping retry');
+            clearInterval(retryTimer);
+            return;
+          }
+        } catch (e) {
+          // Map is invalid, continue retrying
+        }
+      }
+      
+      // Check if container is now available and in DOM
+      if (mapContainerRef.current && mapContainerRef.current.parentNode) {
         console.log('[RunnerDirectionsMap] Effect - ✓ Ref is now ready, calling initializeMap');
         clearInterval(retryTimer);
+        initializationAttemptedRef.current = false; // Reset flag
         initializeMap();
       } else if (retryCount >= maxRetries) {
         console.error('[RunnerDirectionsMap] Effect - ✗ Max retries reached, giving up');
         clearInterval(retryTimer);
         setLoading(false);
-      } else if (mapRef.current || initializationAttemptedRef.current) {
-        console.log('[RunnerDirectionsMap] Effect - Map already initialized, stopping retry');
-        clearInterval(retryTimer);
+        initializationAttemptedRef.current = false; // Reset so it can retry later
       }
     }, retryInterval);
     
     return () => {
       clearInterval(retryTimer);
     };
-  }, [initializeMap]);
+  }, [initializeMap]); // Only depend on initializeMap to avoid unnecessary re-runs
 
   // Fetch and display route
   useEffect(() => {
@@ -368,7 +491,7 @@ export function RunnerDirectionsMap({
             } as GeoJSON.Feature,
           });
 
-          // Add route layer
+          // Add route layer with Benjamin emerald green
           map.addLayer({
             id: ROUTE_LAYER_ID,
             type: 'line',
@@ -378,9 +501,9 @@ export function RunnerDirectionsMap({
               'line-cap': 'round',
             },
             paint: {
-              'line-color': '#4F46E5', // Indigo color for runner app
-              'line-width': 4,
-              'line-opacity': 0.8,
+              'line-color': BENJAMIN_COLORS.emeraldGreen, // Benjamin emerald green
+              'line-width': 5,
+              'line-opacity': 0.75,
             },
           });
 
@@ -394,7 +517,12 @@ export function RunnerDirectionsMap({
           );
 
           map.fitBounds(bounds, {
-            padding: 50,
+            padding: {
+              top: 80,
+              left: 24,
+              right: 24,
+              bottom: bottomPadding + 12, // 12px breathing room above sheet
+            },
             duration: 1000,
           });
 
@@ -416,32 +544,93 @@ export function RunnerDirectionsMap({
         fetchRoute();
       });
     }
-  }, [origin.lat, origin.lng, destination.lat, destination.lng, mapLoaded]);
+  }, [origin.lat, origin.lng, destination.lat, destination.lng, mapLoaded, bottomPadding]);
 
-  // Add markers
+  // Add markers - always show markers regardless of route status
   useEffect(() => {
     const map = mapRef.current;
-    // Only check if map exists - Mapbox will queue work if not ready
+    // Only check if map exists and is ready - Mapbox will queue work if not ready
     if (!map) return;
+    
+    // Helper function to add markers
+    const addMarkers = () => {
+      // Clear existing markers first
+      markersRef.current.forEach(m => {
+        try {
+          m.remove();
+        } catch (e) {
+          // Marker might already be removed, ignore
+          console.debug('[RunnerDirectionsMap] Error removing marker:', e);
+        }
+      });
+      markersRef.current = [];
 
-    // Clear this map's markers only
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
+      // Validate coordinates before creating markers
+      if (isNaN(origin.lat) || isNaN(origin.lng)) {
+        console.warn('[RunnerDirectionsMap] Invalid origin coordinates:', origin);
+      }
+      if (isNaN(destination.lat) || isNaN(destination.lng)) {
+        console.warn('[RunnerDirectionsMap] Invalid destination coordinates:', destination);
+      }
 
-    // Origin marker (green)
-    const originMarker = new mapboxgl.Marker({ color: '#22C55E' })
-      .setLngLat([origin.lng, origin.lat])
-      .setPopup(new mapboxgl.Popup().setText(origin.address || 'Origin'))
-      .addTo(map);
+      // Origin marker - Emerald green (user/runner location)
+      try {
+        if (!isNaN(origin.lat) && !isNaN(origin.lng)) {
+          const originMarker = new mapboxgl.Marker({ color: BENJAMIN_COLORS.emeraldGreen })
+            .setLngLat([origin.lng, origin.lat])
+            .setPopup(new mapboxgl.Popup().setText(origin.address || 'Origin'))
+            .addTo(map);
+          markersRef.current.push(originMarker);
+          console.log('[RunnerDirectionsMap] Origin marker added at:', origin.lat, origin.lng);
+        }
+      } catch (e) {
+        console.error('[RunnerDirectionsMap] Error creating origin marker:', e);
+      }
 
-    // Destination marker (blue)
-    const destMarker = new mapboxgl.Marker({ color: '#3B82F6' })
-      .setLngLat([destination.lng, destination.lat])
-      .setPopup(new mapboxgl.Popup().setText(destination.address || 'Destination'))
-      .addTo(map);
-
-    markersRef.current.push(originMarker, destMarker);
-  }, [origin.lat, origin.lng, origin.address, destination.lat, destination.lng, destination.address]);
+      // Destination marker - Charcoal (destination)
+      try {
+        if (!isNaN(destination.lat) && !isNaN(destination.lng)) {
+          const destMarker = new mapboxgl.Marker({ color: BENJAMIN_COLORS.charcoal })
+            .setLngLat([destination.lng, destination.lat])
+            .setPopup(new mapboxgl.Popup().setText(destination.address || 'Destination'))
+            .addTo(map);
+          markersRef.current.push(destMarker);
+          console.log('[RunnerDirectionsMap] Destination marker added at:', destination.lat, destination.lng);
+        }
+      } catch (e) {
+        console.error('[RunnerDirectionsMap] Error creating destination marker:', e);
+      }
+      
+      console.log('[RunnerDirectionsMap] Total markers added:', markersRef.current.length);
+      if (markersRef.current.length !== 2) {
+        console.warn('[RunnerDirectionsMap] Expected 2 markers but got', markersRef.current.length);
+      }
+    };
+    
+    // Wait for map to be fully loaded before adding markers
+    if (!map.loaded()) {
+      const loadHandler = () => {
+        addMarkers();
+        map.off('load', loadHandler); // Remove handler after use
+      };
+      map.on('load', loadHandler);
+      return;
+    }
+    
+    // Map is loaded, add markers immediately
+    addMarkers();
+    
+    // Also listen for style.load to re-add markers if style changes
+    const styleLoadHandler = () => {
+      // Wait a bit for style to fully render
+      setTimeout(addMarkers, 100);
+    };
+    map.on('style.load', styleLoadHandler);
+    
+    return () => {
+      map.off('style.load', styleLoadHandler);
+    };
+  }, [origin.lat, origin.lng, origin.address, destination.lat, destination.lng, destination.address, mapLoaded]);
 
   // Cleanup
   useEffect(() => {
@@ -472,7 +661,7 @@ export function RunnerDirectionsMap({
 
   if (!hasToken) {
     return (
-      <div className={cn('relative bg-slate-900 rounded-xl overflow-hidden', className)} style={{ height }}>
+      <div className={cn('relative bg-slate-900 overflow-hidden', className)} style={{ height }}>
         <div className="absolute inset-0 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="text-red-400 text-sm font-medium mb-2">Mapbox Token Missing</div>
@@ -487,7 +676,7 @@ export function RunnerDirectionsMap({
 
   if (loading) {
     return (
-      <div className={cn('relative bg-slate-900 rounded-xl overflow-hidden', className)} style={{ height }}>
+      <div className={cn('relative bg-slate-900 overflow-hidden', className)} style={{ height }}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-slate-400">Loading map...</div>
         </div>
@@ -496,15 +685,7 @@ export function RunnerDirectionsMap({
   }
 
   return (
-    <div className={cn('relative bg-slate-900 rounded-xl overflow-hidden', className)} style={{ height }}>
-      {title && (
-        <div className="absolute top-4 left-4 z-10 bg-[#020817]/90 backdrop-blur-sm px-3 py-2 rounded-lg">
-          <h3 className="text-sm font-medium text-white flex items-center gap-2">
-            <Navigation className="h-4 w-4" />
-            {title}
-          </h3>
-        </div>
-      )}
+    <div className={cn('relative bg-slate-900 overflow-hidden', className)} style={{ height }}>
       <div
         ref={(el) => {
           console.log('[RunnerDirectionsMap] ===== REF CALLBACK FIRED =====');

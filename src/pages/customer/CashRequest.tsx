@@ -373,11 +373,15 @@ export default function CashRequest() {
     try {
       const deliveryNotes = selectedAddress.delivery_notes || "";
       
+      // Map deliveryMode to delivery_style
+      const deliveryStyle = deliveryMode === 'count_confirm' ? 'COUNTED' as const : 'SPEED' as const;
+      
       const order = await createOrder(
         amount,
         formatAddress(selectedAddress),
         deliveryNotes,
-        selectedAddress.id
+        selectedAddress.id,
+        deliveryStyle
       );
       if (order) {
         toast.success(strings.toasts.orderPlaced);
@@ -964,7 +968,7 @@ export default function CashRequest() {
                       <p className="mt-0.5 text-sm text-slate-600 truncate">
                         {formatAddress(addr)}
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-400 italic">
+                      <p className="mt-0.5 text-sm text-slate-400">
                         {addr.delivery_notes || "No Note Added"}
                       </p>
                     </div>

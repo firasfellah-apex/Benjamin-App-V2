@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MapPin, CheckCircle2, MessageSquare } from "lucide-react";
+import { MapPin, CheckCircle2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { getOrderById, advanceOrderStatus, generateOTP, verifyOTP, confirmCount, rateCustomerByRunner, markRunnerArrived } from "@/db/api";
+import { supabase } from "@/db/supabase";
 import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
 import type { OrderWithDetails, OrderStatus, Order } from "@/types/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -20,6 +21,7 @@ import { RatingStars } from "@/components/common/RatingStars";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { formatDate } from "@/lib/utils";
 import { RunnerDirectionsMap, getDummyLocations, type Location } from "@/components/maps/RunnerDirectionsMap";
+import { getOrderDeliveryStyle, getArrivalInstruction, getOtpFooterText, getDeliveryStyleLabel, getDeliveryStyleShortHint, getDeliveryStyleChipLabel } from "@/lib/deliveryStyle";
 
 function shortId(orderId: string): string {
   return orderId.slice(0, 8);
@@ -37,29 +39,77 @@ export default function RunnerOrderDetail() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [countCooldownStart, setCountCooldownStart] = useState<Date | null>(null);
   const [countCooldownRemaining, setCountCooldownRemaining] = useState(0);
+  const [isCountingStep, setIsCountingStep] = useState(false);
+  const [countdown, setCountdown] = useState(20);
+  const [completing, setCompleting] = useState(false);
   const unreadCount = useUnreadMessages(orderId || null);
+
+  // Check if runner has already marked arrival (persist across navigation)
+  const checkRunnerArrived = async (orderId: string, orderStatus: OrderStatus): Promise<boolean> => {
+    if (orderStatus !== "Pending Handoff") {
+      return false;
+    }
+
+    try {
+      const { data: events, error } = await supabase
+        .from("order_events")
+        .select("id, client_action_id")
+        .eq("order_id", orderId)
+        .eq("client_action_id", "runner_arrived")
+        .limit(1);
+
+      if (error) {
+        console.warn('[RunnerOrderDetail] Error checking runner arrival:', error);
+        return false;
+      }
+
+      return events && events.length > 0;
+    } catch (error) {
+      console.error('[RunnerOrderDetail] Error checking runner arrival:', error);
+      return false;
+    }
+  };
 
   const loadOrder = async () => {
     if (!orderId) return;
     const data = await getOrderById(orderId);
     setOrder(data);
-    setLoading(false);
+    
     if (data?.status === "Completed") {
       setRunnerArrived(false);
       setOtpValue("");
       setOtpVerified(false);
       setCountCooldownStart(null);
       setCountCooldownRemaining(0);
+      setLoading(false);
     } else if (data) {
+      // Check if runner has already marked arrival (persist across navigation)
+      // MUST check this before setting loading to false to prevent UI flicker
+      if (data.status === "Pending Handoff") {
+        const hasArrived = await checkRunnerArrived(data.id, data.status);
+        setRunnerArrived(hasArrived);
+        console.log('[RunnerOrderDetail] Runner arrival status:', hasArrived);
+      } else {
+        // If not in Pending Handoff, ensure runnerArrived is false
+        setRunnerArrived(false);
+      }
+      
       // Check if OTP was already verified (for counted mode)
       const otpVerifiedAt = (data as any).otp_verified_at;
-      if (otpVerifiedAt && data.status === "Pending Handoff" && (data as any).delivery_mode === 'count_confirm') {
+      const deliveryStyle = getOrderDeliveryStyle(data);
+      if (otpVerifiedAt && data.status === "Pending Handoff" && deliveryStyle === 'COUNTED') {
         setOtpVerified(true);
-        // If we're resuming, don't restart cooldown - allow immediate confirmation
+        setIsCountingStep(true);
+        // If we're resuming, don't restart countdown - allow immediate confirmation
         if (!countCooldownStart) {
+          setCountdown(0);
           setCountCooldownRemaining(0);
         }
       }
+      
+      setLoading(false);
+    } else {
+      setLoading(false);
     }
   };
 
@@ -68,7 +118,7 @@ export default function RunnerOrderDetail() {
     loadOrder();
   }, [orderId]);
 
-  const handleOrderUpdate = useCallback((updatedOrder: Order) => {
+  const handleOrderUpdate = useCallback(async (updatedOrder: Order) => {
     if (!orderId || !updatedOrder) return;
     
     setOrder((prev) => {
@@ -82,19 +132,34 @@ export default function RunnerOrderDetail() {
     if (updatedOrder.status === "Completed") {
       setRunnerArrived(false);
       setOtpValue("");
+    } else if (updatedOrder.status === "Pending Handoff") {
+      // ALWAYS check if runner has already marked arrival when order status is Pending Handoff
+      // This ensures arrival state persists across navigation and real-time updates
+      const hasArrived = await checkRunnerArrived(updatedOrder.id, updatedOrder.status);
+      setRunnerArrived(hasArrived);
+      console.log('[RunnerOrderDetail] Real-time update - Runner arrival status:', hasArrived);
+    } else {
+      // For any other status, ensure runnerArrived is false (only valid for Pending Handoff)
+      setRunnerArrived(false);
     }
     
-    getOrderById(orderId).then((data) => {
+    // Fetch full order details to ensure we have the latest data
+    try {
+      const data = await getOrderById(orderId);
       if (data && data.id === orderId) {
         setOrder(data);
-        if (data.status === "Completed") {
+        // Re-check arrival status after fetching full details if status is Pending Handoff
+        if (data.status === "Pending Handoff") {
+          const hasArrived = await checkRunnerArrived(data.id, data.status);
+          setRunnerArrived(hasArrived);
+        } else if (data.status === "Completed") {
           setRunnerArrived(false);
           setOtpValue("");
         }
       }
-    }).catch((error) => {
+    } catch (error) {
       console.error('[RunnerOrderDetail] Error fetching full order details:', error);
-    });
+    }
   }, [orderId]);
 
   useOrderRealtime(orderId, {
@@ -145,11 +210,10 @@ export default function RunnerOrderDetail() {
       const result = await verifyOTP(orderId, otpValue);
       if (result.success) {
         if (result.requiresCountConfirmation) {
-          // Counted mode: OTP verified, now wait for count confirmation
+          // Counted mode: OTP verified, now show counting step
           setOtpVerified(true);
-          setCountCooldownStart(new Date());
-          setCountCooldownRemaining(15); // 15 second cooldown
-          toast.success("OTP verified. Please wait while the customer counts the cash.");
+          setIsCountingStep(true);
+          setCountdown(20);
         } else {
           // Speed mode: Complete immediately
           triggerConfetti(3000);
@@ -192,13 +256,72 @@ export default function RunnerOrderDetail() {
     }
   };
 
-  // Countdown timer for count cooldown
+  const handleConfirmAllGood = async () => {
+    if (!orderId) return;
+
+    try {
+      setCompleting(true);
+      const result = await confirmCount(orderId);
+      if (result.success) {
+        triggerConfetti(3000);
+        toast.success("Delivery completed successfully!");
+        await loadOrder();
+        setTimeout(() => navigate("/runner/work"), 2000);
+      } else {
+        toast.error(result.error || "Failed to complete delivery. Please try again.");
+      }
+    } catch (error: any) {
+      console.error("Error completing delivery:", error);
+      toast.error(error?.message || strings.errors.generic);
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleReportProblem = async () => {
+    if (!orderId || !order) return;
+
+    try {
+      setCompleting(true);
+      const { createOrderIssue } = await import("@/db/api");
+      await createOrderIssue({
+        orderId: order.id,
+        runnerId: order.runner_id || undefined,
+        customerId: order.customer_id,
+        category: 'CASH_AMOUNT',
+        notes: 'Runner reported an issue at cash handoff (counted style).',
+      });
+      
+      toast.success("We've flagged this delivery for Benjamin support. Stay polite and follow the training playbook.");
+      
+      // Stay on this screen but disable completion - order status will be updated by support
+      setIsCountingStep(false);
+    } catch (error: any) {
+      console.error("Error reporting issue:", error);
+      toast.error(error?.message || "Failed to report issue. Please contact support.");
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  // Countdown timer for count step (20 seconds)
+  useEffect(() => {
+    if (!isCountingStep || countdown <= 0) return;
+
+    const interval = setInterval(() => {
+      setCountdown((c) => (c > 0 ? c - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isCountingStep, countdown]);
+
+  // Legacy countdown for backward compatibility (remove once counting step refactor is complete)
   useEffect(() => {
     if (!countCooldownStart || countCooldownRemaining <= 0) return;
 
     const interval = setInterval(() => {
       const elapsed = Math.floor((new Date().getTime() - countCooldownStart.getTime()) / 1000);
-      const remaining = Math.max(0, 15 - elapsed);
+      const remaining = Math.max(0, 20 - elapsed);
       setCountCooldownRemaining(remaining);
 
       if (remaining === 0) {
@@ -463,6 +586,27 @@ export default function RunnerOrderDetail() {
                             </div>
                           </div>
                         </div>
+                        
+                        {/* Handoff Style Info */}
+                        {(() => {
+                          const deliveryStyle = getOrderDeliveryStyle(order);
+                          return (
+                            <section className="mb-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                              <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                Handoff style
+                              </div>
+                              <div className="flex items-baseline justify-between mt-1">
+                                <span className="text-sm font-semibold text-white">
+                                  {getDeliveryStyleLabel(deliveryStyle)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[11px] text-slate-400">
+                                {getDeliveryStyleShortHint(deliveryStyle)}
+                              </p>
+                            </section>
+                          );
+                        })()}
+                        
                         <Button
                           onClick={async () => {
                             if (!orderId) return;
@@ -505,7 +649,7 @@ export default function RunnerOrderDetail() {
             )}
 
             {/* STAGE 5: At Arrival - OTP Verification */}
-            {order.status === "Pending Handoff" && order.otp_code && runnerArrived && !otpVerified && (
+            {order.status === "Pending Handoff" && order.otp_code && runnerArrived && !otpVerified && !isCountingStep && (
               <section className="rounded-3xl bg-[#050816] border border-white/5 px-4 py-4 space-y-4">
                 <div className="space-y-3">
                   <div className="p-3 bg-white/5 rounded-xl">
@@ -513,6 +657,21 @@ export default function RunnerOrderDetail() {
                     <p className="text-xs text-slate-400 mb-4">
                       Enter the 6-digit code from the customer to complete the delivery.
                     </p>
+                    
+                    {/* Delivery Style Instructions */}
+                    {(() => {
+                      const deliveryStyle = getOrderDeliveryStyle(order);
+                      return (
+                        <div className="mb-4 rounded-xl bg-slate-800/50 border border-slate-700/50 px-3 py-3">
+                          <p className="text-xs font-medium text-white mb-1">
+                            How this customer wants their cash
+                          </p>
+                          <p className="text-xs text-slate-300 whitespace-pre-line">
+                            {getArrivalInstruction(deliveryStyle)}
+                          </p>
+                        </div>
+                      );
+                    })()}
                     {order.customer && (() => {
                       // When runner has arrived, show full name and avatar for recognition
                       const customer = order.customer as any;
@@ -536,11 +695,40 @@ export default function RunnerOrderDetail() {
                               <div className="text-base font-semibold text-white">{fullName}</div>
                               <div className="text-xs text-slate-400 mt-0.5">Ask for the verification code</div>
                             </div>
+                            
+                            {/* Message Button - Circular with Chat Icon (Runner App Style) */}
+                            {!isCompleted && (order.status === "Cash Withdrawn" || order.status === "Pending Handoff") && (
+                              <button
+                                onClick={() => navigate(`/runner/chat/${order.id}`)}
+                                className="relative w-10 h-10 rounded-full bg-[#4F46E5] text-white hover:bg-[#4338CA] flex items-center justify-center transition-colors shrink-0"
+                                aria-label="Message customer"
+                              >
+                                <MessageCircle className="h-5 w-5" />
+                                {unreadCount > 0 && (
+                                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#050816]">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                  </span>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
                     })()}
-                    <div className="flex justify-center mb-4">
+                    
+                    {/* Delivery Style Chip - Above OTP Input */}
+                    {(() => {
+                      const deliveryStyle = getOrderDeliveryStyle(order);
+                      const chipLabel = getDeliveryStyleChipLabel(deliveryStyle);
+                      return (
+                        <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 text-[11px] text-slate-100">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span>{chipLabel}</span>
+                        </div>
+                      );
+                    })()}
+                    
+                    <div className="flex justify-center mb-4 [&_[data-slot='input-otp-slot']]:bg-white/5 [&_[data-slot='input-otp-slot']]:border-white/20 [&_[data-slot='input-otp-slot']]:text-white [&_[data-slot='input-otp-slot'][data-active='true']]:bg-white/10 [&_[data-slot='input-otp-slot'][data-active='true']]:border-[#4F46E5] [&_[data-slot='input-otp-slot'][data-active='true']]:ring-[#4F46E5]/50 [&_[data-slot='input-otp-slot'][data-active='true']]:ring-[3px]">
                       <InputOTP
                         value={otpValue}
                         onChange={setOtpValue}
@@ -564,71 +752,69 @@ export default function RunnerOrderDetail() {
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                       {updating 
                         ? "Verifying..." 
-                        : (order as any).delivery_mode === 'count_confirm'
+                        : getOrderDeliveryStyle(order) === 'COUNTED'
                         ? "Verify OTP"
                         : "Verify and Complete Delivery"}
                     </Button>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* STAGE 6: Count Confirmation (Counted Mode Only) */}
-            {order.status === "Pending Handoff" && otpVerified && (order as any).delivery_mode === 'count_confirm' && (
-              <section className="rounded-3xl bg-[#050816] border border-white/5 px-4 py-4 space-y-4">
-                <div className="space-y-3">
-                  <div className="p-3 bg-white/5 rounded-xl">
-                    <p className="text-sm font-medium text-white mb-2">Confirm Customer Count</p>
-                    <p className="text-xs text-slate-400 mb-4">
-                      Wait while the customer counts the cash. Only tap the button below after the customer has confirmed the count is correct.
-                    </p>
-                    {countCooldownRemaining > 0 && (
-                      <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                        <p className="text-xs text-amber-400 text-center">
-                          Please wait {countCooldownRemaining} second{countCooldownRemaining !== 1 ? 's' : ''} for the customer to count...
+                    
+                    {/* OTP Footer Text - Delivery Style Reminder */}
+                    {(() => {
+                      const deliveryStyle = getOrderDeliveryStyle(order);
+                      return (
+                        <p className="mt-2 text-[11px] text-slate-400 text-center">
+                          {getOtpFooterText(deliveryStyle)}
                         </p>
-                      </div>
-                    )}
-                    <Button
-                      onClick={handleConfirmCount}
-                      disabled={updating || countCooldownRemaining > 0}
-                      className="w-full bg-[#4F46E5] text-white hover:bg-[#4338CA] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      {updating 
-                        ? "Completing..." 
-                        : countCooldownRemaining > 0
-                        ? `Wait ${countCooldownRemaining}s`
-                        : "Customer Confirmed Count"}
-                    </Button>
+                      );
+                    })()}
                   </div>
                 </div>
               </section>
             )}
 
-            {/* Chat Section - Only after cash withdrawal and on the way to customer */}
-            {!isCompleted && (order.status === "Cash Withdrawn" || order.status === "Pending Handoff") && (
-              <section className="rounded-3xl bg-[#050816] border border-white/5 px-4 py-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <MessageSquare className="h-5 w-5 text-slate-300" />
-                  <h3 className="text-sm font-medium text-white">Message Customer</h3>
+            {/* STAGE 6: Counting Step (Counted Mode Only) */}
+            {order.status === "Pending Handoff" && isCountingStep && getOrderDeliveryStyle(order) === 'COUNTED' && (
+              <section className="rounded-3xl bg-[#050816] border border-white/5 px-4 py-8">
+                <div className="flex flex-col items-center justify-center text-center gap-6">
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-semibold text-white">Let them count it</h2>
+                    <p className="text-sm text-slate-400">
+                      Stay with your customer while they count their cash. 
+                      Don't rush them — this protects both of you.
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-16 w-16 rounded-full border-4 border-emerald-400/40 flex items-center justify-center">
+                      <span className="text-2xl font-semibold text-emerald-400">
+                        {countdown}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Offer them up to 20 seconds to count the cash.
+                    </p>
+                  </div>
+                  
+                  <div className="w-full space-y-3">
+                    <Button
+                      className="w-full h-11 rounded-full bg-[#4F46E5] text-white hover:bg-[#4338CA] disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={countdown > 0 || completing}
+                      onClick={handleConfirmAllGood}
+                    >
+                      {countdown > 0 ? 'Waiting…' : 'All good, complete delivery'}
+                    </Button>
+                    <button
+                      type="button"
+                      className="w-full text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                      onClick={handleReportProblem}
+                      disabled={completing}
+                    >
+                      Something's not right
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400 mb-4">
-                  Communicate with the customer about delivery details
-                </p>
-                <Button
-                  onClick={() => navigate(`/runner/chat/${order.id}`)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-3 flex items-center justify-center relative"
-                >
-                  <span>Message Customer</span>
-                  {unreadCount > 0 && (
-                    <span className="absolute right-4 h-6 w-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </Button>
               </section>
             )}
+
           </>
         )}
 

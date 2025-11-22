@@ -20,6 +20,8 @@ export type InvitationStatus = 'Pending' | 'Accepted' | 'Expired' | 'Revoked';
 
 export type KYCStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
+export type DeliveryStyle = 'COUNTED' | 'SPEED';
+
 // Order Event for audit trail
 export interface OrderEvent {
   id: string;
@@ -132,7 +134,8 @@ export interface Order {
   total_service_fee: number;
   total_payment: number;
   status: OrderStatus;
-  delivery_mode: 'quick_handoff' | 'count_confirm' | null; // Delivery mode: Speed or Counted
+  delivery_mode: 'quick_handoff' | 'count_confirm' | null; // Delivery mode: Speed or Counted (legacy)
+  delivery_style: DeliveryStyle | null; // Delivery style: COUNTED or SPEED
   otp_code: string | null;
   otp_hash: string | null;
   otp_expires_at: string | null;

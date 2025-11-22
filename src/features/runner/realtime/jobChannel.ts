@@ -5,7 +5,7 @@
  * Integrates with existing useOrdersRealtime hook.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
 import { useRunnerJobs } from '../state/runnerJobsStore';
 import { useProfile } from '@/contexts/ProfileContext';
@@ -21,6 +21,16 @@ export function useJobOffersSubscription() {
   const { online, receiveOffer } = useRunnerJobs();
   const { profile } = useProfile();
 
+  // Log when subscription hook is called or re-run
+  useEffect(() => {
+    console.log('[JobChannel] 🎯 useJobOffersSubscription state changed:', {
+      online,
+      hasProfile: !!profile?.id,
+      profileId: profile?.id,
+      timestamp: new Date().toISOString(),
+    });
+  }, [online, profile?.id]);
+
   // Calculate offer expiration (30 seconds from now)
   const getExpirationTime = (): string => {
     const expiresInSeconds = 30; // 30 seconds default
@@ -29,26 +39,43 @@ export function useJobOffersSubscription() {
     return expiresAt.toISOString();
   };
 
-  // Transform order to offer
-  const orderToOffer = useCallback((order: OrderWithDetails): Offer | null => {
-    if (!order.address_snapshot) {
-      return null; // Need address snapshot for pickup location
-    }
-
+  // Transform order to offer - always returns an offer (never null)
+  const orderToOffer = useCallback((order: OrderWithDetails): Offer => {
+    // Use address_snapshot if available, otherwise fall back to customer_address
     const payout = getRunnerPayout(order);
     
     // Extract pickup location (ATM) - use customer address as pickup point
     // In reality, this would be the ATM location, but we'll use customer address for now
+    let pickupName = "Pickup Location";
+    let pickupLat = 0;
+    let pickupLng = 0;
+    
+    if (order.address_snapshot) {
+      pickupName = order.address_snapshot.city || order.address_snapshot.neighborhood || "Pickup Location";
+      pickupLat = order.address_snapshot.latitude || 0;
+      pickupLng = order.address_snapshot.longitude || 0;
+    } else if (order.customer_address) {
+      // Fallback: extract city from customer_address string
+      const parts = order.customer_address.split(',').map(s => s.trim());
+      if (parts.length >= 2) {
+        pickupName = parts[parts.length - 2]; // Usually city
+      } else {
+        pickupName = order.customer_address;
+      }
+    }
+    
     const pickup = {
-      name: order.address_snapshot.city || "Pickup Location",
-      lat: order.address_snapshot.latitude || 0,
-      lng: order.address_snapshot.longitude || 0,
+      name: pickupName,
+      lat: pickupLat,
+      lng: pickupLng,
     };
 
     // Extract dropoff neighborhood
     const dropoffApprox: { neighborhood?: string } = {};
-    if (order.address_snapshot.city) {
+    if (order.address_snapshot?.city) {
       dropoffApprox.neighborhood = order.address_snapshot.city;
+    } else if (order.address_snapshot?.neighborhood) {
+      dropoffApprox.neighborhood = order.address_snapshot.neighborhood;
     } else if (order.customer_address) {
       // Fallback: extract from address string
       const parts = order.customer_address.split(',').map(s => s.trim());
@@ -122,6 +149,7 @@ export function useJobOffersSubscription() {
       runnerId: order.runner_id,
       isOnline: online,
       runnerProfileId: profile?.id,
+      hasAddressSnapshot: !!order.address_snapshot,
     });
 
     if (!online) {
@@ -140,18 +168,44 @@ export function useJobOffersSubscription() {
         return; // Don't show orders the runner has already skipped or timed-out
       }
       
-      const offer = orderToOffer(order as OrderWithDetails);
-      if (offer) {
-        console.log('[JobChannel] 🎯 Converting order to offer and sending to runner:', {
-          offerId: offer.id,
-          payout: offer.payout,
-          cashAmount: offer.cashAmount,
-        });
-        receiveOffer(offer);
-        console.log('[JobChannel] ✅ Offer sent to runner store - should appear in UI');
-      } else {
-        console.warn('[JobChannel] ⚠️ Could not convert order to offer (missing address_snapshot?)');
+      // Ensure we have full order details (address_snapshot might be missing in real-time payload)
+      let fullOrder: OrderWithDetails = order as OrderWithDetails;
+      
+      // If order is missing address_snapshot, try to fetch full order details
+      if (!order.address_snapshot && !order.customer_address) {
+        console.log('[JobChannel] ⚠️ Order missing address data, fetching full details...');
+        try {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', order.id)
+            .maybeSingle();
+          
+          if (error || !data) {
+            console.error('[JobChannel] ❌ Error fetching full order:', error);
+            // Continue anyway - orderToOffer will use fallbacks
+          } else {
+            fullOrder = data as OrderWithDetails;
+            console.log('[JobChannel] ✅ Full order fetched:', {
+              hasAddressSnapshot: !!fullOrder.address_snapshot,
+              hasCustomerAddress: !!fullOrder.customer_address,
+            });
+          }
+        } catch (error) {
+          console.error('[JobChannel] ❌ Exception fetching full order:', error);
+          // Continue anyway - orderToOffer will use fallbacks
+        }
       }
+      
+      const offer = orderToOffer(fullOrder);
+      console.log('[JobChannel] 🎯 Converting order to offer and sending to runner:', {
+        offerId: offer.id,
+        payout: offer.payout,
+        cashAmount: offer.cashAmount,
+        pickup: offer.pickup.name,
+      });
+      receiveOffer(offer);
+      console.log('[JobChannel] ✅ Offer sent to runner store - should appear in NewJobModal');
     } else {
       console.log('[JobChannel] ❌ Order filtered out (not available):', {
         status: order.status,
@@ -167,11 +221,21 @@ export function useJobOffersSubscription() {
   }, []);
 
   // Subscribe to available orders (only when online)
+  const subscriptionEnabled = online && !!profile?.id;
+  
+  console.log('[JobChannel] 🔌 Subscription state:', {
+    online,
+    hasProfile: !!profile?.id,
+    profileId: profile?.id,
+    enabled: subscriptionEnabled,
+    timestamp: new Date().toISOString(),
+  });
+
   useOrdersRealtime({
     filter: { mode: 'runner', availableOnly: true },
     onInsert: handleNewOrder,
     onUpdate: handleOrderUpdate,
-    enabled: online && !!profile?.id,
+    enabled: subscriptionEnabled,
   });
 }
 

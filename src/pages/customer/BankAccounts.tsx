@@ -10,7 +10,7 @@ import CustomerCard from "@/pages/customer/components/CustomerCard";
 import { PlaidKycButton } from "@/components/customer/plaid/PlaidKycButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Landmark, Shield, CheckCircle2, Zap, Lock, Clock, Info } from "lucide-react";
+import { Landmark, Shield, CheckCircle2, Zap, Lock, Info } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlaidLinkKyc } from "@/hooks/usePlaidLinkKyc";
@@ -110,7 +110,7 @@ export default function BankAccounts() {
   return (
     <CustomerScreen
       title="My Bank Accounts"
-      subtitle="Manage your bank connection and view your limits"
+      subtitle="Securely link a bank account to verify your identity and enable cash orders."
       showBack
       useXButton
       onBack={handleBack}
@@ -130,54 +130,65 @@ export default function BankAccounts() {
                   <h3 className="text-lg font-semibold text-slate-900">
                     No bank account connected yet
                   </h3>
-                  <p className="text-sm text-slate-600">
-                    Connect a bank account so we can verify your identity and send cash to you quickly.
-                  </p>
+                  <div className="space-y-1 text-sm text-slate-600">
+                    <p>
+                      Benjamin needs at least one verified bank account on file before we can deliver cash.
+                    </p>
+                    <p>
+                      This confirms your identity and helps protect both you and our runners.
+                    </p>
+                  </div>
                 </div>
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
                   <PlaidKycButton
                     label="Connect bank with Plaid"
-                    className="w-full"
+                    className="w-full h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90"
                     disabled={isLoading}
                   />
+                  <p className="text-xs text-slate-500">
+                    Takes about 30 seconds in a secure Plaid window.
+                  </p>
                 </div>
               </CustomerCard>
 
-              {/* Benefits Card */}
+              {/* Why we need this */}
               <CustomerCard className="space-y-4">
                 <h4 className="text-base font-semibold text-slate-900">
-                  What happens when you connect a bank?
+                  Why Benjamin asks for your bank
                 </h4>
                 <ul className="space-y-3 text-sm text-slate-700">
                   <li className="flex items-start gap-3">
-                    <Zap className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <span>Instant access to cash delivery</span>
-                  </li>
-                  <li className="flex items-start gap-3">
                     <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <span>Identity verified with your bank</span>
+                    <span>Verify it's really you before sending cash</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Encrypted & secure</span>
+                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>Confirm the bank account belongs to you</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Clock className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span>Faster order approvals</span>
+                    <Lock className="h-5 w-5 text-slate-600 flex-shrink-0 mt-0.5" />
+                    <span>Reduce fraud and keep the service safe for everyone</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Zap className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <span>Make future cash requests faster to approve</span>
                   </li>
                 </ul>
               </CustomerCard>
 
-              {/* Security Card */}
+              {/* Reassurance block */}
               <CustomerCard className="space-y-3 bg-slate-50/50">
                 <div className="flex items-start gap-3">
                   <Lock className="h-5 w-5 text-slate-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 space-y-1">
+                  <div className="flex-1 space-y-2">
                     <p className="text-sm font-medium text-slate-900">
-                      Your credentials never touch Benjamin
+                      Your bank login never touches Benjamin
                     </p>
                     <p className="text-xs text-slate-600">
-                      Plaid handles all verification securely. Your bank login credentials are never stored on Benjamin’s servers.
+                      Benjamin never sees or stores your online banking password. Bank connection happens in a secure Plaid window, used by thousands of banks and financial apps. Plaid encrypts your credentials and only shares a secure token with us so we can verify your account.
+                    </p>
+                    <p className="text-xs text-slate-500 pt-1">
+                      You can browse the app without linking a bank, but you won't be able to request cash until at least one account is connected.
                     </p>
                   </div>
                 </div>

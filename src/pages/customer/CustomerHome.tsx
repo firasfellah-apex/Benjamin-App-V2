@@ -5,9 +5,9 @@
  * Uses CustomerScreen with 3-zone layout: header, map, footer.
  */
 
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import type React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -16,8 +16,8 @@ import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar
 import { TrustCarousel } from '@/components/customer/TrustCarousel';
 import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
 import { KycReminderCard } from '@/components/customer/KycReminderCard';
-import { useLocation } from '@/contexts/LocationContext';
-import { getCustomerOrders } from '@/db/api';
+import { CompletionRatingModal } from '@/components/customer/CompletionRatingModal';
+import { getCustomerOrders, hasOrderIssue } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
@@ -42,10 +42,14 @@ export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
   const { profile, isReady } = useProfile(user?.id);
   const navigate = useNavigate();
-  const { location } = useLocation();
+  const location = useLocation(); // react-router location
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [orderToRate, setOrderToRate] = useState<OrderWithDetails | null>(null);
+  const [ordersWithIssues, setOrdersWithIssues] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+  const previousLocationRef = useRef<string>('');
   
   // Load orders function
   const loadOrders = useCallback(async () => {
@@ -70,10 +74,27 @@ export default function CustomerHome() {
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+  
+  // Reload orders when navigating back to this page (e.g., after cancellation)
+  useEffect(() => {
+    const currentPath = location.pathname;
+    // If we just navigated to home from another page, reload orders
+    if (previousLocationRef.current && previousLocationRef.current !== currentPath && currentPath === '/customer/home') {
+      console.log('[CustomerHome] Navigation detected, reloading orders');
+      loadOrders();
+    }
+    previousLocationRef.current = currentPath;
+  }, [location.pathname, loadOrders]);
 
   // Handle realtime order updates
   const handleOrderUpdate = useCallback((updatedOrder: Order) => {
     console.log('[CustomerHome] Order update received:', updatedOrder.id, updatedOrder.status);
+    
+    // If order was cancelled, reload all orders to ensure consistency
+    if (updatedOrder.status === 'Cancelled' || updatedOrder.cancelled_at) {
+      loadOrders();
+      return;
+    }
     
     // Update the order in the list
     setOrders((prev) => {
@@ -103,9 +124,18 @@ export default function CustomerHome() {
   });
   
   // Determine order states
-  const { hasActiveOrder, lastCompletedOrder } = useMemo(() => {
+  const { hasActiveOrder, activeOrder, lastCompletedOrder } = useMemo(() => {
     const activeStatuses = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
-    const activeOrders = orders.filter(order => activeStatuses.includes(order.status));
+    // Filter for active orders, but exclude any that are cancelled (even if status is wrong)
+    const activeOrders = orders.filter(order => 
+      activeStatuses.includes(order.status) && 
+      order.status !== 'Cancelled' &&
+      !order.cancelled_at
+    );
+    // Sort active orders by created_at (most recent first) to get the current active order
+    const sortedActiveOrders = activeOrders.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
     // Get completed or cancelled orders (most recent order regardless of status)
     const completedOrCancelledOrders = orders.filter(order => 
       order.status === 'Completed' || order.status === 'Cancelled'
@@ -126,15 +156,92 @@ export default function CustomerHome() {
     
     return {
       hasActiveOrder: activeOrders.length > 0,
+      activeOrder: sortedActiveOrders.length > 0 ? sortedActiveOrders[0] : null,
       lastCompletedOrder: sortedOrders.length > 0 ? sortedOrders[0] : null,
     };
   }, [orders]);
   
+  // Check for reported issues when orders load (only check completed orders without ratings)
+  useEffect(() => {
+    let cancelled = false;
+    
+    const checkOrderIssues = async () => {
+      const completedOrdersWithoutRatings = orders.filter(
+        order => order.status === 'Completed' && !order.runner_rating
+      );
+      
+      if (completedOrdersWithoutRatings.length === 0) {
+        setOrdersWithIssues(new Set());
+        return;
+      }
+
+      const issueSet = new Set<string>();
+      
+      // Check issues in parallel but with reasonable batching
+      const checks = completedOrdersWithoutRatings.map(async (order) => {
+        if (cancelled) return;
+        const hasIssue = await hasOrderIssue(order.id);
+        if (hasIssue && !cancelled) {
+          issueSet.add(order.id);
+        }
+      });
+
+      await Promise.all(checks);
+      
+      if (!cancelled) {
+        setOrdersWithIssues(issueSet);
+      }
+    };
+
+    if (orders.length > 0 && !ordersLoading) {
+      checkOrderIssues();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orders, ordersLoading]);
+  
+  // Update issue status when rating modal closes (issue might have been reported)
+  useEffect(() => {
+    if (!ratingModalOpen && orderToRate) {
+      hasOrderIssue(orderToRate.id).then(issueExists => {
+        if (issueExists) {
+          setOrdersWithIssues(prev => new Set([...prev, orderToRate.id]));
+        }
+      }).catch(() => {
+        // Silently handle errors - issue check failed but don't block UI
+      });
+    }
+  }, [ratingModalOpen, orderToRate]);
+
   // Handle rate runner action
   const handleRateRunner = useCallback((orderId: string) => {
-    // Navigate to order detail page where rating can be done
-    navigate(`/customer/deliveries/${orderId}`);
-  }, [navigate]);
+    // Don't open rating modal if issue was reported
+    if (ordersWithIssues.has(orderId)) {
+      return;
+    }
+    
+    // Find the order to rate
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      setOrderToRate(order);
+      setRatingModalOpen(true);
+    }
+  }, [orders, ordersWithIssues]);
+  
+  // Handle rating modal close
+  const handleRatingModalClose = useCallback(() => {
+    setRatingModalOpen(false);
+    setOrderToRate(null);
+  }, []);
+  
+  // Handle after rating is submitted
+  const handleRated = useCallback(() => {
+    // Refresh orders to get updated rating
+    loadOrders();
+    handleRatingModalClose();
+  }, [loadOrders, handleRatingModalClose]);
   
   /**
    * Format and capitalize a name, filtering out invalid IDs
@@ -283,9 +390,6 @@ export default function CustomerHome() {
       );
     }
     
-    // 24px spacing from fixed divider to content (matches cash amount page pattern)
-    const spacing = <div style={{ paddingTop: '24px' }} />;
-    
     // Show KYC reminder card if needed (before other content)
     if (needsKycReminder && !ordersLoading) {
       content.push(
@@ -303,11 +407,13 @@ export default function CustomerHome() {
     // Show actual card if we have a last delivery (completed or cancelled)
     // Show it even if there's an active order
     if (lastCompletedOrder && !ordersLoading) {
+      const topPadding = needsKycReminder ? '24px' : '24px';
       content.push(
-        <div key="last-delivery" style={{ paddingTop: needsKycReminder ? '24px' : '24px' }}>
+        <div key="last-delivery" style={{ paddingTop: topPadding }}>
           <LastDeliveryCard
             order={lastCompletedOrder}
             onRateRunner={handleRateRunner}
+            hasIssue={ordersWithIssues.has(lastCompletedOrder.id)}
           />
         </div>
       );
@@ -333,33 +439,82 @@ export default function CustomerHome() {
   const { setBottomSlot } = useCustomerBottomSlot();
 
   // Set bottom slot for MobilePageShell
-  // Only depend on setBottomSlot (which is stable from context)
+  // Show progress info and "Track Order" button when there's an active order, otherwise show "Order Cash"
   useEffect(() => {
-    setBottomSlot(
-      <RequestFlowBottomBar
-        mode="home"
-        onPrimary={() => {
-          navigate('/customer/request');
-        }}
-        useFixedPosition={true}
-      />
-    );
+    if (hasActiveOrder && activeOrder) {
+      // Show progress info and "Track Order" button
+      setBottomSlot(
+        <RequestFlowBottomBar
+          mode="home"
+          onPrimary={() => {
+            navigate(`/customer/deliveries/${activeOrder.id}`);
+          }}
+          useFixedPosition={true}
+          activeOrder={activeOrder}
+        />
+      );
+    } else {
+      // Show "Order Cash" button (disabled if orders are loading)
+      setBottomSlot(
+        <RequestFlowBottomBar
+          mode="home"
+          onPrimary={() => {
+            navigate('/customer/request');
+          }}
+          useFixedPosition={true}
+          primaryDisabled={ordersLoading}
+        />
+      );
+    }
     return () => setBottomSlot(null);
-  }, [setBottomSlot, navigate]);
+  }, [setBottomSlot, navigate, hasActiveOrder, activeOrder, ordersLoading]);
+
+  // Calculate custom bottom padding based on whether there's an active order
+  // When active order is shown, the bottom nav includes progress info, making it taller
+  const customBottomPadding = useMemo(() => {
+    if (hasActiveOrder && activeOrder) {
+      // When showing active order progress, the bottom nav includes:
+      // - pt-6 (24px top padding)
+      // - Active order section with mb-4 (16px margin) and space-y-4 (16px spacing):
+      //   * Title + Sub label (~42px: title ~24px + sublabel ~20px + 6px padding)
+      //   * Progress Bar with py-3 (~42px: 12px top + bar ~18px + 12px bottom)
+      //   Total for active order section: ~100px (42px + 16px + 42px)
+      // - Button (56px)
+      // - pb-[max(24px,env(safe-area-inset-bottom))] (24px + safe area)
+      // Total: 24px + 100px + 56px + 24px + safe area = 204px + safe area
+      return "calc(24px + max(24px, env(safe-area-inset-bottom)) + 204px)";
+    }
+    // Default bottom nav height (button + padding)
+    return undefined; // Uses default in CustomerScreen
+  }, [hasActiveOrder, activeOrder]);
 
   return (
-    <CustomerScreen
-      title={title}
-      subtitle="Skip the ATM. Request cash in seconds."
-      fixedContent={fixedContent}
-      topContent={topContent}
-    >
-      {/* Show TrustCarousel below View All Deliveries, even when there's a last delivery */}
-      {lastCompletedOrder && (
-        <div className="space-y-6">
-          <TrustCarousel cards={trustCards} />
-        </div>
+    <>
+      <CustomerScreen
+        title={title}
+        subtitle="Skip the ATM. Request cash in seconds."
+        fixedContent={fixedContent}
+        topContent={topContent}
+        customBottomPadding={customBottomPadding}
+      >
+        {/* Show TrustCarousel below View All Deliveries, even when there's a last delivery */}
+        {lastCompletedOrder && (
+          <div className="space-y-6">
+            <TrustCarousel cards={trustCards} />
+          </div>
+        )}
+      </CustomerScreen>
+      
+      {/* Completion Rating Modal */}
+      {orderToRate && !ordersWithIssues.has(orderToRate.id) && (
+        <CompletionRatingModal
+          order={orderToRate}
+          open={ratingModalOpen}
+          onClose={handleRatingModalClose}
+          onRated={handleRated}
+        />
       )}
-    </CustomerScreen>
+    </>
   );
 }
+

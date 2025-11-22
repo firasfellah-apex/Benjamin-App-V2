@@ -22,6 +22,7 @@ interface AvatarProps {
   size?: AvatarSize;
   blurred?: boolean;
   className?: string;
+  cacheKey?: string | null; // Optional: timestamp or version for cache-busting (e.g., profile.updated_at)
 }
 
 const sizeClasses: Record<AvatarSize, string> = {
@@ -55,7 +56,8 @@ export function Avatar({
   fallback,
   size = 'md',
   blurred = false,
-  className
+  className,
+  cacheKey
 }: AvatarProps) {
   const [imageError, setImageError] = React.useState(false);
   const initials = getInitials(fallback || alt);
@@ -70,13 +72,16 @@ export function Avatar({
     const currentSrc = src || null;
     if (lastSrcRef.current !== currentSrc) {
       setImageError(false);
-      hasLoadedRef.current = false;
+      // If src becomes null/empty, immediately reset loaded state to show initials
+      if (!currentSrc) {
+        hasLoadedRef.current = false;
+      }
       lastSrcRef.current = currentSrc;
     }
   }, [src]);
   
-  // Add stable cache-busting for Supabase storage URLs
-  // Uses a hash of the URL path to create a stable cache key that only changes when the URL changes
+  // Industry-standard cache-busting for Supabase storage URLs
+  // Priority: 1) Use cacheKey (timestamp) if provided, 2) Fall back to hash-based for stability
   const getImageSrc = React.useMemo(() => {
     if (!src) {
       return null;
@@ -90,8 +95,20 @@ export function Avatar({
         url.searchParams.delete('t');
         url.searchParams.delete('v');
         
-        // Create a stable hash from the URL path (not timestamp-based)
-        // This ensures the same URL always gets the same cache-busting value
+        // Industry-standard: Use timestamp-based cache-busting if cacheKey is provided
+        // This ensures instant updates when the image changes
+        if (cacheKey) {
+          // Convert timestamp to a short hash for cleaner URLs
+          // Use the timestamp directly, or convert to seconds since epoch
+          const timestamp = cacheKey.includes('T') 
+            ? new Date(cacheKey).getTime() 
+            : parseInt(cacheKey, 10) || Date.now();
+          url.searchParams.set('t', Math.floor(timestamp / 1000).toString());
+          return url.toString();
+        }
+        
+        // Fallback: Create a stable hash from the URL path for backward compatibility
+        // This ensures the same URL always gets the same cache-busting value when no cacheKey
         const urlPath = url.pathname;
         if (!cacheBustMapRef.current.has(urlPath)) {
           // Generate a hash from the URL path for stable cache-busting
@@ -108,7 +125,15 @@ export function Avatar({
         url.searchParams.set('v', cacheBust);
         return url.toString();
       } catch {
-        // If URL parsing fails, use hash of the full URL
+        // If URL parsing fails, use cacheKey or hash of the full URL
+        if (cacheKey) {
+          const timestamp = cacheKey.includes('T') 
+            ? new Date(cacheKey).getTime() 
+            : parseInt(cacheKey, 10) || Date.now();
+          return `${src}?t=${Math.floor(timestamp / 1000)}`;
+        }
+        
+        // Fallback to hash
         if (!cacheBustMapRef.current.has(src)) {
           let hash = 0;
           for (let i = 0; i < src.length; i++) {
@@ -124,7 +149,7 @@ export function Avatar({
     }
     
     return src;
-  }, [src]);
+  }, [src, cacheKey]);
   
   // Debug logging in development
   React.useEffect(() => {
@@ -138,10 +163,11 @@ export function Avatar({
     }
   }, [src, imageError, getImageSrc]);
   
-  // Simple check: we have a src and no error
+  // Determine if we should show the image
+  // If src is null/empty, always show fallback (initials)
   // If we've loaded the image before, keep showing it even if there's a temporary error
   // This prevents the flash of initials when toggling edit mode
-  const shouldShowImage = !!getImageSrc && (!imageError || hasLoadedRef.current);
+  const shouldShowImage = !!src && !!getImageSrc && (!imageError || hasLoadedRef.current);
   
   return (
     <RadixAvatar
@@ -152,27 +178,26 @@ export function Avatar({
         className
       )}
     >
-      {shouldShowImage && (
-        <AvatarImage
-          src={getImageSrc || undefined}
-          alt={alt}
-          className="object-cover"
-          onError={(e) => {
-            console.error('[Avatar] Failed to load image:', {
-              src,
-              error: e,
-              target: e.currentTarget?.src
-            });
-            setImageError(true);
-          }}
-          onLoad={() => {
-            hasLoadedRef.current = true;
-            if (import.meta.env.DEV) {
-              console.log('[Avatar] Image loaded successfully:', src);
-            }
-          }}
-        />
-      )}
+      {/* Always render AvatarImage - Radix will show fallback when src is undefined/null */}
+      <AvatarImage
+        src={shouldShowImage ? (getImageSrc || undefined) : undefined}
+        alt={alt}
+        className="object-cover"
+        onError={(e) => {
+          console.error('[Avatar] Failed to load image:', {
+            src,
+            error: e,
+            target: e.currentTarget?.src
+          });
+          setImageError(true);
+        }}
+        onLoad={() => {
+          hasLoadedRef.current = true;
+          if (import.meta.env.DEV) {
+            console.log('[Avatar] Image loaded successfully:', src);
+          }
+        }}
+      />
       <AvatarFallback
         className={cn(
           'bg-primary text-primary-foreground font-medium',

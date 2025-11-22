@@ -384,7 +384,7 @@ export default function ManageAddresses() {
                   <p className="mt-0.5 text-sm text-slate-600 truncate">
                     {formatAddress(addr)}
                   </p>
-                  <p className="mt-0.5 text-sm text-slate-400 italic">
+                  <p className="mt-0.5 text-sm text-slate-400">
                     {addr.delivery_notes || "No Note Added"}
                   </p>
                 </div>
@@ -737,7 +737,7 @@ export default function ManageAddresses() {
               </AlertDialogAction>
               <AlertDialogCancel
                 className={cn(
-                  "w-full h-12 rounded-full border-2 border-black bg-white text-black",
+                  "w-full h-12 rounded-full border border-black bg-white text-black",
                   "hover:bg-slate-50 active:scale-[0.98]",
                   "text-base font-semibold",
                   "transition-all duration-150 touch-manipulation",

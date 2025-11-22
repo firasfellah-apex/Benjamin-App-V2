@@ -12,6 +12,7 @@ import type { OrderWithDetails } from "@/types/types";
 interface LastDeliveryCardProps {
   order: OrderWithDetails;
   onRateRunner?: (orderId: string) => void;
+  hasIssue?: boolean;
 }
 
 /**
@@ -82,13 +83,13 @@ function formatTimeLabel(date: Date): string {
   });
 }
 
-export function LastDeliveryCard({ order, onRateRunner }: LastDeliveryCardProps) {
+export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: LastDeliveryCardProps) {
   const navigate = useNavigate();
   
   if (!order) return null;
   
   const isRated = !!order.runner_rating;
-  const canRate = order.status === 'Completed' && !isRated;
+  const canRate = order.status === 'Completed' && !isRated && !hasIssue;
   const isCancelled = order.status === 'Cancelled';
   
   // For completed orders, use handoff_completed_at; for cancelled, use updated_at
@@ -152,11 +153,16 @@ export function LastDeliveryCard({ order, onRateRunner }: LastDeliveryCardProps)
               <button
                 type="button"
                 onClick={handleRateClick}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-slate-900 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                style={{ color: '#D97708' }}
               >
-                <span className="text-base leading-[0]" style={{ color: '#DFB300' }}>★</span>
+                <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
                 <span>Rate runner</span>
               </button>
+            ) : hasIssue && !isRated ? (
+              <div className="flex items-center justify-between w-full">
+                <span className="text-xs text-slate-600">This delivery is being investigated.</span>
+              </div>
             ) : isRated && order.runner_rating ? (
               <div className="flex items-center justify-between w-full">
                 <span className="text-xs text-slate-600">You rated this runner:</span>

@@ -1,5 +1,4 @@
-import { ReactNode } from "react";
-import { useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { EllipsisVertical, ArrowLeft } from "@/lib/icons";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
@@ -26,8 +25,9 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { Avatar } from "@/components/common/Avatar";
+import { useQueryClient } from "@tanstack/react-query";
 import { Clock, MapPinPen, LogOut, X, Star } from "@/lib/icons";
-import { Landmark } from "lucide-react";
+import { Landmark, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoutIllustration from "@/assets/illustrations/Logout.png";
 
@@ -52,6 +52,14 @@ export function CustomerHeader({
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { profile } = useProfile(user?.id);
+  const queryClient = useQueryClient();
+
+  // Refetch profile when menu opens to ensure fresh avatar
+  useEffect(() => {
+    if (isMenuOpen && user?.id) {
+      queryClient.refetchQueries({ queryKey: ['profile', user.id] });
+    }
+  }, [isMenuOpen, user?.id, queryClient]);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -71,6 +79,9 @@ export function CustomerHeader({
 
   const isCustomer = profile?.role.includes('customer');
   const isHomePage = location.pathname === "/customer/home" || location.pathname === "/customer";
+
+  const kycStatus = profile?.kyc_status;
+  const isKycVerified = kycStatus === "verified";
 
   const menuButton = !showBack && isHomePage ? (
     <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -109,71 +120,142 @@ export function CustomerHeader({
 
         {/* Profile Section - Clickable */}
         {user && (
-          <>
-            <button
-              onClick={() => {
-                handleMenuItemClick("/account");
-              }}
-              className="w-full px-6 pb-6 flex flex-col items-center hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
-            >
+          <button
+            onClick={() => {
+              handleMenuItemClick("/account");
+            }}
+            className="w-full px-6 pb-5 flex flex-col items-center transition-colors touch-manipulation"
+          >
             <Avatar
               src={profile?.avatar_url}
-              alt={profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User' : 'User'}
-              fallback={profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User' : 'User'}
+              alt={
+                profile
+                  ? [profile.first_name, profile.last_name]
+                      .filter(Boolean)
+                      .join(" ") || "User"
+                  : "User"
+              }
+              fallback={
+                profile
+                  ? [profile.first_name, profile.last_name]
+                      .filter(Boolean)
+                      .join(" ") || "User"
+                  : "User"
+              }
               size="2xl"
               className="mb-3"
+              cacheKey={profile?.updated_at}
             />
-            <p className="font-semibold text-base text-slate-900 mb-1">
-              {profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'User' : 'Loading...'}
+
+            <p className="font-semibold text-base text-slate-900">
+              {profile
+                ? [profile.first_name, profile.last_name]
+                    .filter(Boolean)
+                    .join(" ") || "User"
+                : "Loading..."}
             </p>
-            {/* Rating with star - placeholder for now */}
-            {profile && (
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                <span className="text-sm text-slate-600">5</span>
-              </div>
-            )}
+
+            <div className="mt-1 flex items-center gap-2">
+              {/* KYC pill */}
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-normal",
+                  isKycVerified
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-700"
+                )}
+              >
+                {isKycVerified ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                )}
+                {isKycVerified ? "Verified" : "Verification needed"}
+              </span>
+
+              {/* Rating pill */}
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal" style={{ backgroundColor: '#FFFBEB', color: '#F2AB58' }}>
+                <Star className="h-3.5 w-3.5 fill-[#F2AB58]" style={{ color: '#F2AB58' }} />
+                <span>5.0</span>
+              </span>
+            </div>
           </button>
-          {/* Divider under account button */}
-          <div className="h-[6px] bg-[#F7F7F7] mx-6" />
-          </>
         )}
+
+        {/* Divider under profile – full width of the sheet */}
+        <div className="h-[6px] bg-[#F7F7F7] w-full" />
 
         {/* Menu Items */}
         {user && isCustomer && (
-          <div className="flex-1 px-6 py-6 space-y-0 overflow-y-auto">
-            <button
-              onClick={() => handleMenuItemClick("/customer/deliveries")}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors border-b border-slate-200"
-            >
-              <Clock className="h-5 w-5 text-slate-900" />
-              <span>My Orders</span>
-            </button>
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-6">
+              {/* My Orders */}
+              <button
+                onClick={() => handleMenuItemClick("/customer/deliveries")}
+                className="w-full flex items-center gap-3 pt-0 pb-3.5 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-transparent"
+              >
+                <Clock className="h-5 w-5 text-slate-900 flex-shrink-0" />
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-base font-medium text-slate-900">
+                    My Orders
+                  </span>
+                  <span className="mt-0.5 text-sm text-slate-400">
+                    See your past cash deliveries.
+                  </span>
+                </span>
+              </button>
+            </div>
 
-            <button
-              onClick={() => handleMenuItemClick("/customer/addresses")}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors border-b border-slate-200"
-            >
-              <MapPinPen className="h-5 w-5 text-slate-900" />
-              <span>Manage Addresses</span>
-            </button>
+            {/* Divider */}
+            <div className="h-[6px] bg-[#F7F7F7] w-full" />
 
-            <button
-              onClick={() => handleMenuItemClick("/customer/banks")}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-            >
-              <Landmark className="h-5 w-5 text-slate-900" />
-              <span>My Bank Accounts</span>
-            </button>
+            <div className="px-6">
+              {/* Manage Addresses */}
+              <button
+                onClick={() => handleMenuItemClick("/customer/addresses")}
+                className="w-full flex items-center gap-3 py-3.5 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-transparent"
+              >
+                <MapPinPen className="h-5 w-5 text-slate-900 flex-shrink-0" />
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-base font-medium text-slate-900">
+                    Manage Addresses
+                  </span>
+                  <span className="mt-0.5 text-sm text-slate-400">
+                    Add, edit, or delete addresses.
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="h-[6px] bg-[#F7F7F7] w-full" />
+
+            <div className="px-6">
+              {/* My Bank Accounts */}
+              <button
+                onClick={() => handleMenuItemClick("/customer/banks")}
+                className="w-full flex items-center gap-3 py-3.5 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-transparent"
+              >
+                <Landmark className="h-5 w-5 text-slate-900 flex-shrink-0" />
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-base font-medium text-slate-900">
+                    My Bank Accounts
+                  </span>
+                  <span className="mt-0.5 text-sm text-slate-400">
+                    Connect or update your bank account.
+                  </span>
+                </span>
+              </button>
+            </div>
           </div>
         )}
 
+        {/* Bottom divider – full width */}
+        {user && <div className="h-[6px] bg-[#F7F7F7] w-full" />}
+
         {/* Log Out Button */}
         {user && (
-          <>
-            {/* Divider above logout button */}
-            <div className="h-[6px] bg-[#F7F7F7] mx-6" />
-            <div className="px-6 pt-4 pb-6">
+          <div className="px-6 pt-4 pb-6">
             <button
               onClick={handleLogoutClick}
               className="w-full flex items-center justify-center gap-2 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border border-red-500 text-red-600 bg-transparent hover:bg-red-50 active:bg-red-100 transition-all"
@@ -182,7 +264,6 @@ export function CustomerHeader({
               <span>Log Out</span>
             </button>
           </div>
-          </>
         )}
       </SheetContent>
     </Sheet>

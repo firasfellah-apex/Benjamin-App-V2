@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { canSeeCashAmount, getCustomerPublicProfile, getCustomerAddressDisplay, canConfirmAtATM, getCashAmountRevealMessage, canShowCashAmountToRunner } from "@/lib/revealRunnerView";
+import { getOrderDeliveryStyle, getDeliveryStyleLabel, getDeliveryStyleShortHint } from "@/lib/deliveryStyle";
 import { Avatar } from "@/components/common/Avatar";
 import { RUNNER_TERMINAL_STATUSES } from "@/lib/orderStatus";
 import { useRunnerJobs } from "@/features/runner/state/runnerJobsStore";
@@ -31,7 +32,7 @@ export default function Work() {
   const { profile, refreshProfile } = useProfile();
   const { pendingOffer, setOnline: setStoreOnline } = useRunnerJobs();
   const [activeOrder, setActiveOrder] = useState<OrderWithDetails | null>(null);
-  const [orderHistory, setOrderHistory] = useState<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Timed-Out' | 'Cancelled' }>>([]);
+  const [orderHistory, setOrderHistory] = useState<Array<OrderWithDetails & { historyStatus: 'Completed' | 'Skipped' | 'Missed' | 'Cancelled' }>>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOnlineStatus, setUpdatingOnlineStatus] = useState(false);
 
@@ -53,7 +54,7 @@ export default function Work() {
       const active = runnerOrders.find(o => !RUNNER_TERMINAL_STATUSES.includes(o.status)) || null;
       setActiveOrder(active);
 
-      // Get order history (Completed, Skipped, Timed-Out)
+      // Get order history (Completed, Skipped, Missed, Cancelled)
       const history = await getRunnerOrderHistory();
       setOrderHistory(history.slice(0, 5)); // Show last 5 orders
 
@@ -156,7 +157,7 @@ export default function Work() {
           console.log('[Work] New offer event:', payload);
           // If it's a skipped or timeout event, reload order history
           if (payload.new && (payload.new.event === 'skipped' || payload.new.event === 'timeout')) {
-            console.log('[Work] Order skipped/timed-out, reloading history...');
+            console.log('[Work] Order skipped/missed, reloading history...');
             // Reload order history to show the newly skipped order
             getRunnerOrderHistory().then(history => {
               setOrderHistory(history.slice(0, 5));
@@ -299,6 +300,26 @@ export default function Work() {
                 </div>
               )}
 
+              {/* Handoff Style Info */}
+              {(() => {
+                const deliveryStyle = getOrderDeliveryStyle(activeOrder);
+                return (
+                  <section className="rounded-xl border border-slate-700/50 bg-slate-800/30 px-3 py-2">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Handoff style
+                    </div>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-sm font-semibold text-white">
+                        {getDeliveryStyleLabel(deliveryStyle)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {getDeliveryStyleShortHint(deliveryStyle)}
+                    </p>
+                  </section>
+                );
+              })()}
+
               <Button
                 onClick={() => navigate(`/runner/deliveries/${activeOrder.id}`)}
                 className="w-full bg-indigo-600 text-white hover:bg-indigo-700"
@@ -355,10 +376,10 @@ export default function Work() {
                   text: 'text-yellow-400',
                   label: 'Skipped'
                 },
-                'Timed-Out': {
+                'Missed': {
                   bg: 'bg-red-500/10',
                   text: 'text-red-400',
-                  label: 'Timed-Out'
+                  label: 'Missed'
                 },
                 'Cancelled': {
                   bg: 'bg-slate-500/10',
@@ -382,7 +403,11 @@ export default function Work() {
                 >
                   <div>
                     <div className="text-base font-semibold text-white">
-                      ${order.requested_amount.toFixed(2)}
+                      {order.requested_amount > 0 
+                        ? `$${order.requested_amount.toFixed(2)}`
+                        : order.historyStatus === 'Skipped' || order.historyStatus === 'Missed'
+                          ? '—'
+                          : `$${order.requested_amount.toFixed(2)}`}
                     </div>
                     {order.historyStatus === 'Completed' && (
                       <div className="text-xs text-emerald-400">

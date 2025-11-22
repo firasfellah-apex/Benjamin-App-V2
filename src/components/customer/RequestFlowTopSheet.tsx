@@ -20,7 +20,7 @@ export function RequestFlowTopSheet({ title, subtitle, children }: RequestFlowTo
       className="fixed top-16 inset-x-0 z-30 flex justify-center pointer-events-none"
       style={{ maxHeight: '50vh' }} // Prevent top sheet from taking too much space
     >
-      <div className="pointer-events-auto w-full max-w-md bg-white rounded-b-3xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] overflow-y-auto max-h-full">
+      <div className="pointer-events-auto w-full max-w-md bg-white rounded-b-3xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] shrink-0">
         <div className="px-6 pt-4 pb-4">
           <h1 className="text-[24px] font-semibold text-slate-900 leading-tight">
             {title}

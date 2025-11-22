@@ -6,7 +6,9 @@ interface SlideToConfirmProps {
   onConfirm: () => void;
   disabled?: boolean;
   className?: string;
-  label?: string; // Not used, kept for backwards compatibility
+  trackClassName?: string; // Custom styling for the track
+  handleClassName?: string; // Custom styling for the handle
+  label?: string; // Custom label text (defaults to "Slide to Confirm Order")
   confirmedLabel?: string;
 }
 
@@ -14,7 +16,9 @@ export function SlideToConfirm({
   onConfirm,
   disabled = false,
   className,
-  label: _label, // Not used, kept for backwards compatibility
+  trackClassName,
+  handleClassName,
+  label,
   confirmedLabel = "Confirmed",
 }: SlideToConfirmProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -102,7 +106,7 @@ export function SlideToConfirm({
   // Padding that keeps the text clear of the initial handle footprint
   const LABEL_PADDING_LEFT = HANDLE_MARGIN + HANDLE_WIDTH + 12;
 
-  const labelText = isConfirmed ? confirmedLabel : "Slide to Confirm Order";
+  const labelText = isConfirmed ? confirmedLabel : (label || "Slide to Confirm Order");
 
   return (
     <div className={cn("w-full", className)}>
@@ -122,11 +126,14 @@ export function SlideToConfirm({
           }
         }}
         className={cn(
-          "relative w-full rounded-full bg-black overflow-hidden",
+          "relative w-full overflow-hidden",
           "flex items-center justify-center",
           "select-none touch-none",
           disabled && "opacity-60 cursor-not-allowed",
-          !disabled && "cursor-pointer"
+          !disabled && "cursor-pointer",
+          // Default styles if no custom className provided
+          !trackClassName && "rounded-full bg-black",
+          trackClassName
         )}
         style={{ height: TRACK_HEIGHT }}
       >
@@ -165,7 +172,10 @@ export function SlideToConfirm({
 
         {/* Green Pill Handle - pinned to left, stretches right */}
         <div
-          className="absolute rounded-full bg-[#22C55E] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20"
+          className={cn(
+            "absolute rounded-full bg-[#22C55E] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20",
+            handleClassName
+          )}
           style={{
             left: `${HANDLE_MARGIN}px`,
             top: `${HANDLE_MARGIN}px`,

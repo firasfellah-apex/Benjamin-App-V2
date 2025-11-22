@@ -63,9 +63,9 @@ export function CustomerScreen({
         className
       )}
     >
-      {/* Header: logo + menu + optional hero (only show when NOT a flow page) */}
+      {/* Header: logo + menu + optional hero (only show when NOT a flow page) - FIXED, NO SCROLL */}
       {!isFlowPage && (
-        <header className="px-6 pt-6">
+        <header className="px-6 pt-6 shrink-0 bg-white">
         <CustomerHeader
             title={showHero ? title : null}
             subtitle={showHero ? subtitle : null}
@@ -76,14 +76,14 @@ export function CustomerScreen({
         </header>
       )}
 
-      {/* Flow header (replaces logo/menu row + title/subtitle) */}
+      {/* Flow header (replaces logo/menu row + title/subtitle) - FIXED, NO SCROLL */}
         {flowHeader && (
-        <header className="px-6 pt-6">
+        <header className="px-6 pt-6 shrink-0 bg-white">
             {flowHeader}
         </header>
       )}
 
-      {/* Fixed content (divider) – not scrollable */}
+      {/* Fixed content (divider) – not scrollable - FIXED, NO SCROLL */}
       {/* No pt-6 here - spacing is handled by pb-6 on title/subtitle containers above */}
       {fixedContent && (
         <div className="px-6 bg-white shrink-0">

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getOrderById, cancelOrder } from "@/db/api";
+import { getOrderById, cancelOrder, hasOrderIssue } from "@/db/api";
 import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
 import type { OrderWithDetails, OrderStatus, Order } from "@/types/types";
 import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
@@ -11,7 +11,6 @@ import { RunnerDirectionsMap } from "@/components/maps/RunnerDirectionsMap";
 import { getDummyLocations } from "@/components/maps/RunnerDirectionsMap";
 import { triggerConfetti } from "@/lib/confetti";
 import { strings } from "@/lib/strings";
-import { cn } from "@/lib/utils";
 import { ActiveDeliverySheet } from "@/components/customer/ActiveDeliverySheet";
 import { CompletionRatingModal } from "@/components/customer/CompletionRatingModal";
 import { canShowLiveLocation } from "@/lib/reveal";
@@ -31,6 +30,8 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [hasIssue, setHasIssue] = useState(false);
+  const [mapBottomPadding, setMapBottomPadding] = useState<number>(260); // sensible default
 
   const loadOrder = async () => {
     if (!orderId) return;
@@ -46,20 +47,34 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       const wasCompleted = previousStatus === "Completed";
       const isNowCompleted = data.status === "Completed";
       setPreviousStatus(data.status);
-      // Show completion modal if order is completed and hasn't been rated
+      
+      // Check if order has a reported issue
+      if (isNowCompleted) {
+        hasOrderIssue(data.id).then(issueExists => {
+          setHasIssue(issueExists);
+        });
+      }
+      
+      // Show completion modal if order is completed and hasn't been rated and no issue reported
       // Only show if transitioning to completed or if already completed on initial load
       if (isNowCompleted && !data.runner_rating) {
-        if (!wasCompleted) {
-          // Just transitioned to completed - show after confetti
-          setTimeout(() => {
-            setShowCompletionModal(true);
-          }, 1000);
-        } else if (!showCompletionModal) {
-          // Already completed on initial load - show after page loads
-          setTimeout(() => {
-            setShowCompletionModal(true);
-          }, 500);
-        }
+        // Check if issue was reported before showing modal
+        hasOrderIssue(data.id).then(issueExists => {
+          setHasIssue(issueExists);
+          if (!issueExists) {
+            if (!wasCompleted) {
+              // Just transitioned to completed - show after confetti
+              setTimeout(() => {
+                setShowCompletionModal(true);
+              }, 1000);
+            } else if (!showCompletionModal) {
+              // Already completed on initial load - show after page loads
+              setTimeout(() => {
+                setShowCompletionModal(true);
+              }, 500);
+            }
+          }
+        });
       }
     }
     
@@ -223,23 +238,30 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
 
   const showLiveMap = canShowLiveLocation(order.status);
   
-  // Get map locations based on order status (same logic as runner)
+  // Get map locations based on order status - MUST match runner map exactly
+  // Customer only sees map after cash withdrawal (when live location is revealed)
   const getMapLocations = () => {
     if (!showLiveMap) return null;
     
     const dummyLocations = getDummyLocations();
+    // Customer map only shows route from ATM to customer (after cash withdrawal)
+    // This should match runner's map when status is Cash Withdrawn / Pending Handoff / Completed
     const showCustomerRoute = ['Cash Withdrawn', 'Pending Handoff', 'Completed'].includes(order.status);
     
     if (showCustomerRoute) {
       // After cash withdrawal: show route from ATM to customer
+      // Use EXACT same logic and locations as runner map for consistency
       const customerLocation = {
-        lat: order.address_snapshot?.latitude || dummyLocations.customer.lat,
-        lng: order.address_snapshot?.longitude || dummyLocations.customer.lng,
+        // Use dummy customer location for consistency with runner map (which uses dummyLocations.customer)
+        // Fallback to order address if available, but prefer dummy for testing consistency
+        lat: dummyLocations.customer.lat, // Use dummy first to match runner
+        lng: dummyLocations.customer.lng,
         address: order.customer_address || 'Customer Address',
       };
       
+      // Use EXACT same locations as runner map
       return {
-        origin: dummyLocations.atm, // ATM location
+        origin: dummyLocations.atm, // ATM location (exactly same as runner)
         destination: customerLocation,
         title: 'Route to You',
       };
@@ -252,22 +274,20 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-[#F5F5F7]">
-      {/* Back Button - Fixed Top Left */}
+      {/* Back Button - Fixed Top Left - Circular */}
       {/* Standardized spacing: px-6 (24px) for consistent alignment */}
       <div className="absolute top-6 left-6 z-30">
-        <Button
-          variant="outline"
-          size="sm"
+        <button
           onClick={() => navigate("/customer/home")}
-          className="bg-white/95 backdrop-blur shadow-lg border-black/10"
+          className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white/95 backdrop-blur hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+          aria-label="Go back"
         >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
+        </button>
       </div>
 
-      {/* Map Background - Full Screen */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
+      {/* Map Background - Half Screen (Top to Middle) */}
+      <div className="absolute inset-x-0 top-0 h-1/2 z-0 pointer-events-none">
         {mapLocations ? (
           <RunnerDirectionsMap
             origin={mapLocations.origin}
@@ -275,6 +295,8 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
             title={mapLocations.title}
             height="100%"
             className="pointer-events-none"
+            bottomPadding={mapBottomPadding}
+            interactive={true}
           />
         ) : (
           <CustomerOrderMap
@@ -293,20 +315,22 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       {/* Gradient Overlay for Readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 z-10 pointer-events-none" />
 
-      {/* Completion Rating Modal */}
-      <CompletionRatingModal
-        order={order}
-        open={showCompletionModal}
-        onClose={() => setShowCompletionModal(false)}
-        onRated={() => {
-          // Refresh order to get updated rating
-          if (orderId) {
-            getOrderById(orderId).then((data) => {
-              if (data) setOrder(data);
-            });
-          }
-        }}
-      />
+      {/* Completion Rating Modal - Only show if no issue was reported */}
+      {!hasIssue && (
+        <CompletionRatingModal
+          order={order}
+          open={showCompletionModal}
+          onClose={() => setShowCompletionModal(false)}
+          onRated={() => {
+            // Refresh order to get updated rating
+            if (orderId) {
+              getOrderById(orderId).then((data) => {
+                if (data) setOrder(data);
+              });
+            }
+          }}
+        />
+      )}
 
       {/* Bottom Sheet */}
       <ActiveDeliverySheet
@@ -318,6 +342,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         onMessage={handleMessage}
         onCallSupport={handleCallSupport}
         onOrderUpdate={(updatedOrder) => setOrder(updatedOrder)}
+        onCollapsedHeightChange={setMapBottomPadding}
       />
     </div>
   );

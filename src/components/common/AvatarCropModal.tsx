@@ -13,7 +13,7 @@ import 'react-easy-crop/react-easy-crop.css';
 
 interface AvatarCropModalProps {
   imageSrc: string;
-  onCropComplete: (croppedImageBlob: Blob) => void;
+  onCropComplete: (croppedImageBlob: Blob) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -115,10 +115,17 @@ export function AvatarCropModal({
     setIsProcessing(true);
     try {
       const croppedImageBlob = await getCroppedImg();
-      onCropComplete(croppedImageBlob);
+      // If onCropComplete returns a promise, wait for it (for upload)
+      const result = onCropComplete(croppedImageBlob);
+      if (result instanceof Promise) {
+        await result;
+      }
     } catch (error) {
-      console.error('Error cropping image:', error);
-      alert('Failed to crop image. Please try again.');
+      console.error('Error cropping/uploading image:', error);
+      // Don't show alert if it's an upload error (toast will be shown by parent)
+      if (error instanceof Error && !error.message.includes('upload')) {
+        alert('Failed to crop image. Please try again.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -212,7 +219,7 @@ export function AvatarCropModal({
             <Button
               onClick={handleSave}
               disabled={isProcessing || !croppedAreaPixels}
-              className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90"
+              className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90 disabled:opacity-50"
             >
               {isProcessing ? (
                 <span className="flex items-center gap-2">
@@ -220,7 +227,7 @@ export function AvatarCropModal({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Processing...
+                  Uploading...
                 </span>
               ) : (
                 'Save Photo'

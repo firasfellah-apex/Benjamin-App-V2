@@ -183,9 +183,13 @@ export function useAvatar(): UseAvatarReturn {
       }
 
       // Update profile to remove avatar_url
+      // Also update updated_at to ensure cache invalidation
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: null })
+        .update({ 
+          avatar_url: null,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id);
 
       if (updateError) {
