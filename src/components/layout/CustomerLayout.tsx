@@ -19,14 +19,14 @@ function CustomerLayoutContent({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      {/* Main content – this is the ONLY scroll container */}
-      <MobilePageShell className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+      {/* Main content – header/title/divider are fixed, only content scrolls */}
+      <MobilePageShell className="flex-1 flex flex-col min-h-0">
         {children}
       </MobilePageShell>
 
       {/* Bottom slot – stays pinned under the scroll area */}
       {bottomSlot && (
-        <div className="w-full">
+        <div className="w-full shrink-0">
           {bottomSlot}
         </div>
       )}
