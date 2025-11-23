@@ -2184,34 +2184,86 @@ export async function createOrderIssue(params: {
 // Check if an order has a reported issue
 // Cache table existence check to avoid repeated 404s
 let orderIssuesTableExists: boolean | null = null;
+let checkingTableExistence: Promise<boolean> | null = null;
+
+async function checkTableExists(): Promise<boolean> {
+  // If we already know, return immediately
+  if (orderIssuesTableExists === false) return false;
+  if (orderIssuesTableExists === true) return true;
+  
+  // If already checking, wait for that check
+  if (checkingTableExistence) {
+    return checkingTableExistence;
+  }
+  
+  // Start a new check
+  checkingTableExistence = (async () => {
+    try {
+      // Try a simple query to see if table exists
+      const { error } = await supabase
+        .from('order_issues')
+        .select('id')
+        .limit(0);
+      
+      // Check for 404 or PGRST205 (table not found)
+      // Supabase returns 404 for missing tables, which may not have a specific error code
+      const is404 = error && (
+        error.code === 'PGRST205' || 
+        error.message?.includes('404') || 
+        error.message?.includes('relation') || 
+        error.message?.includes('does not exist') ||
+        error.message?.includes('not found') ||
+        (error as any).status === 404 ||
+        (error as any).statusCode === 404
+      );
+      
+      if (is404) {
+        orderIssuesTableExists = false;
+        checkingTableExistence = null;
+        return false;
+      }
+      
+      // Table exists (no error or different error)
+      orderIssuesTableExists = true;
+      checkingTableExistence = null;
+      return true;
+    } catch (err) {
+      // On any error, assume table doesn't exist to avoid repeated queries
+      orderIssuesTableExists = false;
+      checkingTableExistence = null;
+      return false;
+    }
+  })();
+  
+  return checkingTableExistence;
+}
 
 export async function hasOrderIssue(orderId: string): Promise<boolean> {
   try {
-    // First check order_issues table if we haven't determined it doesn't exist
-    if (orderIssuesTableExists !== false) {
+    // First check if table exists (with caching)
+    const tableExists = await checkTableExists();
+    
+    // Only query order_issues if table exists
+    if (tableExists) {
       const { data: issueData, error: issueError } = await supabase
         .from('order_issues')
         .select('id')
         .eq('order_id', orderId)
         .maybeSingle();
 
-      // If table exists and we found an issue, return true
+      // If we found an issue, return true
       if (issueData && !issueError) {
-        orderIssuesTableExists = true;
         return true;
       }
 
-      // If table doesn't exist (PGRST205), mark it and skip future checks
-      if (issueError && issueError.code === 'PGRST205') {
-        orderIssuesTableExists = false;
-        // Continue to check order_events
-      } else if (issueError) {
-        // Other error, but table might exist - log and continue
-        console.warn('[hasOrderIssue] Error checking order_issues:', issueError);
-      } else if (!issueData && !issueError) {
-        // Table exists but no issue found
-        orderIssuesTableExists = true;
+      // If no issue found and no error, return false
+      if (!issueData && !issueError) {
         return false;
+      }
+
+      // If there's an error, log it but continue to fallback
+      if (issueError) {
+        console.warn('[hasOrderIssue] Error checking order_issues:', issueError);
       }
     }
 

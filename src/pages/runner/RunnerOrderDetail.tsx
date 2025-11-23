@@ -584,6 +584,22 @@ export default function RunnerOrderDetail() {
                               <div className="text-xs text-slate-400 mb-1">Delivery address:</div>
                               <div className="text-sm font-medium text-white">{order.customer_address || 'Address not available'}</div>
                             </div>
+                            
+                            {/* Message Button - Available when en route to customer */}
+                            {order.customer && (
+                              <button
+                                onClick={() => navigate(`/runner/chat/${order.id}`)}
+                                className="relative w-10 h-10 rounded-full bg-[#4F46E5] text-white hover:bg-[#4338CA] flex items-center justify-center transition-colors shrink-0"
+                                aria-label="Message customer"
+                              >
+                                <MessageCircle className="h-5 w-5" />
+                                {unreadCount > 0 && (
+                                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#050816]">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                  </span>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
                         

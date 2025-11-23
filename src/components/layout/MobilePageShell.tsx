@@ -14,7 +14,12 @@ interface MobilePageShellProps {
 
 export function MobilePageShell({ children, className }: MobilePageShellProps) {
   return (
-    <div className={cn("w-full", className)}>
+    <div 
+      className={cn("w-full", className)}
+      style={{
+        WebkitOverflowScrolling: "touch", // important for iOS smooth scrolling
+      }}
+    >
       {children}
     </div>
   );

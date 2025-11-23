@@ -57,8 +57,8 @@ export function CustomerScreen({
     <div
       className={cn(
         // Treat this as the app viewport for that screen
-        // Use h-screen (100vh) instead of 100dvh to match menu sizing approach
-        "flex h-screen flex-col bg-white",
+        // MobilePageShell is now the scroll container, so this just needs to be a flex column
+        "flex flex-col bg-white min-h-full",
         "text-slate-900",
         className
       )}
@@ -91,16 +91,14 @@ export function CustomerScreen({
           </div>
         )}
 
-      {/* MAIN: the ONLY scroll container */}
+      {/* MAIN: content area (scrolls via MobilePageShell parent) */}
       <main
         className={cn(
-          "flex-1 min-h-0 px-6 space-y-6",
-          "overflow-y-auto",
+          "flex-1 px-6 space-y-6",
           fixedContent ? "pt-2" : "pt-0" // Less top padding when fixedContent is present, 0 when flowHeader (24px spacing handled in topContent)
         )}
         style={{
           paddingBottom: customBottomPadding || "calc(24px + max(24px, env(safe-area-inset-bottom)) + 96px)",
-          WebkitOverflowScrolling: "touch", // important for iOS
         }}
       >
         {topContent}

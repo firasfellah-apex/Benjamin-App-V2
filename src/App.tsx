@@ -1,5 +1,4 @@
 import { Routes, Route } from 'react-router-dom';
-import { Toaster } from 'sonner';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { RoleBasedRedirect } from '@/components/auth/RoleBasedRedirect';
 import { ViewportIndicator } from '@/components/dev/ViewportIndicator';
@@ -19,7 +18,6 @@ const App = () => {
 
   return (
     <>
-      <Toaster position="top-center" richColors />
       <RequireAuth whitelist={["/login", "/404", "/debug", "/debug/map", "/onboarding/profile"]}>
         <Routes>
           <Route path="/debug" element={<DebugPage />} />

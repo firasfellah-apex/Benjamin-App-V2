@@ -184,13 +184,14 @@ All colors MUST be HSL.
 
   /* Ensure html, body, and root are full height with no margin/padding */
   html,
-  body,
-  #root {
+  body {
     height: 100%;
+    margin: 0;
+    padding: 0;
   }
 
-  /* Kill any stray margin/padding on root */
   #root {
+    height: 100%;
     margin: 0;
     padding: 0;
   }
@@ -208,16 +209,20 @@ All colors MUST be HSL.
     overscroll-behavior-x: none;
     /* Disable text selection highlight on tap */
     -webkit-tap-highlight-color: transparent;
+    margin: 0;
+    padding: 0;
   }
 
   /* Root container - edge-to-edge */
   body.mobile-app-viewport #root {
     width: 100%;
-    min-height: 100vh;
+    height: 100vh; /* Fixed height to constrain flex children */
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
-    overscroll-behavior-x: none;
+    overflow: hidden; /* Prevent root from scrolling */
+    overscroll-behavior: none;
+    align-items: stretch; /* Ensure children stretch to full width */
+    justify-content: flex-start; /* Align children to top */
   }
 
   /* Ensure all content respects the container */
@@ -225,18 +230,27 @@ All colors MUST be HSL.
     width: 100%;
     position: relative;
     overflow-x: hidden;
+    flex: 1; /* Take available space */
+    min-height: 0; /* Critical: allows flex children to shrink below content size */
+    display: flex; /* Make direct children flex containers */
+    flex-direction: column;
+    margin: 0; /* Remove any default margins */
+    padding: 0; /* Remove any default padding */
+    align-items: stretch; /* Ensure children stretch to full width */
+    justify-content: flex-start; /* Align children to top */
   }
 
   /* Make sure layouts fill the container properly */
   body.mobile-app-viewport [class*="CustomerLayout"],
   body.mobile-app-viewport [class*="RunnerLayout"] {
     width: 100%;
-    min-height: 100vh;
+    height: 100%; /* Use 100% of parent, not min-height */
     position: relative;
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0; /* Important for flex scrolling */
+    overflow: hidden; /* Prevent layout from scrolling, let children scroll */
   }
   
   /* Admin layouts should be responsive */

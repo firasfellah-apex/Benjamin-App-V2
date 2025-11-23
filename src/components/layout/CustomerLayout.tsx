@@ -18,14 +18,13 @@ function CustomerLayoutContent({ children }: { children: ReactNode }) {
   const { bottomSlot } = useCustomerBottomSlot();
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      {/* Main content column - no overflow constraints, let page scroll naturally */}
-      <MobilePageShell className="flex-1 flex flex-col">
-          {children}
+    <div className="flex min-h-screen flex-col bg-white">
+      {/* Main content – this is the ONLY scroll container */}
+      <MobilePageShell className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+        {children}
       </MobilePageShell>
-      
-      {/* Bottom slot - RequestFlowBottomBar handles its own fixed positioning */}
-      {/* When useFixedPosition=true, it's fixed to viewport bottom and won't move with content */}
+
+      {/* Bottom slot – stays pinned under the scroll area */}
       {bottomSlot && (
         <div className="w-full">
           {bottomSlot}
