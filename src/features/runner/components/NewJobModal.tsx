@@ -13,7 +13,7 @@ import { useRunnerJobs } from '../state/runnerJobsStore';
 import { Button } from '@/components/ui/button';
 import { SlideToConfirm } from '@/components/customer/SlideToConfirm';
 import { toast } from 'sonner';
-import { getOrderDeliveryStyle, getDeliveryStyleLabel, getDeliveryStyleShortHint } from '@/lib/deliveryStyle';
+import { resolveDeliveryStyleFromOrder, getDeliveryStyleCopy, getDeliveryStyleShortHint } from '@/lib/deliveryStyle';
 
 export function NewJobModal() {
   const { pendingOffer, acceptOffer, skipOffer, online } = useRunnerJobs();
@@ -172,12 +172,13 @@ export function NewJobModal() {
                     <div className="text-sm font-medium text-white">{pendingOffer.dropoffApprox.neighborhood}</div>
                     {/* Delivery Style Pill */}
                     {(() => {
-                      const deliveryStyle = getOrderDeliveryStyle(pendingOffer.order);
+                      const deliveryStyle = resolveDeliveryStyleFromOrder(pendingOffer.order);
+                      const styleCopy = getDeliveryStyleCopy(deliveryStyle);
                       return (
                         <div className="mt-2 inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-1">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
                           <span className="text-[11px] font-medium text-slate-200">
-                            {getDeliveryStyleLabel(deliveryStyle)}
+                            {styleCopy.label}
                           </span>
                         </div>
                       );
@@ -192,12 +193,13 @@ export function NewJobModal() {
                     <div className="text-sm font-medium text-white">—</div>
                     {/* Delivery Style Pill */}
                     {(() => {
-                      const deliveryStyle = getOrderDeliveryStyle(pendingOffer.order);
+                      const deliveryStyle = resolveDeliveryStyleFromOrder(pendingOffer.order);
+                      const styleCopy = getDeliveryStyleCopy(deliveryStyle);
                       return (
                         <div className="mt-2 inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-1">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
                           <span className="text-[11px] font-medium text-slate-200">
-                            {getDeliveryStyleLabel(deliveryStyle)}
+                            {styleCopy.label}
                           </span>
                         </div>
                       );
@@ -209,7 +211,7 @@ export function NewJobModal() {
             
             {/* Delivery Style Short Hint */}
             {(() => {
-              const deliveryStyle = getOrderDeliveryStyle(pendingOffer.order);
+              const deliveryStyle = resolveDeliveryStyleFromOrder(pendingOffer.order);
               return (
                 <div className="mt-2 text-center">
                   <p className="text-[11px] text-slate-400">

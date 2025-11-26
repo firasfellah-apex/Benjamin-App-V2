@@ -57,6 +57,9 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   fun_fact: string | null;
+  usual_withdrawal_amount: number | null;
+  preferred_handoff_style: 'speed' | 'counted' | 'depends' | null;
+  cash_usage_categories: string[] | null;
   is_active: boolean;
   is_suspended: boolean;
   kyc_status: KYCStatus;

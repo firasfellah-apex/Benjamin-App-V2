@@ -14,6 +14,15 @@ function shouldOnboard(profile: any): boolean {
   return !profile.first_name || !profile.last_name;
 }
 
+function shouldPersonalize(profile: any): boolean {
+  if (!profile) return false;
+  // Check if personalization is incomplete
+  // All three fields should be non-null to be considered complete
+  return profile.usual_withdrawal_amount === null || 
+         profile.preferred_handoff_style === null || 
+         profile.cash_usage_categories === null;
+}
+
 export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
@@ -26,6 +35,7 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
   // Check if current path is whitelisted
   const isWhitelisted = whitelist.some(path => location.pathname === path || location.pathname.startsWith(path));
   const isProfileOnboardingPath = location.pathname === '/onboarding/profile';
+  const isPersonalizeOnboardingPath = location.pathname === '/customer/onboarding/personalize';
   const isBankOnboardingPath = location.pathname === '/customer/onboarding/bank';
 
   // If whitelisted, render children
@@ -42,13 +52,19 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
   // Only require onboarding for customer users, not runners
   const isCustomer = profile?.role?.includes('customer') && !profile?.role?.includes('admin');
   const needsProfileOnboarding = isReady && user && shouldOnboard(profile) && isCustomer;
+  const needsPersonalization = isReady && user && !shouldOnboard(profile) && shouldPersonalize(profile) && isCustomer;
   
   // If customer needs profile onboarding and not on profile onboarding path, redirect
-  if (needsProfileOnboarding && !isProfileOnboardingPath) {
+  if (needsProfileOnboarding && !isProfileOnboardingPath && !isPersonalizeOnboardingPath) {
     return <Navigate to="/onboarding/profile" replace />;
   }
 
-  // If on profile onboarding path but profile is complete, redirect to bank onboarding or home
+  // If customer needs personalization and not on personalization path, redirect
+  if (needsPersonalization && !isPersonalizeOnboardingPath && !isProfileOnboardingPath) {
+    return <Navigate to="/customer/onboarding/personalize" replace />;
+  }
+
+  // If on profile onboarding path but profile is complete, redirect to personalization or home
   // Also redirect non-customers away from onboarding
   if (isProfileOnboardingPath) {
     if (isReady && user && profile && (!shouldOnboard(profile) || !isCustomer)) {
@@ -58,10 +74,32 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
       } else if (profile.role?.includes('runner')) {
         return <Navigate to="/runner/work" replace />;
       } else {
-        // Customer with complete profile - allow them to proceed to bank onboarding or home
-        // Don't redirect here, let them access the page if they navigate to it manually
-        // But if they're already here and profile is complete, they should go to bank onboarding
-        return <Navigate to="/customer/onboarding/bank" replace />;
+        // Customer with complete profile - check if personalization is needed
+        if (shouldPersonalize(profile)) {
+          return <Navigate to="/customer/onboarding/personalize" replace />;
+        }
+        return <Navigate to="/customer/home" replace />;
+      }
+    }
+  }
+
+  // If on personalization path but already personalized, redirect to home
+  // Also redirect non-customers away from onboarding
+  if (isPersonalizeOnboardingPath) {
+    if (isReady && user && profile) {
+      if (!isCustomer) {
+        // Redirect non-customers based on role
+        if (profile.role?.includes('admin')) {
+          return <Navigate to="/admin/dashboard" replace />;
+        } else if (profile.role?.includes('runner')) {
+          return <Navigate to="/runner/work" replace />;
+        }
+      } else if (!shouldPersonalize(profile)) {
+        // Already personalized, go to home
+        return <Navigate to="/customer/home" replace />;
+      } else if (shouldOnboard(profile)) {
+        // Profile not complete, go to profile onboarding first
+        return <Navigate to="/onboarding/profile" replace />;
       }
     }
   }
@@ -80,6 +118,10 @@ export const RequireAuth = ({ children, whitelist = [] }: RequireAuthProps) => {
     // If customer needs profile onboarding, redirect to profile onboarding first
     if (needsProfileOnboarding) {
       return <Navigate to="/onboarding/profile" replace />;
+    }
+    // If customer needs personalization, redirect to personalization first
+    if (needsPersonalization) {
+      return <Navigate to="/customer/onboarding/personalize" replace />;
     }
   }
 

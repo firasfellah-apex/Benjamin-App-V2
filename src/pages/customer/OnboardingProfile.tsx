@@ -208,7 +208,7 @@ export default function OnboardingProfile() {
       });
 
       toast.success('Profile saved successfully!');
-      navigate('/customer/onboarding/bank', { replace: true });
+      navigate('/customer/onboarding/personalize', { replace: true });
     } catch (error: any) {
       console.error('Error saving profile:', error);
       toast.error(error?.message || 'Failed to save profile. Please try again.');

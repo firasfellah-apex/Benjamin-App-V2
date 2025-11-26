@@ -8,10 +8,51 @@
 import type { DeliveryStyle } from '@/types/types';
 
 /**
+ * Single source of truth: Resolve delivery style from an order
+ * Checks delivery_style first, then falls back to delivery_mode for legacy orders
+ */
+export function resolveDeliveryStyleFromOrder(order: any): DeliveryStyle {
+  const style = (order as any).delivery_style as DeliveryStyle | null;
+  const mode = (order as any).delivery_mode as ('quick_handoff' | 'count_confirm' | null);
+
+  // Source of truth: delivery_style
+  if (style === 'COUNTED') return 'COUNTED';
+  if (style === 'SPEED') return 'SPEED';
+
+  // Legacy fallback: delivery_mode
+  if (mode === 'count_confirm') return 'COUNTED';
+  if (mode === 'quick_handoff') return 'SPEED';
+
+  // Default: speed handoff
+  return 'SPEED';
+}
+
+/**
+ * Get delivery style copy (labels, descriptions, etc.)
+ */
+export function getDeliveryStyleCopy(style: DeliveryStyle) {
+  if (style === 'COUNTED') {
+    return {
+      key: 'COUNTED',
+      label: 'Counted handoff',
+      shortLabel: 'Counted',
+      description: 'Customer counts the cash in front of the runner before handoff is marked complete.'
+    };
+  }
+  return {
+    key: 'SPEED',
+    label: 'Speed handoff',
+    shortLabel: 'Speed',
+    description: 'Fast, discreet handoff – no counting required on the spot.'
+  };
+}
+
+/**
  * Get a human-readable label for the delivery style
+ * @deprecated Use getDeliveryStyleCopy().label instead
  */
 export function getDeliveryStyleLabel(style: DeliveryStyle): string {
-  return style === 'COUNTED' ? 'Counted handoff' : 'Speed handoff';
+  return getDeliveryStyleCopy(style).label;
 }
 
 /**
@@ -57,21 +98,8 @@ export function getOtpFooterText(style: DeliveryStyle): string {
 /**
  * Get the delivery style from an order, with backward compatibility
  * Falls back to delivery_mode if delivery_style is not set
+ * @deprecated Use resolveDeliveryStyleFromOrder() instead
  */
 export function getOrderDeliveryStyle(order: { delivery_style?: DeliveryStyle | null; delivery_mode?: 'quick_handoff' | 'count_confirm' | null }): DeliveryStyle {
-  // Use delivery_style if available
-  if (order.delivery_style === 'COUNTED' || order.delivery_style === 'SPEED') {
-    return order.delivery_style;
-  }
-  
-  // Fallback to delivery_mode for backward compatibility
-  if (order.delivery_mode === 'count_confirm') {
-    return 'COUNTED';
-  }
-  if (order.delivery_mode === 'quick_handoff') {
-    return 'SPEED';
-  }
-  
-  // Default to SPEED (less friction)
-  return 'SPEED';
+  return resolveDeliveryStyleFromOrder(order);
 }

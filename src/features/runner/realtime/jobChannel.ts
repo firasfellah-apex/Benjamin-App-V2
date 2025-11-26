@@ -147,6 +147,8 @@ export function useJobOffersSubscription() {
       orderId: order.id,
       status: order.status,
       runnerId: order.runner_id,
+      delivery_style: (order as any).delivery_style || 'NOT SET',
+      delivery_mode: (order as any).delivery_mode || 'NOT SET',
       isOnline: online,
       runnerProfileId: profile?.id,
       hasAddressSnapshot: !!order.address_snapshot,
@@ -168,12 +170,19 @@ export function useJobOffersSubscription() {
         return; // Don't show orders the runner has already skipped or timed-out
       }
       
-      // Ensure we have full order details (address_snapshot might be missing in real-time payload)
+      // Ensure we have full order details (address_snapshot and delivery_style might be missing in real-time payload)
       let fullOrder: OrderWithDetails = order as OrderWithDetails;
       
-      // If order is missing address_snapshot, try to fetch full order details
-      if (!order.address_snapshot && !order.customer_address) {
-        console.log('[JobChannel] ⚠️ Order missing address data, fetching full details...');
+      // Check if we need to fetch full order details
+      const needsFullOrder = 
+        (!order.address_snapshot && !order.customer_address) || 
+        !(order as any).delivery_style;
+      
+      if (needsFullOrder) {
+        console.log('[JobChannel] ⚠️ Order missing critical data (address or delivery_style), fetching full details...', {
+          hasAddress: !!(order.address_snapshot || order.customer_address),
+          hasDeliveryStyle: !!(order as any).delivery_style,
+        });
         try {
           const { data, error } = await supabase
             .from('orders')
@@ -189,6 +198,8 @@ export function useJobOffersSubscription() {
             console.log('[JobChannel] ✅ Full order fetched:', {
               hasAddressSnapshot: !!fullOrder.address_snapshot,
               hasCustomerAddress: !!fullOrder.customer_address,
+              delivery_style: (fullOrder as any).delivery_style || 'NOT SET',
+              delivery_mode: (fullOrder as any).delivery_mode || 'NOT SET',
             });
           }
         } catch (error) {
@@ -203,6 +214,8 @@ export function useJobOffersSubscription() {
         payout: offer.payout,
         cashAmount: offer.cashAmount,
         pickup: offer.pickup.name,
+        delivery_style: (offer.order as any).delivery_style || 'NOT SET',
+        delivery_mode: (offer.order as any).delivery_mode || 'NOT SET',
       });
       receiveOffer(offer);
       console.log('[JobChannel] ✅ Offer sent to runner store - should appear in NewJobModal');

@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { canSeeCashAmount, getCustomerPublicProfile, getCustomerAddressDisplay, canConfirmAtATM, getCashAmountRevealMessage, canShowCashAmountToRunner } from "@/lib/revealRunnerView";
-import { getOrderDeliveryStyle, getDeliveryStyleLabel, getDeliveryStyleShortHint } from "@/lib/deliveryStyle";
+import { resolveDeliveryStyleFromOrder, getDeliveryStyleCopy, getDeliveryStyleShortHint } from "@/lib/deliveryStyle";
 import { Avatar } from "@/components/common/Avatar";
 import { RUNNER_TERMINAL_STATUSES } from "@/lib/orderStatus";
 import { useRunnerJobs } from "@/features/runner/state/runnerJobsStore";
@@ -302,7 +302,8 @@ export default function Work() {
 
               {/* Handoff Style Info */}
               {(() => {
-                const deliveryStyle = getOrderDeliveryStyle(activeOrder);
+                const deliveryStyle = resolveDeliveryStyleFromOrder(activeOrder);
+                const styleCopy = getDeliveryStyleCopy(deliveryStyle);
                 return (
                   <section className="rounded-xl border border-slate-700/50 bg-slate-800/30 px-3 py-2">
                     <div className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -310,7 +311,7 @@ export default function Work() {
                     </div>
                     <div className="flex items-baseline justify-between mt-1">
                       <span className="text-sm font-semibold text-white">
-                        {getDeliveryStyleLabel(deliveryStyle)}
+                        {styleCopy.label}
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-400">

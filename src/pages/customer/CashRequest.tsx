@@ -60,6 +60,28 @@ export default function CashRequest() {
   const [loading, setLoading] = useState(false);
   const [showFeeDetails, setShowFeeDetails] = useState(false); // Collapsed by default
 
+  // Initialize amount and delivery mode from profile personalization (only once on mount)
+  useEffect(() => {
+    if (profile) {
+      // Set amount from usual_withdrawal_amount if available
+      if (profile.usual_withdrawal_amount !== null && 
+          profile.usual_withdrawal_amount >= MIN_AMOUNT && 
+          profile.usual_withdrawal_amount <= MAX_AMOUNT) {
+        setAmount(profile.usual_withdrawal_amount);
+      }
+      
+      // Set delivery mode from preferred_handoff_style if available
+      if (profile.preferred_handoff_style) {
+        if (profile.preferred_handoff_style === 'speed') {
+          setDeliveryMode('quick_handoff');
+        } else if (profile.preferred_handoff_style === 'counted') {
+          setDeliveryMode('count_confirm');
+        }
+        // 'depends' means no preselection, keep default
+      }
+    }
+  }, [profile?.usual_withdrawal_amount, profile?.preferred_handoff_style]); // Only run when these specific fields change
+
   // Map center is now computed inside CustomerMapViewport using computeCustomerMapCenter
 
   // Sync step with URL param (for navigation back from ManageAddresses or Bank Accounts)
@@ -375,6 +397,13 @@ export default function CashRequest() {
       
       // Map deliveryMode to delivery_style
       const deliveryStyle = deliveryMode === 'count_confirm' ? 'COUNTED' as const : 'SPEED' as const;
+      
+      // Debug logging for delivery style mapping
+      console.log('[CashRequest] Creating order with delivery style:', {
+        deliveryMode,
+        deliveryStyle,
+        mapping: deliveryMode === 'count_confirm' ? 'count_confirm → COUNTED' : 'quick_handoff → SPEED',
+      });
       
       const order = await createOrder(
         amount,

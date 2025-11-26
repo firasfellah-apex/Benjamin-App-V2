@@ -553,6 +553,9 @@ export async function createOrder(
   // Include delivery_style if provided (will be omitted if column doesn't exist yet)
   if (deliveryStyle) {
     insertPayload.delivery_style = deliveryStyle;
+    console.log("[Order Creation] 📝 Including delivery_style in insert payload:", deliveryStyle);
+  } else {
+    console.warn("[Order Creation] ⚠️ No deliveryStyle provided to createOrder!");
   }
 
   let { data, error } = await supabase
@@ -563,7 +566,10 @@ export async function createOrder(
 
   // If error is due to missing delivery_style column, retry without it (backward compatibility)
   if (error && error.message?.includes("delivery_style")) {
-    console.warn("[Order Creation] delivery_style column not found, retrying without it");
+    console.error("[Order Creation] ❌ CRITICAL: delivery_style column does not exist in database!");
+    console.error("[Order Creation] ❌ Error details:", error.message);
+    console.error("[Order Creation] ❌ ACTION REQUIRED: Run migration 20251126_add_delivery_style_to_orders.sql");
+    console.warn("[Order Creation] ⚠️ Retrying without delivery_style (order will default to Speed)");
     const { delivery_style, ...payloadWithoutStyle } = insertPayload;
     const retryResult = await supabase
       .from("orders")
@@ -587,9 +593,19 @@ export async function createOrder(
       runnerId: data.runner_id,
       requestedAmount: data.requested_amount,
       customerId: data.customer_id,
+      deliveryStyle: data.delivery_style || 'NOT SET',
+      deliveryMode: data.delivery_mode || 'NOT SET',
       timestamp: new Date().toISOString(),
     });
     console.log("[Order Creation] 📡 This order should now be available to runners via Realtime");
+    
+    // Warn if delivery_style was not saved
+    if (deliveryStyle && !data.delivery_style) {
+      console.warn("[Order Creation] ⚠️ WARNING: delivery_style was provided but not saved to database!", {
+        provided: deliveryStyle,
+        saved: data.delivery_style,
+      });
+    }
   }
 
   return data;
@@ -880,6 +896,8 @@ export async function getOrderById(orderId: string): Promise<OrderWithDetails | 
       hasRunner: !!data.runner,
       customerId: data.customer_id,
       runnerId: data.runner_id,
+      deliveryStyle: data.delivery_style || 'NOT SET',
+      deliveryMode: data.delivery_mode || 'NOT SET',
       customerData: data.customer ? {
         id: data.customer.id,
         avatar_url: data.customer.avatar_url,
@@ -1222,30 +1240,81 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
     // Determine if this is COUNTED mode (check delivery_style first, then fallback to delivery_mode)
     const isCounted = deliveryStyle === 'COUNTED' || (deliveryStyle !== 'SPEED' && deliveryMode === 'count_confirm');
 
-    // OTP is correct - update verified_at timestamp (if column exists)
+    // OTP is correct - update verified_at timestamp
+    const otpVerifiedTimestamp = new Date().toISOString();
     try {
+      // First, try to update without select to see if update works
       const { error: updateError } = await supabase
         .from("orders")
-        .update({ otp_verified_at: new Date().toISOString() })
+        .update({ otp_verified_at: otpVerifiedTimestamp })
         .eq("id", orderId);
 
       if (updateError) {
-        // If column doesn't exist (42703 = undefined_column), log warning but continue
+        // Log all errors - this is critical for counted delivery mode
+        console.error('[OTP] ❌ Error updating otp_verified_at:', {
+          orderId,
+          error: updateError,
+          code: updateError.code,
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint
+        });
+        
+        // If column doesn't exist (42703 = undefined_column), this is a schema issue
         if (updateError.code === '42703' || updateError.message?.includes('otp_verified_at') || updateError.message?.includes('column')) {
-          if (import.meta.env.DEV) {
-            console.warn('[OTP] otp_verified_at column may not exist. Order will still be completed.');
+          console.error('[OTP] ❌ otp_verified_at column does not exist in database. Please run migration: 20251126_add_otp_verified_at_to_orders.sql');
+          // For counted mode, we MUST have this column - return error
+          if (isCounted) {
+            return { success: false, error: "Database configuration error. Please contact support." };
           }
         } else {
-          // Log other errors in dev
-          if (import.meta.env.DEV) {
-            console.error("Error updating OTP verified timestamp:", updateError);
+          // Other errors - log and fail for counted mode
+          if (isCounted) {
+            return { success: false, error: `Failed to record OTP verification: ${updateError.message}` };
+          }
+        }
+      } else {
+        // Update succeeded - verify by fetching the order
+        const { data: verifyOrder, error: verifyError } = await supabase
+          .from("orders")
+          .select('id, otp_verified_at')
+          .eq("id", orderId)
+          .single();
+
+        if (verifyError) {
+          console.error('[OTP] ⚠️ Update succeeded but failed to verify:', {
+            orderId,
+            verifyError
+          });
+          // Even if verification fails, the update likely succeeded, so continue
+        } else {
+          const verifiedAt = (verifyOrder as any)?.otp_verified_at;
+          if (verifiedAt) {
+            console.log('[OTP] ✅ otp_verified_at updated and verified successfully:', {
+              orderId,
+              otp_verified_at: verifiedAt
+            });
+          } else {
+            console.warn('[OTP] ⚠️ Update succeeded but otp_verified_at is still null in fetched order:', {
+              orderId,
+              verifyOrder
+            });
+            // For counted mode, this is a problem
+            if (isCounted) {
+              return { success: false, error: "OTP verification was not properly recorded. Please try again." };
+            }
           }
         }
       }
     } catch (updateError: any) {
-      // Silently handle if column doesn't exist - this is optional
-      if (import.meta.env.DEV && (updateError.message?.includes('otp_verified_at') || updateError.code === '42703')) {
-        console.warn('[OTP] otp_verified_at column may not exist. Order will still be completed.');
+      console.error('[OTP] Exception updating otp_verified_at:', {
+        orderId,
+        error: updateError,
+        message: updateError?.message,
+        stack: updateError?.stack
+      });
+      if (isCounted) {
+        return { success: false, error: "Failed to record OTP verification. Please try again." };
       }
     }
 
@@ -1328,8 +1397,10 @@ export async function confirmCount(orderId: string): Promise<{ success: boolean;
       return { success: false, error: "OTP must be verified before confirming count." };
     }
 
-    const deliveryMode = (order as any).delivery_mode;
-    if (deliveryMode !== 'count_confirm') {
+    // Use the same resolver as the UI to check delivery style
+    const { resolveDeliveryStyleFromOrder } = await import('@/lib/deliveryStyle');
+    const style = resolveDeliveryStyleFromOrder(order);
+    if (style !== 'COUNTED') {
       return { success: false, error: "Count confirmation is only required for counted delivery mode." };
     }
 
@@ -2714,3 +2785,4 @@ export async function logRunnerOfferEvent(data: {
     console.error('Error logging runner offer event:', error);
   }
 }
+

@@ -6,7 +6,7 @@ import { validateInvitationToken, acceptInvitation, getCurrentProfile } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import { AppleLogo } from "@/components/common/AppleLogo";
 import { GoogleLogo } from "@/components/common/GoogleLogo";
@@ -21,10 +21,13 @@ export default function Login() {
   const [redirecting, setRedirecting] = useState(false);
   
   // Auth state
-  const [mode, setMode] = useState<'providers' | 'email'>('providers');
+  const [emailMode, setEmailMode] = useState<'signup' | 'signin'>('signup');
   const [loadingProvider, setLoadingProvider] = useState<'apple' | 'google' | 'email' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const isSignup = emailMode === 'signup';
 
   useEffect(() => {
     const token = searchParams.get('invitation');
@@ -123,16 +126,48 @@ export default function Login() {
     }
   };
 
-  const handleEmailSignUp = async (e: React.FormEvent) => {
+  const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     
     if (!email || !password) {
-      toast.error('Add your email and a password to continue.');
+      setFormError('Add your email and a password to continue.');
+      return;
+    }
+
+    try {
+      setLoadingProvider('email');
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        setFormError(error.message || 'Could not sign in. Please check your credentials.');
+        return;
+      }
+
+      // Success - auth context will handle redirect
+      // The useEffect above will check profile and redirect accordingly
+    } catch (err: any) {
+      console.error(err);
+      setFormError(err?.message || 'Could not sign in');
+    } finally {
+      setLoadingProvider(null);
+    }
+  };
+
+  const handleEmailSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    
+    if (!email || !password) {
+      setFormError('Add your email and a password to continue.');
       return;
     }
     
     if (password.length < 8) {
-      toast.error('Password should be at least 8 characters.');
+      setFormError('Password should be at least 8 characters.');
       return;
     }
 
@@ -149,21 +184,21 @@ export default function Login() {
       if (error) {
         // Friendly handling if user already exists
         if (error.message.toLowerCase().includes('user already registered')) {
-          toast.error('Looks like you already have a Benjamin account. Try signing in with Google or Apple using this email.');
+          setFormError('Looks like you already have a Benjamin account. Try signing in instead.');
+          setEmailMode('signin');
         } else {
-          toast.error(error.message);
+          setFormError(error.message);
         }
         return;
       }
 
       toast.success('Check your email to confirm your account.');
-      // Optionally: close form or navigate to a "check your email" screen
-      setMode('providers');
+      // Reset form
       setEmail('');
       setPassword('');
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.message || 'Could not create your account');
+      setFormError(err?.message || 'Could not create your account');
     } finally {
       setLoadingProvider(null);
     }
@@ -201,79 +236,86 @@ export default function Login() {
           </div>
         )}
 
-        {/* Middle: buttons or email form */}
+        {/* Middle: unified auth options */}
         <div className="flex-1 flex flex-col justify-center">
-          {mode === 'providers' ? (
-            /* State A: Provider buttons */
-            <div className="space-y-3">
-              {/* Apple button */}
-              <Button
-                type="button"
-                onClick={handleAppleSignIn}
-                className="w-full h-[56px] rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                disabled={!!loadingProvider}
-              >
-                {loadingProvider === 'apple' ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <AppleLogo size={20} className="text-white" />
-                )}
-                <span className="text-[15px] font-medium">
-                  Continue with Apple
-                </span>
-              </Button>
+          <div className="mt-10 space-y-6">
+            {/* Apple button */}
+            <Button
+              type="button"
+              className="w-full h-[52px] rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+              onClick={handleAppleSignIn}
+              disabled={!!loadingProvider}
+            >
+              {loadingProvider === 'apple' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <AppleLogo size={20} className="text-white" />
+              )}
+              <span className="text-[15px] font-medium">Continue with Apple</span>
+            </Button>
 
-              {/* Google button */}
-              <Button
-                type="button"
-                onClick={handleGoogleSignIn}
-                className="w-full h-[56px] rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                disabled={!!loadingProvider}
-              >
-                {loadingProvider === 'google' ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <GoogleLogo size={20} />
-                )}
-                <span className="text-[15px] font-medium">
-                  Continue with Google
-                </span>
-              </Button>
+            {/* Google button */}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-[52px] rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
+              onClick={handleGoogleSignIn}
+              disabled={!!loadingProvider}
+            >
+              {loadingProvider === 'google' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <GoogleLogo size={20} />
+              )}
+              <span className="text-[15px] font-medium">Continue with Google</span>
+            </Button>
 
-              {/* Email toggle button (ghost/outline) */}
-              <Button
-                type="button"
-                onClick={() => setMode('email')}
-                variant="outline"
-                className="w-full h-[56px] rounded-full border-slate-800 bg-white text-slate-900 hover:bg-slate-50 flex items-center justify-center gap-2"
-                disabled={!!loadingProvider}
-              >
-                <Mail className="h-4 w-4" />
-                <span className="text-[15px] font-medium">Continue with Email</span>
-              </Button>
+            {/* OR separator */}
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
+                or
+              </span>
+              <div className="h-px flex-1 bg-slate-200" />
             </div>
-          ) : (
-            /* State B: Email form */
-            <div className="space-y-4">
-              {/* Back button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('providers');
-                  setEmail('');
-                  setPassword('');
-                }}
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors mb-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to other options</span>
-              </button>
 
-              {/* Email form */}
-              <form onSubmit={handleEmailSignUp} className="space-y-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Sign up with Email</h2>
-                </div>
+            {/* Email block */}
+            <div className="space-y-4">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  {isSignup ? 'Sign up with Email' : 'Sign in with Email'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailMode(isSignup ? 'signin' : 'signup');
+                    setFormError(null);
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  {isSignup ? (
+                    <>
+                      Already have an account?{' '}
+                      <span className="underline">Sign in</span>
+                    </>
+                  ) : (
+                    <>
+                      New to Benjamin?{' '}
+                      <span className="underline">Create account</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <form
+                onSubmit={isSignup ? handleEmailSignUp : handleEmailSignIn}
+                className="space-y-3"
+              >
+                {formError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-xs text-red-600">{formError}</p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-slate-900">
@@ -286,9 +328,13 @@ export default function Login() {
                     autoComplete="email"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setFormError(null);
+                    }}
                     className="rounded-full h-12 text-base border-slate-200 placeholder:text-slate-400"
                     required
+                    disabled={loadingProvider === 'email'}
                   />
                 </div>
 
@@ -299,65 +345,42 @@ export default function Login() {
                   <Input
                     id="password"
                     type="password"
-                    autoComplete="new-password"
-                    placeholder="Create a password"
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                    placeholder={isSignup ? 'Create a password' : 'Enter your password'}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setFormError(null);
+                    }}
                     className="rounded-full h-12 text-base border-slate-200 placeholder:text-slate-400"
                     required
-                    minLength={8}
+                    minLength={isSignup ? 8 : undefined}
+                    disabled={loadingProvider === 'email'}
                   />
-                  <p className="text-xs text-slate-500 mt-1">
-                    We only use this to sign you in. No spam, no surprises.
-                  </p>
+                  {isSignup && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      We'll only use this to sign you in. No spam, no surprises.
+                    </p>
+                  )}
                 </div>
 
                 <Button
                   type="submit"
                   disabled={loadingProvider === 'email'}
-                  className="w-full h-[56px] rounded-full bg-black text-white hover:bg-black/90 text-base font-medium mt-4"
+                  className="w-full h-[52px] rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
                 >
                   {loadingProvider === 'email' ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Creating account…
+                      {isSignup ? 'Creating account…' : 'Signing in…'}
                     </>
                   ) : (
-                    'Create account'
+                    isSignup ? 'Create account' : 'Sign in'
                   )}
                 </Button>
-
-                {/* Optional: Prefer other options */}
-                <div className="pt-2">
-                  <p className="text-xs text-center text-slate-500">
-                    Prefer{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode('providers');
-                        handleAppleSignIn();
-                      }}
-                      className="underline hover:text-slate-700"
-                    >
-                      Apple
-                    </button>
-                    {' '}or{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode('providers');
-                        handleGoogleSignIn();
-                      }}
-                      className="underline hover:text-slate-700"
-                    >
-                      Google
-                    </button>
-                    {' '}instead?
-                  </p>
-                </div>
               </form>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Bottom: terms copy */}

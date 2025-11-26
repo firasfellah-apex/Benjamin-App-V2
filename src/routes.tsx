@@ -30,6 +30,7 @@ import AdminOrderDetail from './pages/admin/AdminOrderDetail';
 import RunnerTraining from './pages/admin/RunnerTraining';
 
 import ProfileOnboarding from './pages/customer/OnboardingProfile';
+import PersonalizeOnboarding from './pages/customer/OnboardingPersonalize';
 import ConnectBankOnboarding from './pages/customer/ConnectBankOnboarding';
 import BankAccounts from './pages/customer/BankAccounts';
 import DebugMapPage from './pages/debug/DebugMapPage';
@@ -56,6 +57,12 @@ const routes: RouteConfig[] = [
     name: 'Profile Onboarding',
     path: '/onboarding/profile',
     element: <ProfileOnboarding />,
+    visible: false
+  },
+  {
+    name: 'Personalization Onboarding',
+    path: '/customer/onboarding/personalize',
+    element: <CustomerLayout><PersonalizeOnboarding /></CustomerLayout>,
     visible: false
   },
   {

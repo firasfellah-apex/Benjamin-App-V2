@@ -13,7 +13,6 @@ import { triggerConfetti } from "@/lib/confetti";
 import { strings } from "@/lib/strings";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { 
-  getCustomerAddressDisplay, 
   canConfirmAtATM
 } from "@/lib/revealRunnerView";
 import { RunnerSubpageLayout } from "@/components/layout/RunnerSubpageLayout";
@@ -21,7 +20,7 @@ import { RatingStars } from "@/components/common/RatingStars";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { formatDate } from "@/lib/utils";
 import { RunnerDirectionsMap, getDummyLocations, type Location } from "@/components/maps/RunnerDirectionsMap";
-import { getOrderDeliveryStyle, getArrivalInstruction, getOtpFooterText, getDeliveryStyleLabel, getDeliveryStyleShortHint, getDeliveryStyleChipLabel } from "@/lib/deliveryStyle";
+import { resolveDeliveryStyleFromOrder, getDeliveryStyleCopy, getArrivalInstruction, getOtpFooterText, getDeliveryStyleShortHint, getDeliveryStyleChipLabel } from "@/lib/deliveryStyle";
 
 function shortId(orderId: string): string {
   return orderId.slice(0, 8);
@@ -96,15 +95,33 @@ export default function RunnerOrderDetail() {
       
       // Check if OTP was already verified (for counted mode)
       const otpVerifiedAt = (data as any).otp_verified_at;
-      const deliveryStyle = getOrderDeliveryStyle(data);
-      if (otpVerifiedAt && data.status === "Pending Handoff" && deliveryStyle === 'COUNTED') {
-        setOtpVerified(true);
-        setIsCountingStep(true);
-        // If we're resuming, don't restart countdown - allow immediate confirmation
-        if (!countCooldownStart) {
-          setCountdown(0);
-          setCountCooldownRemaining(0);
+      const deliveryStyle = resolveDeliveryStyleFromOrder(data);
+      
+      // Debug logging for delivery style
+      console.log('[RunnerOrderDetail] Delivery style check:', {
+        orderId: data.id,
+        delivery_style: data.delivery_style || 'NOT SET',
+        delivery_mode: data.delivery_mode || 'NOT SET',
+        resolvedStyle: deliveryStyle,
+        isCounted: deliveryStyle === 'COUNTED',
+        otpVerifiedAt: otpVerifiedAt || 'NOT SET',
+      });
+      
+      // If OTP is verified in database OR we already have otpVerified set to true locally,
+      // and we're in the right state, set the counting step
+      if (data.status === "Pending Handoff" && deliveryStyle === 'COUNTED') {
+        if (otpVerifiedAt) {
+          // Database confirms OTP is verified
+          setOtpVerified(true);
+          setIsCountingStep(true);
+          // Start countdown timer if not already started
+          if (!countCooldownStart) {
+            setCountdown(20);
+            setCountCooldownRemaining(20);
+          }
         }
+        // If otpVerifiedAt is not in DB yet but we have local otpVerified state,
+        // preserve it (don't reset to false) - the DB update might still be propagating
       }
       
       setLoading(false);
@@ -120,6 +137,15 @@ export default function RunnerOrderDetail() {
 
   const handleOrderUpdate = useCallback(async (updatedOrder: Order) => {
     if (!orderId || !updatedOrder) return;
+    
+    // Debug logging for delivery style in realtime updates
+    const resolvedStyle = resolveDeliveryStyleFromOrder(updatedOrder);
+    console.log('[RunnerOrderDetail] Realtime order update:', {
+      orderId: updatedOrder.id,
+      delivery_style: updatedOrder.delivery_style || 'NOT SET',
+      delivery_mode: updatedOrder.delivery_mode || 'NOT SET',
+      resolvedStyle,
+    });
     
     setOrder((prev) => {
       if (!prev || prev.id !== updatedOrder.id) return prev;
@@ -214,6 +240,8 @@ export default function RunnerOrderDetail() {
           setOtpVerified(true);
           setIsCountingStep(true);
           setCountdown(20);
+          // Reload order to get updated otp_verified_at field
+          await loadOrder();
         } else {
           // Speed mode: Complete immediately
           triggerConfetti(3000);
@@ -234,33 +262,57 @@ export default function RunnerOrderDetail() {
     }
   };
 
-  const handleConfirmCount = async () => {
-    if (!orderId) return;
-
-    setUpdating(true);
-    try {
-      const result = await confirmCount(orderId);
-      if (result.success) {
-        triggerConfetti(3000);
-        toast.success("Delivery completed successfully!");
-        await loadOrder();
-        setTimeout(() => navigate("/runner/work"), 2000);
-      } else {
-        toast.error(result.error || "Failed to confirm count. Please try again.");
-      }
-    } catch (error: any) {
-      console.error("Error confirming count:", error);
-      toast.error(error?.message || strings.errors.generic);
-    } finally {
-      setUpdating(false);
-    }
-  };
 
   const handleConfirmAllGood = async () => {
-    if (!orderId) return;
+    if (!orderId || !order) return;
+
+    // Validate order state before attempting completion
+    if (order.status !== "Pending Handoff") {
+      console.error('[handleConfirmAllGood] Order is not in Pending Handoff status:', {
+        orderId,
+        currentStatus: order.status,
+        expectedStatus: "Pending Handoff"
+      });
+      toast.error("Order is not in the correct state. Please refresh and try again.");
+      await loadOrder(); // Refresh to get latest state
+      return;
+    }
+
+    // Use local otpVerified state instead of checking order object
+    // The confirmCount function will verify with the database for data integrity
+    if (!otpVerified) {
+      console.error('[handleConfirmAllGood] OTP not verified (local state):', {
+        orderId,
+        otpVerified,
+        orderStatus: order.status
+      });
+      toast.error("OTP must be verified before completing delivery. Please verify the OTP first.");
+      // Try to reload order to sync state
+      await loadOrder();
+      return;
+    }
+
+    const deliveryStyle = resolveDeliveryStyleFromOrder(order);
+    if (deliveryStyle !== 'COUNTED') {
+      console.error('[handleConfirmAllGood] Not a counted delivery:', {
+        orderId,
+        deliveryStyle,
+        expectedStyle: 'COUNTED'
+      });
+      toast.error("This action is only available for counted delivery style.");
+      return;
+    }
 
     try {
       setCompleting(true);
+      console.log('[handleConfirmAllGood] Attempting to complete delivery:', {
+        orderId,
+        status: order.status,
+        otpVerified,
+        deliveryStyle,
+        countdown
+      });
+      
       const result = await confirmCount(orderId);
       if (result.success) {
         triggerConfetti(3000);
@@ -268,11 +320,20 @@ export default function RunnerOrderDetail() {
         await loadOrder();
         setTimeout(() => navigate("/runner/work"), 2000);
       } else {
+        console.error('[handleConfirmAllGood] confirmCount returned error:', result.error);
         toast.error(result.error || "Failed to complete delivery. Please try again.");
       }
     } catch (error: any) {
-      console.error("Error completing delivery:", error);
-      toast.error(error?.message || strings.errors.generic);
+      console.error("[handleConfirmAllGood] Error completing delivery:", {
+        error,
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        orderId,
+        orderStatus: order?.status
+      });
+      toast.error(error?.message || strings.errors.generic || "Failed to complete delivery. Please try again.");
     } finally {
       setCompleting(false);
     }
@@ -605,7 +666,8 @@ export default function RunnerOrderDetail() {
                         
                         {/* Handoff Style Info */}
                         {(() => {
-                          const deliveryStyle = getOrderDeliveryStyle(order);
+                          const deliveryStyle = resolveDeliveryStyleFromOrder(order);
+                          const styleCopy = getDeliveryStyleCopy(deliveryStyle);
                           return (
                             <section className="mb-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                               <div className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -613,7 +675,7 @@ export default function RunnerOrderDetail() {
                               </div>
                               <div className="flex items-baseline justify-between mt-1">
                                 <span className="text-sm font-semibold text-white">
-                                  {getDeliveryStyleLabel(deliveryStyle)}
+                                  {styleCopy.label}
                                 </span>
                               </div>
                               <p className="mt-1 text-[11px] text-slate-400">
@@ -676,7 +738,7 @@ export default function RunnerOrderDetail() {
                     
                     {/* Delivery Style Instructions */}
                     {(() => {
-                      const deliveryStyle = getOrderDeliveryStyle(order);
+                      const deliveryStyle = resolveDeliveryStyleFromOrder(order);
                       return (
                         <div className="mb-4 rounded-xl bg-slate-800/50 border border-slate-700/50 px-3 py-3">
                           <p className="text-xs font-medium text-white mb-1">
@@ -713,7 +775,7 @@ export default function RunnerOrderDetail() {
                             </div>
                             
                             {/* Message Button - Circular with Chat Icon (Runner App Style) */}
-                            {!isCompleted && (order.status === "Cash Withdrawn" || order.status === "Pending Handoff") && (
+                            {((order.status === "Cash Withdrawn" as OrderStatus) || (order.status === "Pending Handoff" as OrderStatus)) && (
                               <button
                                 onClick={() => navigate(`/runner/chat/${order.id}`)}
                                 className="relative w-10 h-10 rounded-full bg-[#4F46E5] text-white hover:bg-[#4338CA] flex items-center justify-center transition-colors shrink-0"
@@ -734,7 +796,7 @@ export default function RunnerOrderDetail() {
                     
                     {/* Delivery Style Chip - Above OTP Input */}
                     {(() => {
-                      const deliveryStyle = getOrderDeliveryStyle(order);
+                      const deliveryStyle = resolveDeliveryStyleFromOrder(order);
                       const chipLabel = getDeliveryStyleChipLabel(deliveryStyle);
                       return (
                         <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 text-[11px] text-slate-100">
@@ -768,14 +830,14 @@ export default function RunnerOrderDetail() {
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                       {updating 
                         ? "Verifying..." 
-                        : getOrderDeliveryStyle(order) === 'COUNTED'
+                        : resolveDeliveryStyleFromOrder(order) === 'COUNTED'
                         ? "Verify OTP"
                         : "Verify and Complete Delivery"}
                     </Button>
                     
                     {/* OTP Footer Text - Delivery Style Reminder */}
                     {(() => {
-                      const deliveryStyle = getOrderDeliveryStyle(order);
+                      const deliveryStyle = resolveDeliveryStyleFromOrder(order);
                       return (
                         <p className="mt-2 text-[11px] text-slate-400 text-center">
                           {getOtpFooterText(deliveryStyle)}
@@ -788,7 +850,7 @@ export default function RunnerOrderDetail() {
             )}
 
             {/* STAGE 6: Counting Step (Counted Mode Only) */}
-            {order.status === "Pending Handoff" && isCountingStep && getOrderDeliveryStyle(order) === 'COUNTED' && (
+            {order.status === "Pending Handoff" && isCountingStep && resolveDeliveryStyleFromOrder(order) === 'COUNTED' && (
               <section className="rounded-3xl bg-[#050816] border border-white/5 px-4 py-8">
                 <div className="flex flex-col items-center justify-center text-center gap-6">
                   <div className="space-y-2">
@@ -813,7 +875,7 @@ export default function RunnerOrderDetail() {
                   <div className="w-full space-y-3">
                     <Button
                       className="w-full h-11 rounded-full bg-[#4F46E5] text-white hover:bg-[#4338CA] disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={countdown > 0 || completing}
+                      disabled={countdown > 0 || completing || !order || order.status !== "Pending Handoff" || !otpVerified}
                       onClick={handleConfirmAllGood}
                     >
                       {countdown > 0 ? 'Waiting…' : 'All good, complete delivery'}
