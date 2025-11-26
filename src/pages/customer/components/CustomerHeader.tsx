@@ -273,15 +273,14 @@ export function CustomerHeader({
     <button
       onClick={onBack || (() => navigate(-1))}
       className={cn(
-        "w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation",
-        useXButton ? "" : "p-2 hover:bg-gray-100 -ml-2"
+        "w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
       )}
       aria-label={useXButton ? "Close" : "Go back"}
     >
       {useXButton ? (
         <X className="h-5 w-5 text-slate-900" />
       ) : (
-        <ArrowLeft className="h-5 w-5 text-gray-600" />
+        <ArrowLeft className="h-5 w-5 text-slate-900" />
       )}
     </button>
   ) : (

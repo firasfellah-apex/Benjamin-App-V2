@@ -96,17 +96,32 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       orderId: updatedOrder.id,
       oldStatus: oldOrder?.status,
       newStatus: updatedOrder.status,
+      mode: import.meta.env.MODE,
+      isDev: import.meta.env.DEV,
+      timestamp: new Date().toISOString(),
     });
     
     // Update state immediately with payload data for instant UI update
     setOrder((prev) => {
-      if (!prev || prev.id !== updatedOrder.id) return prev;
+      if (!prev || prev.id !== updatedOrder.id) {
+        console.log('[OrderTracking] Order ID mismatch or no previous order, skipping update');
+        return prev;
+      }
       
       // Merge the update into existing order to preserve relations
-      return {
+      const merged = {
         ...prev,
         ...updatedOrder,
       } as OrderWithDetails;
+      
+      console.log('[OrderTracking] Order state updated:', {
+        orderId: merged.id,
+        status: merged.status,
+        updated_at: merged.updated_at,
+        willTriggerReRender: true,
+      });
+      
+      return merged;
     });
     
     // Check for status transitions
@@ -144,6 +159,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   // Subscribe to realtime updates for this order
   useOrderRealtime(orderId, {
     onUpdate: handleOrderUpdate,
+    enabled: !!orderId, // Explicitly enable when orderId exists
   });
 
   // Debug logging for PWA

@@ -8,6 +8,7 @@
 
 import { useNavigate } from "react-router-dom";
 import type { OrderWithDetails } from "@/types/types";
+import { formatOrderTitle, formatOrderListTimestamp, getOrderStatusLabel, hasRunnerRating } from "@/lib/orderDisplay";
 
 interface LastDeliveryCardProps {
   order: OrderWithDetails;
@@ -15,92 +16,14 @@ interface LastDeliveryCardProps {
   hasIssue?: boolean;
 }
 
-/**
- * Get address label from order
- */
-function getAddressLabel(order: OrderWithDetails): string {
-  if (order.address_snapshot?.label) {
-    return order.address_snapshot.label;
-  }
-  
-  // Try to get from address snapshot line1
-  if (order.address_snapshot?.line1) {
-    const parts = order.address_snapshot.line1.split(',');
-    return parts[0] || 'Delivery address';
-  }
-  
-  // Fallback to customer_address
-  if (order.customer_address) {
-    const parts = order.customer_address.split(',');
-    return parts[0] || 'Delivery address';
-  }
-  
-  return 'Delivery address';
-}
-
-/**
- * Format date label (e.g., "Today" or "Oct 11")
- */
-function formatDateLabel(date: Date): string {
-  const today = new Date();
-  const orderDate = new Date(date);
-  
-  // Check if same day
-  if (
-    orderDate.getDate() === today.getDate() &&
-    orderDate.getMonth() === today.getMonth() &&
-    orderDate.getFullYear() === today.getFullYear()
-  ) {
-    return 'Today';
-  }
-  
-  // Check if yesterday
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (
-    orderDate.getDate() === yesterday.getDate() &&
-    orderDate.getMonth() === yesterday.getMonth() &&
-    orderDate.getFullYear() === yesterday.getFullYear()
-  ) {
-    return 'Yesterday';
-  }
-  
-  // Otherwise format as "Oct 11"
-  return orderDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-/**
- * Format time label (e.g., "9:43 AM")
- */
-function formatTimeLabel(date: Date): string {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
 export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: LastDeliveryCardProps) {
   const navigate = useNavigate();
   
   if (!order) return null;
   
-  const isRated = !!order.runner_rating;
+  const isRated = hasRunnerRating(order);
   const canRate = order.status === 'Completed' && !isRated && !hasIssue;
   const isCancelled = order.status === 'Cancelled';
-  
-  // For completed orders, use handoff_completed_at; for cancelled, use updated_at
-  const orderDate = isCancelled
-    ? new Date(order.updated_at)
-    : (order.handoff_completed_at ? new Date(order.handoff_completed_at) : new Date(order.created_at));
-  
-  const addressLabel = getAddressLabel(order);
-  const dateLabel = formatDateLabel(orderDate);
-  const timeLabel = formatTimeLabel(orderDate);
-  const amount = order.requested_amount;
   
   const handleRateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -125,23 +48,21 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 Latest Order
               </div>
               <div className="text-base font-semibold text-slate-900">
-                ${amount.toFixed(0)} {isCancelled ? 'requested' : 'delivered'} to {addressLabel}
+                {formatOrderTitle(order)}
               </div>
               <div className="text-[11px] text-slate-500">
-                {dateLabel} · {timeLabel}
+                {formatOrderListTimestamp(order)}
               </div>
             </div>
             
             {/* Status pill */}
-            {isCancelled ? (
-              <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                Cancelled
-              </div>
-            ) : (
-              <div className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Delivered
-              </div>
-            )}
+            <div className={`flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium border ${
+              isCancelled
+                ? "bg-slate-100 text-slate-600 border-slate-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+            }`}>
+              {getOrderStatusLabel(order)}
+            </div>
           </div>
           
           {/* Divider */}

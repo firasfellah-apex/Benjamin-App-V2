@@ -87,6 +87,30 @@ export function ActiveDeliverySheet({
   const COUNT_GUARDRAIL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
   const makeGuardrailKey = (orderId: string) => `benjamin:count-guardrail:${orderId}`;
   
+  // Debug: Log when order prop changes (for PWA troubleshooting)
+  const prevOrderRef = useRef<OrderWithDetails | null>(null);
+  useEffect(() => {
+    const prevOrder = prevOrderRef.current;
+    const hasChanged = !prevOrder || 
+      prevOrder.status !== order.status || 
+      prevOrder.updated_at !== order.updated_at ||
+      prevOrder.id !== order.id;
+    
+    if (hasChanged) {
+      console.log('[ActiveDeliverySheet] Order prop updated:', {
+        orderId: order.id,
+        status: order.status,
+        updated_at: order.updated_at,
+        previousStatus: prevOrder?.status,
+        previousUpdatedAt: prevOrder?.updated_at,
+        timestamp: new Date().toISOString(),
+        mode: import.meta.env.MODE,
+        isDev: import.meta.env.DEV,
+      });
+      prevOrderRef.current = order;
+    }
+  }, [order]);
+
   // Check for runner arrival when status is Pending Handoff
   // Re-check whenever order updates (including when order_events change)
   useEffect(() => {
@@ -101,7 +125,7 @@ export function ActiveDeliverySheet({
       }
     };
     updateCustomerStatus();
-  }, [order.status, order.id, order.updated_at]);
+  }, [order.status, order.id, order.updated_at, order]);
   
   // Poll for arrival status periodically when in Pending Handoff
   // This ensures we catch arrival even if realtime subscription has issues

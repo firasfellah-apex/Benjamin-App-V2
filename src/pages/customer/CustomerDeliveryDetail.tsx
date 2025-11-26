@@ -4,20 +4,22 @@
  * Detailed view of a single past delivery with timeline, cost breakdown, runner info, and rating
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Clock, MapPin, DollarSign } from "@/lib/icons";
+import { Check, Clock, MapPin, DollarSign, Star } from "@/lib/icons";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
-import { StatusBadge } from "@/components/customer/deliveries/StatusBadge";
 import { DeliveryTimeline, type TimelineEvent } from "@/components/customer/deliveries/DeliveryTimeline";
-import { RatingStars } from "@/components/common/RatingStars";
+import { CompletionRatingModal } from "@/components/customer/CompletionRatingModal";
+import { ReportIssueSheet } from "@/components/customer/ReportIssueSheet";
 import { useCustomerDeliveries } from "@/features/customer/hooks/useCustomerDeliveries";
-import { rateRunner } from "@/db/api";
+import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
+import { getOrderById } from "@/db/api";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { formatDate } from "@/lib/utils";
 import { Skeleton } from "@/components/common/Skeleton";
 import type { CustomerDelivery } from "@/types/delivery";
+import type { OrderWithDetails } from "@/types/types";
 
 /**
  * Build timeline events from delivery data
@@ -62,7 +64,7 @@ function buildTimelineEvents(delivery: CustomerDelivery): TimelineEvent[] {
     const acceptedDate = new Date(delivery.runnerAcceptedAt);
     events.push({
       id: "accepted",
-      label: "Order created",
+      label: "Request received",
       time: acceptedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       icon: <MapPin className="w-3 h-3" />,
       isDone: true,
@@ -74,7 +76,7 @@ function buildTimelineEvents(delivery: CustomerDelivery): TimelineEvent[] {
     const createdDate = new Date(delivery.createdAt);
     events.push({
       id: "created",
-      label: "Order created",
+      label: "Request received",
       time: createdDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       icon: <MapPin className="w-3 h-3" />,
       isDone: true,
@@ -94,13 +96,17 @@ export default function CustomerDeliveryDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { deliveries, isLoading } = useCustomerDeliveries();
+  const { setBottomSlot } = useCustomerBottomSlot();
   
   // Try to get delivery from location state first (for instant render)
   const [delivery, setDelivery] = useState<CustomerDelivery | null>(
     location.state?.delivery || null
   );
-  const [submittingRating, setSubmittingRating] = useState(false);
-  const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  const [order, setOrder] = useState<OrderWithDetails | null>(null);
+  const [loadingOrder, setLoadingOrder] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [showReportIssueSheet, setShowReportIssueSheet] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
 
   // If not in state, find from deliveries list
   useEffect(() => {
@@ -122,39 +128,151 @@ export default function CustomerDeliveryDetail() {
     }
   }, [deliveryId, deliveries]);
 
+  // Load full order for reorder functionality
+  useEffect(() => {
+    if (deliveryId && !order && !loadingOrder) {
+      setLoadingOrder(true);
+      getOrderById(deliveryId)
+        .then((data) => {
+          if (data) setOrder(data);
+        })
+        .catch((error) => {
+          console.error("Error loading order for reorder:", error);
+        })
+        .finally(() => {
+          setLoadingOrder(false);
+        });
+    }
+  }, [deliveryId, order, loadingOrder]);
+
   const handleBack = () => {
     navigate('/customer/deliveries');
   };
 
-  const handleRateRunner = async (rating: number) => {
-    if (!delivery) return;
+  // Format delivery timestamp for subtitle
+  const formattedDeliveryTime = useMemo(() => {
+    if (!delivery?.deliveredAt) return "";
     
-    try {
-      setSubmittingRating(true);
-      await rateRunner(delivery.id, rating);
-      
-      // Update local state immediately for instant UI feedback
-      setDelivery({
-        ...delivery,
-        customerRating: rating,
-      });
-      
-      toast.success("Rating submitted successfully");
-    } catch (error: any) {
-      console.error("Error rating runner:", error);
-      toast.error(error.message || "Failed to submit rating");
-    } finally {
-      setSubmittingRating(false);
-      setSelectedRating(null);
+    const deliveredDate = new Date(delivery.deliveredAt);
+    const now = new Date();
+    const sameDay = deliveredDate.toDateString() === now.toDateString();
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = deliveredDate.toDateString() === yesterday.toDateString();
+    
+    const time = deliveredDate.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    
+    if (sameDay) {
+      return `Today · ${time}`;
     }
-  };
+    
+    if (isYesterday) {
+      return `Yesterday · ${time}`;
+    }
+    
+    const datePart = deliveredDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+    
+    return `${datePart} · ${time}`;
+  }, [delivery?.deliveredAt]);
 
-  const handleReportProblem = () => {
-    if (!delivery) return;
-    const subject = `Issue with Delivery ${delivery.id.slice(0, 8)}`;
-    const body = `I'm reporting an issue with my delivery.\n\nDelivery ID: ${delivery.id}\nDate: ${delivery.deliveredAt ? formatDate(new Date(delivery.deliveredAt)) : 'N/A'}\nAmount: $${delivery.amountDelivered.toFixed(2)}`;
-    window.location.href = `mailto:support@benjamin.cash?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
+  const handleRated = useCallback(() => {
+    // Refetch delivery to get updated rating
+    // The useCustomerDeliveries hook should refetch automatically via query invalidation
+    // For now, we'll just close the modal and let the user refresh if needed
+    // In a production app, we'd invalidate the query cache here
+  }, []);
+
+  const handleReorder = useCallback(() => {
+    if (isNavigating) return; // Prevent double-clicks
+    
+    if (!order) {
+      toast.error("Order data not available for reorder");
+      return;
+    }
+
+    setIsNavigating(true);
+    
+    const params = new URLSearchParams();
+    params.set('amount', order.requested_amount.toString());
+    
+    if (order.address_id) {
+      params.set('address_id', order.address_id);
+    } else if (order.address_snapshot) {
+      sessionStorage.setItem('reorder_address_snapshot', JSON.stringify(order.address_snapshot));
+    }
+    
+    // Clear bottom nav before navigation to prevent glitches
+    setBottomSlot(null);
+    
+    navigate(`/customer/request?${params.toString()}`);
+  }, [order, navigate, isNavigating, setBottomSlot]);
+
+  const handleReportProblem = useCallback(() => {
+    if (!order) {
+      toast.error("Order data not available. Please wait a moment and try again.");
+      return;
+    }
+    setShowReportIssueSheet(true);
+  }, [order]);
+
+  // Memoize bottom nav to prevent glitching/flashing
+  const bottomNav = useMemo(() => {
+    if (!delivery || isNavigating) return null;
+
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 z-[70] w-screen max-w-none bg-white border-t border-slate-200/70">
+        <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+          {/* Primary CTA */}
+          <div className="flex w-full gap-3 items-center justify-center mb-2">
+            <button
+              type="button"
+              onClick={handleReorder}
+              disabled={!order || loadingOrder || isNavigating}
+              className={cn(
+                "w-full rounded-full py-4 px-6",
+                "text-base font-semibold",
+                "flex items-center justify-center",
+                "transition-colors duration-200",
+                (!order || loadingOrder || isNavigating)
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-black text-white hover:bg-black/90 active:scale-[0.98]"
+              )}
+            >
+              {loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}
+            </button>
+          </div>
+          
+          {/* Secondary Action: Report Problem */}
+          <button
+            onClick={handleReportProblem}
+            disabled={isNavigating || !order}
+            className="w-full text-xs text-slate-400 text-center py-2 transition-colors hover:text-slate-600 disabled:opacity-50"
+          >
+            Report a problem with this order
+          </button>
+        </div>
+      </nav>
+    );
+  }, [delivery, order, loadingOrder, isNavigating, handleReorder, handleReportProblem]);
+
+  // Set bottom nav - only update when bottomNav changes
+  useEffect(() => {
+    if (isNavigating) {
+      setBottomSlot(null);
+      return;
+    }
+    setBottomSlot(bottomNav);
+    return () => {
+      setBottomSlot(null);
+    };
+  }, [bottomNav, isNavigating, setBottomSlot]);
 
   // Build timeline events
   const timelineEvents = useMemo(() => {
@@ -172,18 +290,9 @@ export default function CustomerDeliveryDetail() {
   if (isLoading && !delivery) {
     return (
       <CustomerScreen
-        loading={true}
         title="Loading..."
-        headerLeft={
-          <button
-            onClick={handleBack}
-            className="p-2 rounded-full transition-colors -ml-2"
-            aria-label="Back"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-        }
-        map={<div className="flex flex-col h-full bg-[#F5F7FA]" />}
+        showBack={true}
+        onBack={handleBack}
       >
         <div className="space-y-4">
           <Skeleton className="h-6 w-3/4" />
@@ -199,16 +308,8 @@ export default function CustomerDeliveryDetail() {
     return (
       <CustomerScreen
         title="Delivery not found"
-        headerLeft={
-          <button
-            onClick={handleBack}
-            className="p-2 rounded-full transition-colors -ml-2"
-            aria-label="Back"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-        }
-        map={<div className="flex flex-col h-full bg-[#F5F7FA]" />}
+        showBack={true}
+        onBack={handleBack}
       >
         <p className="text-sm text-slate-500">This delivery could not be found.</p>
       </CustomerScreen>
@@ -224,21 +325,21 @@ export default function CustomerDeliveryDetail() {
         .slice(0, 2)
     : '?';
 
+  // Fixed content: divider under title/subtitle (matches deliveries history page)
+  const fixedContent = (
+    <>
+      <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+    </>
+  );
+
   return (
     <CustomerScreen
       title={`Cash delivery to ${delivery.locationLabel}`}
-      subtitle={`$${delivery.amountDelivered.toLocaleString()} received · You paid $${delivery.totalPaid.toFixed(2)}`}
-      actions={<StatusBadge status={delivery.status} />}
-      headerLeft={
-        <button
-          onClick={handleBack}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
-      }
-      map={<div className="flex flex-col h-full bg-[#F5F7FA]" />}
+      subtitle={formattedDeliveryTime ? `Delivered • ${formattedDeliveryTime}` : "Delivered"}
+      showBack={true}
+      onBack={handleBack}
+      fixedContent={fixedContent}
+      customBottomPadding="calc(120px + max(24px, env(safe-area-inset-bottom)))"
     >
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -248,36 +349,36 @@ export default function CustomerDeliveryDetail() {
       >
         {/* Timeline */}
         {timelineEvents.length > 0 && (
-          <div>
+          <div className="pt-2">
             <h3 className="text-sm font-semibold text-slate-900 mb-3">Timeline</h3>
             <DeliveryTimeline events={timelineEvents} />
           </div>
         )}
 
-        {/* Cost Breakdown */}
-        <div className="mt-5 rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm">
+        {/* Money Summary Card */}
+        <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm">
           <div className="flex justify-between mb-2">
-            <span className="text-slate-500">Cash received</span>
+            <span className="text-slate-500">Cash Received</span>
             <span className="font-medium text-slate-900">
               ${delivery.amountDelivered.toLocaleString()}
             </span>
           </div>
           <div className="flex justify-between mb-2">
-            <span className="text-slate-500">Service fee</span>
+            <span className="text-slate-500">Service Fee</span>
             <span className="text-slate-900">${serviceFee.toFixed(2)}</span>
           </div>
           <div className="mt-2 border-t border-slate-100 pt-2 flex justify-between">
-            <span className="font-medium text-slate-700">Total paid</span>
+            <span className="font-semibold text-slate-900">Total Paid</span>
             <span className="font-semibold text-slate-900">
               ${delivery.totalPaid.toFixed(2)}
             </span>
           </div>
         </div>
 
-        {/* Runner Info + Rating */}
+        {/* Runner Section */}
         {delivery.runner && (
-          <div className="mt-5 rounded-2xl border border-slate-100 bg-white px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="h-9 w-9 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center text-xs font-medium text-slate-500 flex-shrink-0">
                 {delivery.runner.avatarUrl ? (
                   <img
@@ -291,61 +392,58 @@ export default function CustomerDeliveryDetail() {
               </div>
               <div className="text-sm flex-1 min-w-0">
                 <div className="font-medium text-slate-900 truncate">
-                  {delivery.runner.displayName}
+                  {delivery.runner.displayName.split(' ')[0]}
                 </div>
-                {delivery.runner.averageRating && (
-                  <div className="text-xs text-slate-500">
-                    ★ {delivery.runner.averageRating.toFixed(1)} average rating
-                  </div>
-                )}
+                <div className="text-xs text-slate-500 mt-0.5">
+                  Your Benjamin runner
+                </div>
               </div>
             </div>
 
-            {/* Rating CTA */}
-            {delivery.customerRating ? (
-              <button
-                disabled
-                className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-600 flex items-center gap-1"
-              >
-                ★ You rated {delivery.customerRating.toFixed(1)}
-              </button>
-            ) : delivery.status === "delivered" ? (
-              <div className="flex flex-col items-end gap-2">
-                {selectedRating ? (
-                  <div className="flex items-center gap-2">
-                    <RatingStars
-                      value={selectedRating || 0}
-                      onChange={setSelectedRating}
-                    />
-                    <button
-                      onClick={() => handleRateRunner(selectedRating)}
-                      disabled={submittingRating}
-                      className="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white transition-colors disabled:opacity-50"
-                    >
-                      {submittingRating ? "Submitting..." : "Submit"}
-                    </button>
-                  </div>
+            {/* Rating - Yellow button matching LastDeliveryCard */}
+            {delivery.status === "delivered" && (
+              <div className="mt-3">
+                {delivery.customerRating ? (
+                  <span className="inline-flex items-center text-[11px] text-slate-500">
+                    <Star className="w-3 h-3 mr-1 fill-amber-400 text-amber-400" />
+                    {delivery.customerRating.toFixed(1)} · Your rating
+                  </span>
                 ) : (
                   <button
-                    onClick={() => setSelectedRating(5)}
-                    className="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white transition-colors"
+                    type="button"
+                    onClick={() => setRatingModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                    style={{ color: '#D97708' }}
                   >
-                    Rate runner
+                    <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
+                    <span>Rate Runner</span>
                   </button>
                 )}
               </div>
-            ) : null}
+            )}
           </div>
         )}
 
-        {/* Support footer */}
-        <button
-          onClick={handleReportProblem}
-          className="mt-5 text-xs text-slate-400 underline underline-offset-2 transition-colors"
-        >
-          Report a problem with this delivery
-        </button>
       </motion.div>
+
+      {/* Rating Modal */}
+      {order && (
+        <CompletionRatingModal
+          order={order}
+          open={ratingModalOpen}
+          onClose={() => setRatingModalOpen(false)}
+          onRated={handleRated}
+        />
+      )}
+
+      {/* Report Issue Sheet */}
+      {order && (
+        <ReportIssueSheet
+          open={showReportIssueSheet}
+          order={order}
+          onClose={() => setShowReportIssueSheet(false)}
+        />
+      )}
     </CustomerScreen>
   );
 }

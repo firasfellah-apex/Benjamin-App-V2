@@ -354,13 +354,15 @@ export function useOrderRealtime(
   callbacks: {
     onUpdate?: (order: Order, oldOrder?: Order) => void;
     onDelete?: (order: Order) => void;
-  }
+    enabled?: boolean;
+  } = {}
 ) {
+  const { onUpdate, onDelete, enabled = true } = callbacks;
   useOrdersRealtime({
     filter: { mode: 'single', orderId: orderId || '' },
-    onUpdate: callbacks.onUpdate,
-    onDelete: callbacks.onDelete,
-    enabled: !!orderId,
+    onUpdate,
+    onDelete,
+    enabled: enabled && !!orderId,
   });
 }
 
