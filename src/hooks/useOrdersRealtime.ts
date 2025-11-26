@@ -61,6 +61,23 @@ export function useOrdersRealtime({
   }, [onInsert, onUpdate, onDelete]);
 
   useEffect(() => {
+    // Enhanced logging for PWA debugging
+    console.log(`[Realtime] Subscription setup check:`, {
+      enabled,
+      mode: import.meta.env.MODE,
+      isDev: import.meta.env.DEV,
+      filterMode: filter.mode,
+      channelName: filter.mode === 'single' 
+        ? `order:${filter.mode === 'single' ? filter.orderId : 'N/A'}`
+        : filter.mode === 'customer'
+        ? `customer-orders:${filter.mode === 'customer' ? filter.customerId : 'N/A'}`
+        : filter.mode === 'runner'
+        ? filter.availableOnly 
+          ? 'runner-available-orders'
+          : `runner-orders:${filter.runnerId || 'all'}`
+        : 'admin-orders',
+    });
+
     if (!enabled) {
       console.log(`[Realtime] ${filter.mode === 'runner' && filter.availableOnly ? 'runner-available-orders' : 'channel'} - Subscription disabled, skipping setup`);
       return;
@@ -288,11 +305,14 @@ export function useOrdersRealtime({
             availableOnly: filter.mode === 'runner' ? filter.availableOnly : undefined,
             table: 'orders',
             schema: 'public',
+            envMode: import.meta.env.MODE,
+            isDev: import.meta.env.DEV,
             timestamp: new Date().toISOString(),
           });
           
           // Test: Log a message to confirm subscription is active
           console.log(`[Realtime] ${channelName} - 📡 Listening for events on orders table...`);
+          console.log(`[Realtime] ${channelName} - 🔧 Environment: ${import.meta.env.MODE} (DEV: ${import.meta.env.DEV})`);
           if (filter.mode === 'runner' && filter.availableOnly) {
             console.log(`[Realtime] ${channelName} - 👀 Watching for new Pending orders (runner_id IS NULL)`);
             console.log(`[Realtime] ${channelName} - 💡 When a customer creates an order, you should see an INSERT event here`);

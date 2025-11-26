@@ -146,6 +146,23 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     onUpdate: handleOrderUpdate,
   });
 
+  // Debug logging for PWA
+  useEffect(() => {
+    if (orderId) {
+      console.log('[OrderTracking] Realtime subscription mounted', {
+        orderId,
+        mode: import.meta.env.MODE,
+        isDev: import.meta.env.DEV,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    return () => {
+      if (orderId) {
+        console.log('[OrderTracking] Realtime subscription unmounting', { orderId });
+      }
+    };
+  }, [orderId]);
+
   const handleCancel = async () => {
     if (!orderId || !order) {
       toast.error("Order not found");
