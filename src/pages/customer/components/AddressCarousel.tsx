@@ -10,7 +10,7 @@ import { useLocation } from "react-router-dom";
 import type { CustomerAddress } from "@/types/types";
 import { cn } from "@/lib/utils";
 import { getIconByName } from "@/components/address/IconPicker";
-import { formatAddress } from "@/db/api";
+import { formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
 import { AddressCard } from "./AddressCard";
 import { MapPin, Plus } from "@/lib/icons";
 import { track } from "@/lib/analytics";
@@ -633,10 +633,7 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
     };
   }, [slides.length, location.pathname, snapToIndex, getSelectedIndex]); // Include getSelectedIndex to check if we should bounce
 
-  // Helper function to get address title
-  const getAddressTitle = (addr: CustomerAddress): string => {
-    return addr.label || addr.line1?.split(',')[0] || 'Address';
-  };
+  // Use helper functions from api.ts for consistency
 
   // Zero-address state: show icon + short copy + "Add your first address" primary button
   // If hideZeroAddressButton is true, don't render anything (UI is shown elsewhere, e.g., in top shelf)
@@ -695,8 +692,8 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
             {slide.type === "address" ? (
               <AddressCard
                 mode="carousel"
-                label={getAddressTitle(slide.address)}
-                addressLine={formatAddress(slide.address)}
+                label={getAddressPrimaryLine(slide.address)}
+                addressLine={getAddressSecondaryLine(slide.address)}
                 isDefault={slide.address.is_default}
                 isSelected={slide.address.id === selectedAddressId}
                 icon={(() => {

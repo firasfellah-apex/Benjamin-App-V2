@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { deleteAddress, formatAddress } from "@/db/api";
+import { deleteAddress, formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
 import type { CustomerAddress } from "@/types/types";
 import { getIconByName } from "@/components/address/IconPicker";
 import { AddressForm, type AddressFormRef } from "@/components/address/AddressForm";
@@ -379,10 +379,10 @@ export default function ManageAddresses() {
                 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">
-                    {addr.label || "Saved address"}
+                    {getAddressPrimaryLine(addr)}
                   </p>
                   <p className="mt-0.5 text-sm text-slate-600 truncate">
-                    {formatAddress(addr)}
+                    {getAddressSecondaryLine(addr)}
                   </p>
                   <p className="mt-0.5 text-sm text-slate-400">
                     {addr.delivery_notes || "No Note Added"}
@@ -713,10 +713,10 @@ export default function ManageAddresses() {
                 {addressToDelete && (
                   <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <p className="text-sm font-semibold text-slate-900">
-                      {addressToDelete.label || "Address"}
+                      {getAddressPrimaryLine(addressToDelete)}
                     </p>
                     <p className="text-xs text-slate-600 mt-1">
-                      {formatAddress(addressToDelete)}
+                      {getAddressSecondaryLine(addressToDelete)}
                     </p>
                   </div>
                 )}

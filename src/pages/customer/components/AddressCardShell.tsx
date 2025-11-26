@@ -78,7 +78,7 @@ export function AddressCardShell({
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {icon || <Home className="w-5 h-5 text-slate-800 shrink-0" />}
               <span className="font-semibold text-slate-900 truncate">
-                {label || "Saved address"}
+                {label || 'Address'}
               </span>
             </div>
             {/* Default badge hidden for now */}
@@ -101,7 +101,7 @@ export function AddressCardShell({
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {icon || <Home className="w-5 h-5 text-slate-800 shrink-0" />}
               <span className="font-semibold text-slate-900 truncate">
-                {label || "Saved address"}
+                {label || 'Address'}
               </span>
             </div>
             {/* Default badge hidden for now */}

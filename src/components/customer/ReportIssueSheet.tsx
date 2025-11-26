@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ interface ReportIssueSheetProps {
   open: boolean;
   order: OrderWithDetails;
   onClose: () => void;
+  initialCategory?: OrderIssueCategory;
+  lockCategory?: boolean;
 }
 
 const ISSUE_OPTIONS: { id: OrderIssueCategory; label: string }[] = [
@@ -21,10 +23,25 @@ const ISSUE_OPTIONS: { id: OrderIssueCategory; label: string }[] = [
   { id: 'OTHER',            label: 'Something else' },
 ];
 
-export function ReportIssueSheet({ open, order, onClose }: ReportIssueSheetProps) {
+export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCategory }: ReportIssueSheetProps) {
   const [selectedCategories, setSelectedCategories] = useState<OrderIssueCategory[]>([]);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Auto-set category when initialCategory is provided and sheet opens
+  useEffect(() => {
+    if (open && initialCategory && selectedCategories.length === 0) {
+      setSelectedCategories([initialCategory]);
+    }
+  }, [open, initialCategory, selectedCategories.length]);
+
+  // Reset form when sheet closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedCategories([]);
+      setNotes('');
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -129,21 +146,31 @@ export function ReportIssueSheet({ open, order, onClose }: ReportIssueSheetProps
                   What felt off? <span className="text-slate-400 text-xs">(you can pick more than one)</span>
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {ISSUE_OPTIONS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => toggleCategory(option.id)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-full text-sm border transition-colors',
-                        selectedCategories.includes(option.id)
-                          ? 'border-black bg-black text-white'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                  {ISSUE_OPTIONS.map((option) => {
+                    const isSelected = selectedCategories.includes(option.id);
+                    const isLockedOther = lockCategory && initialCategory && option.id !== initialCategory;
+                    
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          if (isLockedOther) return;
+                          toggleCategory(option.id);
+                        }}
+                        disabled={submitting || isLockedOther}
+                        className={cn(
+                          'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                          isSelected
+                            ? 'border-black bg-black text-white'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400',
+                          isLockedOther && 'opacity-40 cursor-not-allowed hover:border-slate-200'
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

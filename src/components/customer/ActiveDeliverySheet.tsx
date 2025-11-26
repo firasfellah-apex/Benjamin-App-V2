@@ -24,6 +24,10 @@ import { OtpDisplay } from '@/components/customer/OtpDisplay';
 import { rateRunner } from '@/db/api';
 import { toast } from 'sonner';
 import { supabase } from '@/db/supabase';
+import { resolveDeliveryStyleFromOrder } from '@/lib/deliveryStyle';
+import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
+import { X } from 'lucide-react';
+import moneyCountIllustration from '@/assets/illustrations/MoneyCount.png';
 
 // Loader component for runner assignment state
 import LottieComponent from "lottie-react";
@@ -63,6 +67,10 @@ export function ActiveDeliverySheet({
   const progressTimelineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [collapsedHeight, setCollapsedHeight] = useState<number>(260); // sensible default
+  const [showCountGuardrail, setShowCountGuardrail] = useState(false);
+  const [showCountIssueSheet, setShowCountIssueSheet] = useState(false);
+  const [hasDismissedGuardrail, setHasDismissedGuardrail] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   
   // Motion for bottom sheet pan
   const y = useMotionValue(0);
@@ -74,6 +82,10 @@ export function ActiveDeliverySheet({
     damping: 40,
     mass: 0.8,
   };
+
+  // COUNTED guardrail constants
+  const COUNT_GUARDRAIL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+  const makeGuardrailKey = (orderId: string) => `benjamin:count-guardrail:${orderId}`;
   
   // Check for runner arrival when status is Pending Handoff
   // Re-check whenever order updates (including when order_events change)
@@ -183,6 +195,72 @@ export function ActiveDeliverySheet({
       supabase.removeChannel(channel);
     };
   }, [order.status, order.id, order, onOrderUpdate]);
+
+  // Subscribe to OTP verification events to start count window immediately
+  // NOTE: This is a backup - the primary trigger is otp_verified_at field check
+  useEffect(() => {
+    const deliveryStyle = resolveDeliveryStyleFromOrder(order);
+    if (deliveryStyle !== 'COUNTED' || !order.id) return;
+
+    const orderId = order.id;
+    const channelName = `order-events:${orderId}:otp-verified`;
+    
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'order_events',
+          filter: `order_id=eq.${orderId}`,
+        },
+        async (payload: any) => {
+          const event = payload.new;
+          // Debug log all order_events for this order
+          console.log('[ActiveDeliverySheet][OTP] order_event received', payload.new);
+          
+          // Check if this is an OTP VERIFICATION event (not generation)
+          if (event && event.order_id === orderId) {
+            const metadata = (event.metadata || {}) as any;
+            const clientAction = (event.client_action_id || '') as string;
+            const metaAction = (metadata.action || metadata.type || '') as string;
+
+            // Only match OTP VERIFICATION events, not generation events
+            const isOtpVerificationEvent =
+              (/verify_otp/i.test(metaAction) || /verify_otp/i.test(clientAction)) &&
+              !/generate_otp/i.test(metaAction) &&
+              !/generate_otp/i.test(clientAction);
+
+            if (!isOtpVerificationEvent) {
+              return;
+            }
+
+            console.log('[ActiveDeliverySheet][OTP] ✅ OTP verification event detected, starting count window');
+
+            const eventTime = event.created_at ? new Date(event.created_at).getTime() : Date.now();
+            const expiresAt = eventTime + COUNT_GUARDRAIL_WINDOW_MS;
+            const key = makeGuardrailKey(orderId);
+
+            try {
+              localStorage.setItem(key, JSON.stringify({ dismissed: false, expiresAt }));
+              // Don't set showCountGuardrail here - let the main effect handle it based on otp_verified_at
+            } catch (e) {
+              console.warn('[ActiveDeliverySheet][OTP] Failed to persist guardrail start', e);
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[ActiveDeliverySheet] ✅ Subscribed to OTP verification events for order ${orderId}`);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order.id]);
   const showRunnerIdentity = canRevealRunnerIdentity(order.status);
   const allowContact = canContactRunner(order.status);
   const isFinal = isOrderFinal(order.status);
@@ -417,6 +495,182 @@ export function ActiveDeliverySheet({
     // Always snap y back to 0; we use height + scroll, not permanent offset
     controls.start({ y: 0, transition: SPRING });
   }, [isExpanded, controls]);
+
+  // COUNTED delivery guardrail logic - driven by OTP verification, persists for 3 minutes
+  useEffect(() => {
+    const deliveryStyle = resolveDeliveryStyleFromOrder(order);
+    if (deliveryStyle !== 'COUNTED' || order.status === 'Cancelled') {
+      setShowCountGuardrail(false);
+      setHasDismissedGuardrail(false);
+      return;
+    }
+
+    const key = makeGuardrailKey(order.id);
+
+    const parseStored = () => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw) as { dismissed?: boolean; expiresAt?: number };
+      } catch (e) {
+        console.warn('[ActiveDeliverySheet] Failed to parse count guardrail state', e);
+        return null;
+      }
+    };
+
+    const stored = parseStored();
+    const otpVerifiedAt = (order as any).otp_verified_at;
+    
+    // CRITICAL: Only show guardrail when OTP is VERIFIED, not when it's generated
+    // OTP is verified when:
+    // 1. otp_verified_at is set (runner successfully entered the OTP code)
+    // 2. Status is "Pending Handoff" (for COUNTED, this means OTP verified but delivery not completed)
+    // 
+    // OTP is generated when:
+    // - otp_code exists but otp_verified_at is null
+    // - Status is "Pending Handoff" but OTP not verified yet
+    const isOtpVerified = !!otpVerifiedAt && order.status === 'Pending Handoff';
+    
+    let expiresAt: number | null = null;
+    let windowStartTime: number | null = null;
+    
+    if (isOtpVerified) {
+      // OTP was verified by runner - use this as the window start time
+      windowStartTime = new Date(otpVerifiedAt).getTime();
+      expiresAt = windowStartTime + COUNT_GUARDRAIL_WINDOW_MS;
+      
+      console.log('[ActiveDeliverySheet][Guardrail] ✅ OTP verified by runner, starting count window:', {
+        orderId: order.id,
+        otpVerifiedAt,
+        status: order.status,
+        windowStartTime: new Date(windowStartTime).toISOString(),
+        expiresAt: new Date(expiresAt).toISOString(),
+      });
+      
+      // If we have a stored window but otp_verified_at is more recent, update it
+      if (!stored || !stored.expiresAt || stored.expiresAt < expiresAt) {
+        try {
+          localStorage.setItem(key, JSON.stringify({ dismissed: false, expiresAt }));
+        } catch {
+          // ignore
+        }
+      }
+    } else if (stored && stored.expiresAt) {
+      // Check if stored window is still valid (OTP was verified when it was created)
+      // Only use stored window if we're still in Pending Handoff (OTP verified but not completed)
+      if (order.status === 'Pending Handoff' || order.status === 'Completed') {
+        expiresAt = stored.expiresAt;
+        console.log('[ActiveDeliverySheet][Guardrail] Using stored window (from previous OTP verification):', {
+          orderId: order.id,
+          status: order.status,
+          expiresAt: new Date(expiresAt).toISOString(),
+        });
+      } else {
+        // Order status changed, clear stored window
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          // ignore
+        }
+        setShowCountGuardrail(false);
+        setHasDismissedGuardrail(false);
+        return;
+      }
+    } else {
+      // OTP not verified yet (otp_verified_at is null or status is not Pending Handoff)
+      // Don't show guardrail
+      setShowCountGuardrail(false);
+      setHasDismissedGuardrail(false);
+      return;
+    }
+
+    if (!expiresAt) {
+      // Should not happen, but safety check
+      setShowCountGuardrail(false);
+      setHasDismissedGuardrail(false);
+      return;
+    }
+
+    const now = Date.now();
+    const { dismissed } = stored || {};
+
+    // If window already expired, mark as dismissed and hide
+    if (now > expiresAt || dismissed) {
+      try {
+        localStorage.setItem(
+          key,
+          JSON.stringify({ dismissed: true, expiresAt })
+        );
+      } catch {
+        // ignore
+      }
+      setShowCountGuardrail(false);
+      setHasDismissedGuardrail(true);
+      return;
+    }
+
+    // Window is active → show guardrail until it expires or user dismisses
+    setShowCountGuardrail(true);
+    setHasDismissedGuardrail(false);
+
+    // Calculate initial countdown
+    const remainingMs = expiresAt - now;
+    setCountdownSeconds(Math.max(0, Math.floor(remainingMs / 1000)));
+
+    const timeout = window.setTimeout(() => {
+      try {
+        localStorage.setItem(
+          key,
+          JSON.stringify({ dismissed: true, expiresAt })
+        );
+      } catch {
+        // ignore
+      }
+      setShowCountGuardrail(false);
+      setHasDismissedGuardrail(true);
+      setCountdownSeconds(null);
+    }, expiresAt - now);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [order.id, order.status, (order as any).otp_verified_at]);
+
+  // Countdown timer - update every second when guardrail is active
+  useEffect(() => {
+    if (!showCountGuardrail || countdownSeconds === null) {
+      setCountdownSeconds(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const key = makeGuardrailKey(order.id);
+      try {
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : {};
+        const expiresAt = parsed?.expiresAt;
+        
+        if (!expiresAt) {
+          setCountdownSeconds(null);
+          return;
+        }
+
+        const now = Date.now();
+        const remainingMs = expiresAt - now;
+        const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+        
+        setCountdownSeconds(remainingSeconds);
+        
+        if (remainingSeconds === 0) {
+          setCountdownSeconds(null);
+        }
+      } catch {
+        setCountdownSeconds(null);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showCountGuardrail, countdownSeconds, order.id]);
 
   // Track if user is at top of scroll (for collapse gesture)
   const [isAtTop, setIsAtTop] = useState(true);
@@ -819,8 +1073,8 @@ export function ActiveDeliverySheet({
             </div>
 
 
-            {/* Rate Your Runner (Completed Only) */}
-            {isCompleted && (
+            {/* Rate Your Runner (Completed Only) - Hidden while guardrail is active */}
+            {isCompleted && !showCountGuardrail && (
               <div className="space-y-2">
                 <div className="text-sm font-medium text-slate-900">Rate your runner</div>
                 <RatingStars
@@ -831,8 +1085,8 @@ export function ActiveDeliverySheet({
               </div>
             )}
 
-            {/* Reorder CTA (Completed Only) */}
-            {isCompleted && onReorder && (
+            {/* Reorder CTA (Completed Only) - Hidden while guardrail is active */}
+            {isCompleted && !showCountGuardrail && onReorder && (
               <Button
                 onClick={onReorder}
                 className="w-full rounded-2xl bg-black text-white hover:bg-black/90 h-12"
@@ -862,6 +1116,145 @@ export function ActiveDeliverySheet({
             </div>
           )}
       </div>
+
+      {/* ReportIssueSheet for COUNTED guardrail */}
+      <ReportIssueSheet
+        open={showCountIssueSheet}
+        order={order}
+        onClose={() => {
+          setShowCountIssueSheet(false);
+          setShowCountGuardrail(false);
+          setHasDismissedGuardrail(true);
+          try {
+            const key = makeGuardrailKey(order.id);
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : {};
+            const expiresAt = parsed?.expiresAt ?? Date.now();
+            localStorage.setItem(
+              key,
+              JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+            );
+          } catch (e) {
+            console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+          }
+        }}
+        initialCategory="CASH_AMOUNT"
+        lockCategory={true}
+      />
+
+      {/* COUNTED guardrail modal overlay */}
+      {showCountGuardrail && !isCancelled && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white shadow-xl p-6 space-y-4 relative">
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCountGuardrail(false);
+                setHasDismissedGuardrail(true);
+                try {
+                  const key = makeGuardrailKey(order.id);
+                  const raw = localStorage.getItem(key);
+                  const parsed = raw ? JSON.parse(raw) : {};
+                  const expiresAt = parsed?.expiresAt ?? Date.now();
+                  localStorage.setItem(
+                    key,
+                    JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                  );
+                } catch (e) {
+                  console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                }
+              }}
+              className="absolute top-4 right-4 w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5 text-slate-900" />
+            </button>
+
+            {/* Illustration */}
+            <div className="flex justify-center -mt-2">
+              <img
+                src={moneyCountIllustration}
+                alt="Money count"
+                className="w-32 h-32 object-contain"
+              />
+            </div>
+
+            {/* Content */}
+            <div className="space-y-2 text-center">
+              <h3 className="text-lg font-semibold text-slate-900">
+                How did the count go?
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Take a moment to count the cash while your runner is still with you. If the amount doesn&apos;t match what you requested, tell us and we&apos;ll review it with your runner.
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                You&apos;ll have about 3 minutes to flag any issue for this delivery.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-3 pt-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setShowCountGuardrail(false);
+                  setHasDismissedGuardrail(true);
+                  try {
+                    const key = makeGuardrailKey(order.id);
+                    const raw = localStorage.getItem(key);
+                    const parsed = raw ? JSON.parse(raw) : {};
+                    const expiresAt = parsed?.expiresAt ?? Date.now();
+                    localStorage.setItem(
+                      key,
+                      JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                    );
+                  } catch (e) {
+                    console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                  }
+                  
+                  // For COUNTED deliveries, navigate to home page to close the active delivery sheet
+                  // This happens after runner marks "All good" and order is completed
+                  const deliveryStyle = resolveDeliveryStyleFromOrder(order);
+                  if (deliveryStyle === 'COUNTED') {
+                    // Navigate to home page to close the active delivery sheet
+                    navigate('/customer/home', { replace: true });
+                  }
+                }}
+                className="w-full h-12 rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
+              >
+                Looks Correct
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  // Close guardrail modal and dismiss it
+                  setShowCountGuardrail(false);
+                  setHasDismissedGuardrail(true);
+                  try {
+                    const key = makeGuardrailKey(order.id);
+                    const raw = localStorage.getItem(key);
+                    const parsed = raw ? JSON.parse(raw) : {};
+                    const expiresAt = parsed?.expiresAt ?? Date.now();
+                    localStorage.setItem(
+                      key,
+                      JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                    );
+                  } catch (e) {
+                    console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                  }
+                  // Open the issue report sheet
+                  setShowCountIssueSheet(true);
+                }}
+                className="w-full h-12 rounded-full border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600 text-base font-medium"
+              >
+                Incorrect Amount
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

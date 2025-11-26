@@ -19,7 +19,7 @@ import { getIconByName } from "@/components/address/IconPicker";
 import { cn } from "@/lib/utils";
 import { FlowHeader } from "@/components/customer/FlowHeader";
 import { toast } from "sonner";
-import { createOrder, formatAddress } from "@/db/api";
+import { createOrder, formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
 import { useProfile } from "@/contexts/ProfileContext";
 import { strings } from "@/lib/strings";
 import type { CustomerAddress } from "@/types/types";
@@ -992,10 +992,10 @@ export default function CashRequest() {
                     
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">
-                        {addr.label || "Saved address"}
+                        {getAddressPrimaryLine(addr)}
                       </p>
                       <p className="mt-0.5 text-sm text-slate-600 truncate">
-                        {formatAddress(addr)}
+                        {getAddressSecondaryLine(addr)}
                       </p>
                       <p className="mt-0.5 text-sm text-slate-400">
                         {addr.delivery_notes || "No Note Added"}

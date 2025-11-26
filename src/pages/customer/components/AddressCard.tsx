@@ -211,7 +211,7 @@ export function AddressCard({
             </div>
           )}
           <span className="text-base font-semibold text-slate-900 truncate">
-            {label || "Saved address"}
+            {label || 'Address'}
           </span>
           {/* Default badge hidden for now */}
           {false && isDefault && (

@@ -499,6 +499,35 @@ export function formatAddress(address: CustomerAddress | AddressSnapshot): strin
   return parts.join(", ");
 }
 
+/**
+ * Get the primary line for address display (label or street address)
+ * - If label exists → return label
+ * - If label missing → return line1 (street address)
+ */
+export function getAddressPrimaryLine(address: CustomerAddress | AddressSnapshot): string {
+  return address.label || address.line1 || 'Address';
+}
+
+/**
+ * Get the secondary line for address display
+ * - If label exists → return full address (line1, city, state)
+ * - If label missing → return city, state only
+ */
+export function getAddressSecondaryLine(address: CustomerAddress | AddressSnapshot): string {
+  if (address.label) {
+    // If label exists, show full address in secondary line
+    const parts = [
+      address.line1,
+      address.line2,
+      `${address.city}, ${address.state}`
+    ].filter(Boolean);
+    return parts.join(", ");
+  } else {
+    // If no label, show only city, state
+    return `${address.city}, ${address.state}`;
+  }
+}
+
 // Order APIs
 export async function createOrder(
   requestedAmount: number,
