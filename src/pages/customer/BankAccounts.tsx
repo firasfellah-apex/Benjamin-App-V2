@@ -4,18 +4,20 @@
  * User-friendly bank connection management with trust-building elements
  */
 
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import CustomerCard from "@/pages/customer/components/CustomerCard";
 import { PlaidKycButton } from "@/components/customer/plaid/PlaidKycButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Landmark, Shield, CheckCircle2, Zap, Lock, Info } from "lucide-react";
+import { Landmark, Shield, CheckCircle2, Zap, Lock, Info, HelpCircle } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlaidLinkKyc } from "@/hooks/usePlaidLinkKyc";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { BankingHelpStories } from "@/components/customer/BankingHelpStories";
 
 function getKycStatusBadge(kycStatus: string) {
   const status = kycStatus?.toLowerCase();
@@ -53,6 +55,7 @@ export default function BankAccounts() {
   const { user } = useAuth();
   const { profile, isReady } = useProfile(user?.id);
   const queryClient = useQueryClient();
+  const [showHelpStories, setShowHelpStories] = useState(false);
 
   const { isLoading } = usePlaidLinkKyc(async () => {
     // After successful KYC, refetch profile
@@ -107,14 +110,64 @@ export default function BankAccounts() {
     <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
   );
 
+  // Help button for top right (adjacent to X button, like FlowHeader)
+  const helpButton = (
+    <button
+      onClick={() => setShowHelpStories(true)}
+      className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+      aria-label="Help"
+    >
+      <HelpCircle className="h-5 w-5 text-slate-900" strokeWidth={2} />
+    </button>
+  );
+
+  // Story pages - placeholder content for now
+  const storyPages = [
+    {
+      id: "page-1",
+      content: (
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-slate-900">Page 1</h2>
+          <p className="text-base text-slate-600">
+            Placeholder content for page 1. Add your imagery and copy here.
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "page-2",
+      content: (
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-slate-900">Page 2</h2>
+          <p className="text-base text-slate-600">
+            Placeholder content for page 2. Add your imagery and copy here.
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "page-3",
+      content: (
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-slate-900">Page 3</h2>
+          <p className="text-base text-slate-600">
+            Placeholder content for page 3. Add your imagery and copy here.
+          </p>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <CustomerScreen
-      title="My Bank Accounts"
-      subtitle="Securely link a bank account to verify your identity and enable cash orders."
-      showBack
-      useXButton
-      onBack={handleBack}
-      fixedContent={fixedContent}
+    <>
+      <CustomerScreen
+        title="My Bank Accounts"
+        subtitle="Securely link a bank account to verify your identity and enable cash orders."
+        showBack
+        useXButton
+        onBack={handleBack}
+        fixedContent={fixedContent}
+        headerTopRight={helpButton}
       topContent={
         <div style={{ paddingTop: '24px' }} className="space-y-6">
           {!hasBankConnection ? (
@@ -321,5 +374,11 @@ export default function BankAccounts() {
         </div>
       }
     />
+      <BankingHelpStories
+        isOpen={showHelpStories}
+        onClose={() => setShowHelpStories(false)}
+        pages={storyPages}
+      />
+    </>
   );
 }

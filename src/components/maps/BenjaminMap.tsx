@@ -12,6 +12,8 @@ export interface BenjaminMapProps {
   className?: string;
   marker?: LatLngLiteral | null; // Optional marker position
   minimal?: boolean; // If true, hide POI labels and reduce map features
+  draggable?: boolean; // If true, marker can be dragged
+  onMarkerDrag?: (position: LatLngLiteral) => void; // Callback when marker is dragged
 }
 
 export function BenjaminMap({
@@ -20,11 +22,14 @@ export function BenjaminMap({
   className,
   marker,
   minimal = false,
+  draggable = false,
+  onMarkerDrag,
 }: BenjaminMapProps) {
   const { isReady, isError } = useGoogleMaps();
   const mapDivRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const dragListenerRef = useRef<any>(null);
 
   useEffect(() => {
     const g = (window as any).google as any;
@@ -100,7 +105,10 @@ export function BenjaminMap({
         fullscreenControl: false,
         mapTypeControl: false,
         streetViewControl: false,
-        zoomControl: false,
+        zoomControl: true, // Enable zoom controls
+        zoomControlOptions: {
+          position: g.maps.ControlPosition.RIGHT_CENTER,
+        },
       };
 
       if (minimal && minimalStyles.length > 0) {
@@ -112,6 +120,14 @@ export function BenjaminMap({
       // Update existing map
       mapInstanceRef.current.setCenter(center);
       mapInstanceRef.current.setZoom(zoom ?? 15);
+      
+      // Update zoom controls
+      mapInstanceRef.current.setOptions({
+        zoomControl: true,
+        zoomControlOptions: {
+          position: g.maps.ControlPosition.RIGHT_CENTER,
+        },
+      });
       
       // Update styles if minimal prop changed
       if (minimal && minimalStyles.length > 0) {
@@ -126,8 +142,35 @@ export function BenjaminMap({
       const MarkerCtor = g.maps.Marker as any;
       if (typeof MarkerCtor === "function") {
         if (markerRef.current) {
-          // Update existing marker position
-          markerRef.current.setPosition({ lat: marker.lat, lng: marker.lng });
+          // Update existing marker position only if it changed externally
+          const currentPos = markerRef.current.getPosition();
+          if (!currentPos || 
+              Math.abs(currentPos.lat() - marker.lat) > 0.0001 || 
+              Math.abs(currentPos.lng() - marker.lng) > 0.0001) {
+            markerRef.current.setPosition({ lat: marker.lat, lng: marker.lng });
+          }
+          // Update draggable state
+          markerRef.current.setDraggable(draggable);
+          
+          // Remove old drag listener if it exists
+          if (dragListenerRef.current) {
+            g.maps.event.removeListener(dragListenerRef.current);
+            dragListenerRef.current = null;
+          }
+          
+          // Add dragend listener if draggable and callback provided
+          if (draggable && onMarkerDrag) {
+            dragListenerRef.current = markerRef.current.addListener('dragend', () => {
+              const position = markerRef.current.getPosition();
+              if (position && onMarkerDrag) {
+                onMarkerDrag({
+                  lat: position.lat(),
+                  lng: position.lng(),
+                });
+              }
+            });
+          }
+          
           // Ensure map centers on marker
           if (mapInstanceRef.current) {
             mapInstanceRef.current.setCenter({ lat: marker.lat, lng: marker.lng });
@@ -137,15 +180,32 @@ export function BenjaminMap({
           markerRef.current = new MarkerCtor({
             position: { lat: marker.lat, lng: marker.lng },
             map: mapInstanceRef.current,
+            draggable: draggable,
             icon: {
-              path: g.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: "#22C55E", // Green color
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 3,
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M16 0C10.477 0 6 4.477 6 10C6 17.5 16 40 16 40C16 40 26 17.5 26 10C26 4.477 21.523 0 16 0Z" fill="#22C55E"/>
+                  <circle cx="16" cy="10" r="5" fill="white"/>
+                </svg>
+              `),
+              scaledSize: new g.maps.Size(32, 40),
+              anchor: new g.maps.Point(16, 40),
             },
           });
+          
+          // Add dragend listener if draggable and callback provided
+          if (draggable && onMarkerDrag) {
+            dragListenerRef.current = markerRef.current.addListener('dragend', () => {
+              const position = markerRef.current.getPosition();
+              if (position && onMarkerDrag) {
+                onMarkerDrag({
+                  lat: position.lat(),
+                  lng: position.lng(),
+                });
+              }
+            });
+          }
+          
           // Ensure map centers on marker when it's first created
           if (mapInstanceRef.current) {
             mapInstanceRef.current.setCenter({ lat: marker.lat, lng: marker.lng });
@@ -155,6 +215,11 @@ export function BenjaminMap({
     } else {
       // Remove marker if marker prop is null/undefined
       if (markerRef.current) {
+        // Remove drag listener
+        if (dragListenerRef.current && g?.maps?.event) {
+          g.maps.event.removeListener(dragListenerRef.current);
+          dragListenerRef.current = null;
+        }
         markerRef.current.setMap(null);
         markerRef.current = null;
       }
@@ -216,12 +281,16 @@ export function BenjaminMap({
         observer.disconnect();
       }
       // Cleanup marker on unmount
+      if (dragListenerRef.current && g?.maps?.event) {
+        g.maps.event.removeListener(dragListenerRef.current);
+        dragListenerRef.current = null;
+      }
       if (markerRef.current) {
         markerRef.current.setMap(null);
         markerRef.current = null;
       }
     };
-  }, [isReady, center.lat, center.lng, zoom, isError, marker?.lat, marker?.lng, minimal]);
+  }, [isReady, center.lat, center.lng, zoom, isError, marker?.lat, marker?.lng, minimal, draggable, onMarkerDrag]);
 
   const showSkeleton =
     !isReady ||

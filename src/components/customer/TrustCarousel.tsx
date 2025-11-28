@@ -13,6 +13,7 @@ interface TrustCard {
   image?: string; // URL or path to image
   title: string;
   bullets: TrustCardBullet[];
+  backgroundColor?: string; // Background color for illustration
 }
 
 interface TrustCarouselProps {
@@ -167,7 +168,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
               >
                   <div className="w-full flex flex-col md:flex-row">
                   {/* Image half - extends to top and sides, ignoring parent padding */}
-                  <div className="w-full md:w-1/2 h-48 md:h-56 flex items-center justify-center" style={{ backgroundColor: '#F5F5F4' }}>
+                  <div className="w-full md:w-1/2 h-48 md:h-56 flex items-center justify-center" style={{ backgroundColor: card.backgroundColor || '#F5F5F4' }}>
                     {card.image ? (
                       <img
                         src={card.image}

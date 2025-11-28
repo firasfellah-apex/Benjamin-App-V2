@@ -555,10 +555,51 @@ export async function createOrder(
 
   // If addressId is provided, fetch the address and create snapshot
   let addressSnapshot: AddressSnapshot | null = null;
+  let atmSelection: { atmId: string; atmName: string | null; atmAddress: string | null; atmLat: number; atmLng: number; distanceMeters: number; score?: number } | null = null;
+  
   if (addressId) {
     const address = await getAddressById(addressId);
     if (address) {
       addressSnapshot = createAddressSnapshot(address);
+      
+      // Select ATM for this address if we have coordinates
+      if (address.latitude && address.longitude) {
+        try {
+          const { selectBestAtmForAddress } = await import('@/lib/atm/selectBestAtmForAddress');
+          atmSelection = await selectBestAtmForAddress({
+            addressId: addressId,
+            addressLat: address.latitude,
+            addressLng: address.longitude,
+          });
+          
+          if (atmSelection) {
+            console.log('[ORDER_CREATE] ATM selection result', {
+              addressId: addressId,
+              atmId: atmSelection.atmId,
+              atmName: atmSelection.atmName,
+              pickup_lat: atmSelection.atmLat,
+              pickup_lng: atmSelection.atmLng,
+              distanceMeters: atmSelection.distanceMeters,
+              score: atmSelection.score,
+            });
+          } else {
+            console.warn('[ORDER_CREATE][ATM_MISSING] No ATM found for address', {
+              addressId: addressId,
+              addressLat: address.latitude,
+              addressLng: address.longitude,
+            });
+          }
+        } catch (error) {
+          console.error('[ORDER_CREATE][ATM_ERROR] Failed to select ATM:', error);
+          // Don't block order creation if ATM selection fails
+        }
+      } else {
+        console.warn('[ORDER_CREATE][ATM_MISSING] Address missing coordinates', {
+          addressId: addressId,
+          hasLatitude: !!address.latitude,
+          hasLongitude: !!address.longitude,
+        });
+      }
     }
   }
 
@@ -579,6 +620,26 @@ export async function createOrder(
     status: "Pending"
   };
 
+  // Include ATM selection if available
+  if (atmSelection) {
+    insertPayload.atm_id = atmSelection.atmId;
+    insertPayload.atm_distance_meters = atmSelection.distanceMeters;
+    insertPayload.pickup_name = atmSelection.atmName || null;
+    insertPayload.pickup_address = atmSelection.atmAddress || null;
+    insertPayload.pickup_lat = atmSelection.atmLat;
+    insertPayload.pickup_lng = atmSelection.atmLng;
+    
+    console.log('[ORDER_CREATE] Including ATM in insert payload:', {
+      atm_id: insertPayload.atm_id,
+      pickup_name: insertPayload.pickup_name,
+      pickup_address: insertPayload.pickup_address,
+      pickup_lat: insertPayload.pickup_lat,
+      pickup_lng: insertPayload.pickup_lng,
+    });
+  } else {
+    console.warn('[ORDER_CREATE] Order will be created WITHOUT ATM assignment');
+  }
+
   // Include delivery_style if provided (will be omitted if column doesn't exist yet)
   if (deliveryStyle) {
     insertPayload.delivery_style = deliveryStyle;
@@ -592,6 +653,18 @@ export async function createOrder(
     .insert(insertPayload)
     .select()
     .maybeSingle();
+
+  // Log ATM selection result after order creation
+  if (data && atmSelection) {
+    console.log('[ORDER_CREATE] ATM selection result', {
+      orderId: data.id,
+      atmId: atmSelection.atmId,
+      atmName: atmSelection.atmName,
+      pickup_lat: atmSelection.atmLat,
+      pickup_lng: atmSelection.atmLng,
+      distanceMeters: atmSelection.distanceMeters,
+    });
+  }
 
   // If error is due to missing delivery_style column, retry without it (backward compatibility)
   if (error && error.message?.includes("delivery_style")) {
@@ -835,12 +908,32 @@ export async function getRunnerOrderHistory(): Promise<Array<OrderWithDetails & 
               customer_address: null,
               customer_name: 'Customer',
               customer_notes: null,
-              customer_rating_by_runner: null,
-              runner_rating: null,
+              delivery_mode: null,
+              delivery_style: null,
+              otp_code: null,
+              otp_hash: null,
+              otp_expires_at: null,
+              otp_attempts: 0,
+              otp_verified_at: null,
+              runner_accepted_at: null,
+              runner_at_atm_at: null,
               cash_withdrawn_at: null,
               handoff_completed_at: null,
-              customer: null,
-              runner: null,
+              cancelled_at: null,
+              cancelled_by: null,
+              cancellation_reason: null,
+              runner_rating: null,
+              runner_rating_comment: null,
+              customer_rating_by_runner: null,
+              customer_rating_tags: null,
+              atm_id: null,
+              atm_distance_meters: null,
+              pickup_name: null,
+              pickup_address: null,
+              pickup_lat: null,
+              pickup_lng: null,
+              customer: undefined,
+              runner: undefined,
             };
 
             history.push(minimalOrder);
@@ -911,6 +1004,19 @@ export async function getOrderById(orderId: string): Promise<OrderWithDetails | 
     `)
     .eq("id", orderId)
     .maybeSingle();
+  
+  // Ensure pickup fields are included (they should be in * but explicitly check)
+  if (data && !('pickup_lat' in data)) {
+    console.warn('[getOrderById] Order missing pickup fields, fetching explicitly');
+    const { data: fullData } = await supabase
+      .from("orders")
+      .select("atm_id, pickup_name, pickup_address, pickup_lat, pickup_lng, atm_distance_meters")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (fullData) {
+      Object.assign(data, fullData);
+    }
+  }
 
   if (error) {
     console.error("Error fetching order:", error);
@@ -927,6 +1033,10 @@ export async function getOrderById(orderId: string): Promise<OrderWithDetails | 
       runnerId: data.runner_id,
       deliveryStyle: data.delivery_style || 'NOT SET',
       deliveryMode: data.delivery_mode || 'NOT SET',
+      pickup_lat: (data as any).pickup_lat,
+      pickup_lng: (data as any).pickup_lng,
+      pickup_address: (data as any).pickup_address,
+      atm_id: (data as any).atm_id,
       customerData: data.customer ? {
         id: data.customer.id,
         avatar_url: data.customer.avatar_url,

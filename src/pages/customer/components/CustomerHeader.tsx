@@ -35,13 +35,15 @@ export function CustomerHeader({
   title,
   subtitle,
   right,
+  topRight,
   showBack,
   onBack,
   useXButton = false,
 }: {
   title: ReactNode | null;
   subtitle?: ReactNode | null;
-  right?: ReactNode;
+  right?: ReactNode; // Right side of title/subtitle area
+  topRight?: ReactNode; // Right side of top row (adjacent to back/X button)
   showBack?: boolean;
   onBack?: () => void;
   useXButton?: boolean; // Use X button instead of arrow for menu pages
@@ -296,7 +298,10 @@ export function CustomerHeader({
     <>
       <div className="flex items-center justify-between mb-4">
         {backButton}
-        {menuButton}
+        <div className="flex items-center gap-2">
+          {topRight}
+          {menuButton}
+        </div>
       </div>
       {/* Only render hero block when we actually have a title/subtitle */}
       {/* pb-6 ensures 24px spacing from subtitle to divider (matches FlowHeader) */}
@@ -319,40 +324,59 @@ export function CustomerHeader({
       )}
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <AlertDialogContent className="sm:max-w-md">
-          <div className="flex flex-col items-center text-center space-y-4">
-            {/* Logout Illustration */}
-            <div className="flex justify-center mb-2">
-              <img 
-                src={logoutIllustration} 
-                alt="Logout" 
-                className="w-32 h-32 object-contain"
-              />
-            </div>
-            
-            <AlertDialogHeader className="space-y-2">
-              <AlertDialogTitle className="text-xl font-semibold">
+        <AlertDialogContent 
+          className="p-0 gap-0 !top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2 !right-auto !bottom-auto"
+          style={{ 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            right: 'auto',
+            bottom: 'auto'
+          }}
+        >
+          {/* Illustration */}
+          <div className="h-48 md:h-56 flex items-center justify-center bg-[#E5E7EA] rounded-t-[24px]">
+            <img
+              src={logoutIllustration}
+              alt="Logout confirmation"
+              className="w-3/4 h-3/4 object-contain"
+            />
+          </div>
+
+          <div className="px-6 py-6 space-y-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
                 Confirm Logout
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-base text-slate-600">
+              <AlertDialogDescription className="text-center text-slate-600">
                 Are you sure you want to log out? You'll need to log in again to access your account.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+              <AlertDialogAction
+                onClick={confirmLogout}
+                className={cn(
+                  "w-full h-14 rounded-full bg-black text-white",
+                  "hover:bg-black/90 active:scale-[0.98]",
+                  "text-base font-semibold",
+                  "transition-all duration-150 touch-manipulation"
+                )}
+              >
+                Log Out
+              </AlertDialogAction>
+              <AlertDialogCancel
+                className={cn(
+                  "w-full h-14 rounded-full border border-black bg-white text-black",
+                  "hover:bg-slate-50 active:scale-[0.98]",
+                  "text-base font-semibold",
+                  "transition-all duration-150 touch-manipulation",
+                  "mt-0"
+                )}
+              >
+                Cancel
+              </AlertDialogCancel>
+            </AlertDialogFooter>
           </div>
-          
-          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-6">
-            <AlertDialogCancel 
-              className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50 w-full sm:w-auto"
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmLogout}
-              className="h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90 w-full sm:w-auto"
-            >
-              Log Out
-            </AlertDialogAction>
-          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>

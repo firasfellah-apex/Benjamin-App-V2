@@ -29,10 +29,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import logoutIllustration from "@/assets/illustrations/Logout.png";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 interface CustomerTopShellProps {
@@ -248,19 +251,59 @@ export function CustomerTopShell({
       </div>
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to log out? You'll need to log in again to access your account.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLogout}>
-              Log Out
-            </AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent 
+          className="p-0 gap-0 !top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2 !right-auto !bottom-auto"
+          style={{ 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            right: 'auto',
+            bottom: 'auto'
+          }}
+        >
+          {/* Illustration */}
+          <div className="h-48 md:h-56 flex items-center justify-center bg-[#E5E7EA] rounded-t-[24px]">
+            <img
+              src={logoutIllustration}
+              alt="Logout confirmation"
+              className="w-3/4 h-3/4 object-contain"
+            />
+          </div>
+
+          <div className="px-6 py-6 space-y-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
+                Confirm Logout
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-slate-600">
+                Are you sure you want to log out? You'll need to log in again to access your account.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+              <AlertDialogAction
+                onClick={confirmLogout}
+                className={cn(
+                  "w-full h-14 rounded-full bg-black text-white",
+                  "hover:bg-black/90 active:scale-[0.98]",
+                  "text-base font-semibold",
+                  "transition-all duration-150 touch-manipulation"
+                )}
+              >
+                Log Out
+              </AlertDialogAction>
+              <AlertDialogCancel
+                className={cn(
+                  "w-full h-14 rounded-full border border-black bg-white text-black",
+                  "hover:bg-slate-50 active:scale-[0.98]",
+                  "text-base font-semibold",
+                  "transition-all duration-150 touch-manipulation",
+                  "mt-0"
+                )}
+              >
+                Cancel
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </>

@@ -313,6 +313,7 @@ export default function CustomerHome() {
       id: 'bank-linked',
       image: bankIllustration,
       title: 'Bank-linked, OTP protected',
+      backgroundColor: '#EFE2D1', // Bank illustration background
       bullets: [
         { text: 'Secure, bank-level encryption', icon: ShieldCheckIcon },
         { text: 'One-time verification codes for handoff', icon: KeyIcon },
@@ -323,6 +324,7 @@ export default function CustomerHome() {
       id: 'no-atm-runs',
       image: atmIllustration,
       title: 'No ATM runs. No borrowing.',
+      backgroundColor: '#CFE7F9', // ATM illustration background
       bullets: [
         { text: 'Skip the line and the walk', icon: BoltIcon },
         { text: 'Discreet, private cash delivery', icon: EyeSlashIcon },
@@ -333,6 +335,7 @@ export default function CustomerHome() {
       id: 'background-checked',
       image: runnersIllustration,
       title: 'Background-checked runners',
+      backgroundColor: '#C7EDC5', // Runner illustration background
       bullets: [
         { text: 'Every runner is vetted and verified', icon: CheckBadgeIcon },
         { text: 'Identity tracked from pickup to delivery', icon: MapPinIcon },

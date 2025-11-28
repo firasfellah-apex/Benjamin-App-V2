@@ -43,7 +43,7 @@ const DELIVERY_NOTES_TEMPLATES = [
   "Meet in lobby",
   "Ring doorbell",
   "Call when near",
-  "Gate code: #1234",
+  "Gate code:",
 ];
 
 export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
@@ -539,7 +539,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               Address Preview
             </Label>
             <p className="text-xs text-gray-500">
-              Verify your address on the map
+              Move pin to exact location
             </p>
           </div>
           <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: "200px" }}>
@@ -549,14 +549,22 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   ? { lat: formData.latitude, lng: formData.longitude }
                   : liveLocation || { lat: 25.7617, lng: -80.1918 }
               }
-              zoom={15}
+              zoom={20}
               className="h-full"
               marker={
                 formData.latitude && formData.longitude
                   ? { lat: formData.latitude, lng: formData.longitude }
                   : null
               }
-              minimal={true}
+              minimal={false}
+              draggable={true}
+              onMarkerDrag={(position) => {
+                setFormData(prev => ({
+                  ...prev,
+                  latitude: position.lat,
+                  longitude: position.lng,
+                }));
+              }}
             />
           </div>
         </div>

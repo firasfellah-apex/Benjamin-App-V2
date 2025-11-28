@@ -160,6 +160,12 @@ export interface Order {
   runner_rating_comment: string | null;
   customer_rating_by_runner: number | null;
   customer_rating_tags: string | null;
+  atm_id: string | null;
+  atm_distance_meters: number | null;
+  pickup_name: string | null;
+  pickup_address: string | null;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -44,13 +44,18 @@ export function useJobOffersSubscription() {
     // Use address_snapshot if available, otherwise fall back to customer_address
     const payout = getRunnerPayout(order);
     
-    // Extract pickup location (ATM) - use customer address as pickup point
-    // In reality, this would be the ATM location, but we'll use customer address for now
+    // Extract pickup location (ATM) - use pickup fields if available, otherwise fallback
     let pickupName = "Pickup Location";
     let pickupLat = 0;
     let pickupLng = 0;
     
-    if (order.address_snapshot) {
+    // Use pickup location fields if they exist (ATM location)
+    if ((order as any).pickup_name && (order as any).pickup_lat && (order as any).pickup_lng) {
+      pickupName = (order as any).pickup_name;
+      pickupLat = (order as any).pickup_lat;
+      pickupLng = (order as any).pickup_lng;
+    } else if (order.address_snapshot) {
+      // Fallback: use customer address as pickup (legacy behavior)
       pickupName = order.address_snapshot.city || order.address_snapshot.neighborhood || "Pickup Location";
       pickupLat = order.address_snapshot.latitude || 0;
       pickupLng = order.address_snapshot.longitude || 0;

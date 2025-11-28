@@ -642,26 +642,33 @@ export const AddressCarousel: React.FC<AddressCarouselProps> = ({
       return null;
     }
     return (
-      <div className="w-full">
-        <div className="w-full flex flex-col items-center justify-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-slate-600" />
-          </div>
-          <h3 className="text-base font-semibold text-slate-900 text-center">
-            No Address Yet
-          </h3>
-          <p className="text-sm text-slate-500 text-center">
-            Let's add your first address.
-          </p>
-          <button
-            type="button"
-            onClick={onAddAddress}
-            className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2 py-4 px-6"
-          >
-            <Plus className="w-5 h-5" />
-            Add Your First Address
-          </button>
+      <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
+          <MapPin className="w-5 h-5" />
         </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-slate-900">
+            Add Your First Address
+          </p>
+          <p className="text-sm text-slate-500">
+            Save a place where you'd like cash delivered.
+            <br />
+            You can add more later.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onAddAddress}
+          className={cn(
+            "w-full h-[52px] rounded-full bg-black text-white",
+            "hover:bg-black/90 active:scale-[0.98]",
+            "text-base font-semibold",
+            "transition-all duration-150 touch-manipulation",
+            "flex items-center justify-center"
+          )}
+        >
+          Add Address
+        </button>
       </div>
     );
   }

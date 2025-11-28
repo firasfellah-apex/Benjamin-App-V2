@@ -19,7 +19,7 @@ import { RunnerSubpageLayout } from "@/components/layout/RunnerSubpageLayout";
 import { RatingStars } from "@/components/common/RatingStars";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { formatDate } from "@/lib/utils";
-import { RunnerDirectionsMap, getDummyLocations, type Location } from "@/components/maps/RunnerDirectionsMap";
+import { RunnerDirectionsMap, type Location } from "@/components/maps/RunnerDirectionsMap";
 import { resolveDeliveryStyleFromOrder, getDeliveryStyleCopy, getArrivalInstruction, getOtpFooterText, getDeliveryStyleShortHint, getDeliveryStyleChipLabel } from "@/lib/deliveryStyle";
 
 function shortId(orderId: string): string {
@@ -72,6 +72,22 @@ export default function RunnerOrderDetail() {
   const loadOrder = async () => {
     if (!orderId) return;
     const data = await getOrderById(orderId);
+    
+    // Debug: Log pickup fields when order loads
+    if (data) {
+      console.log('[RunnerOrderDetail] 📍 Order loaded with pickup fields:', {
+        orderId: data.id,
+        pickup_lat: (data as any).pickup_lat,
+        pickup_lng: (data as any).pickup_lng,
+        pickup_name: (data as any).pickup_name,
+        pickup_address: (data as any).pickup_address,
+        atm_id: (data as any).atm_id,
+        hasAddressSnapshot: !!data.address_snapshot,
+        addressSnapshotLat: data.address_snapshot?.latitude,
+        addressSnapshotLng: data.address_snapshot?.longitude,
+      });
+    }
+    
     setOrder(data);
     
     if (data?.status === "Completed") {
@@ -444,40 +460,112 @@ export default function RunnerOrderDetail() {
     ? formatDate(completedDate, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : 'N/A';
 
-  // Get dummy locations for testing (will be replaced with real data later)
-  const dummyLocations = getDummyLocations();
-  
-  // Determine map locations based on order status
+  // Determine map locations based on order status using actual order data
   const getMapLocations = (): { origin: Location; destination: Location; title: string } | null => {
     const showCustomerRoute = ['Cash Withdrawn', 'Pending Handoff', 'Completed'].includes(order.status);
     
     console.log('[RunnerOrderDetail] getMapLocations - order.status:', order.status);
     console.log('[RunnerOrderDetail] showCustomerRoute:', showCustomerRoute);
+    console.log('[RunnerOrderDetail] Order pickup fields:', {
+      pickup_lat: (order as any).pickup_lat,
+      pickup_lng: (order as any).pickup_lng,
+      pickup_name: (order as any).pickup_name,
+      pickup_address: (order as any).pickup_address,
+    });
+    console.log('[RunnerOrderDetail] Order address snapshot:', order.address_snapshot);
+    
+    // Get pickup location (ATM) from order
+    // Prefer real ATM coordinates, fallback to Miami center if missing
+    const hasPickup = !!(order as any).pickup_lat && !!(order as any).pickup_lng;
+    
+    const pickupLocation: Location | null = hasPickup
+      ? {
+          lat: (order as any).pickup_lat,
+          lng: (order as any).pickup_lng,
+          address: (order as any).pickup_address || (order as any).pickup_name || 'ATM Location',
+        }
+      : null;
+    
+    if (!hasPickup) {
+      console.warn('[RUNNER_MAP] Order has no pickup_lat/lng, will use fallback destination', { 
+        orderId: order.id,
+        pickup_lat: (order as any).pickup_lat,
+        pickup_lng: (order as any).pickup_lng,
+        pickup_name: (order as any).pickup_name,
+        pickup_address: (order as any).pickup_address,
+      });
+    }
+    
+    // Get dropoff location (customer delivery address) from order
+    const dropoffLocation: Location | null = 
+      order.address_snapshot?.latitude && order.address_snapshot?.longitude
+        ? {
+            lat: order.address_snapshot.latitude,
+            lng: order.address_snapshot.longitude,
+            address: order.address_snapshot.line1 
+              ? `${order.address_snapshot.line1}${order.address_snapshot.line2 ? `, ${order.address_snapshot.line2}` : ''}, ${order.address_snapshot.city}, ${order.address_snapshot.state}`
+              : order.customer_address || 'Customer Address',
+          }
+        : null;
     
     if (showCustomerRoute) {
       // After cash withdrawal: show route from ATM to customer
-      // TODO: Replace with real customer address coordinates
-      const customerLocation: Location = {
-        lat: dummyLocations.customer.lat,
-        lng: dummyLocations.customer.lng,
-        address: order.customer_address || 'Customer Address',
+      if (pickupLocation && dropoffLocation) {
+        const locations = {
+          origin: pickupLocation,
+          destination: dropoffLocation,
+          title: 'Route to Customer',
+        };
+        console.log('[RunnerOrderDetail] Returning customer route locations:', locations);
+        return locations;
+      } else {
+        console.warn('[RunnerOrderDetail] Missing pickup or dropoff location for customer route');
+        return null;
+      }
+    } else if (order.status === 'Runner Accepted' || order.status === 'Runner at ATM') {
+      // Before cash withdrawal: show route to ATM
+      // Use fallback if pickup location is missing (map will still render)
+      const FALLBACK_DESTINATION: Location = {
+        lat: 25.7617, // Miami center
+        lng: -80.1918,
+        address: 'Miami, FL',
+      };
+      
+      const destination = pickupLocation || FALLBACK_DESTINATION;
+      
+      if (!pickupLocation) {
+        console.warn('[RunnerOrderDetail] ⚠️ Missing pickup location for ATM route, using fallback', {
+          pickup_lat: (order as any).pickup_lat,
+          pickup_lng: (order as any).pickup_lng,
+          pickup_address: (order as any).pickup_address,
+          orderId: order.id,
+        });
+        // Don't return null - use fallback so map still renders
+      }
+      
+      // For origin, we'll use a default location (runner's current location would be ideal but requires GPS)
+      // TODO: Replace with actual runner GPS location when available
+      // For now, use Miami center as a fallback - the map will center on destination (ATM) anyway
+      const defaultOrigin: Location = {
+        lat: 25.7617, // Miami center as fallback (map centers on destination, so this is just for route calculation)
+        lng: -80.1918,
+        address: 'Current Location',
       };
       
       const locations = {
-        origin: dummyLocations.atm, // ATM location (will be replaced with actual ATM location)
-        destination: customerLocation,
-        title: 'Route to Customer',
-      };
-      console.log('[RunnerOrderDetail] Returning customer route locations:', locations);
-      return locations;
-    } else if (order.status === 'Runner Accepted' || order.status === 'Runner at ATM') {
-      // Before cash withdrawal: show route to ATM
-      const locations = {
-        origin: dummyLocations.origin, // Current location (will be replaced with runner's actual location)
-        destination: dummyLocations.atm,
+        origin: defaultOrigin, // TODO: Replace with actual runner GPS location when available
+        destination: destination,
         title: 'Route to ATM',
       };
-      console.log('[RunnerOrderDetail] Returning ATM route locations:', locations);
+      
+      console.log('[RunnerOrderDetail] ✅ Returning ATM route locations:', {
+        origin: locations.origin,
+        destination: locations.destination,
+        destinationLat: locations.destination.lat,
+        destinationLng: locations.destination.lng,
+        destinationAddress: locations.destination.address,
+        usingFallback: !pickupLocation,
+      });
       return locations;
     }
     
@@ -546,6 +634,12 @@ export default function RunnerOrderDetail() {
                   <div className="space-y-3">
                     <div className="p-3 bg-white/5 rounded-xl">
                       <p className="text-sm font-medium text-white mb-2">Head towards the ATM</p>
+                      {(order as any).pickup_address && (
+                        <div className="mb-3 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                          <p className="text-xs text-slate-400 mb-1">ATM Location</p>
+                          <p className="text-sm font-medium text-white">{(order as any).pickup_address}</p>
+                        </div>
+                      )}
                       <p className="text-xs text-slate-400 mb-4">
                         Navigate to the ATM location. The exact cash amount and full delivery address will be revealed once you confirm you're at the ATM.
                       </p>

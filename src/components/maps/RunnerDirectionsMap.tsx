@@ -193,10 +193,22 @@ export function RunnerDirectionsMap({
     console.log('[RunnerDirectionsMap] Destination:', destination);
 
     try {
+      // Center map on destination (where runner needs to go) rather than origin
+      // This ensures the ATM location is visible when heading to ATM
+      const centerLng = destination.lng;
+      const centerLat = destination.lat;
+      
+      console.log('[RunnerDirectionsMap] Initializing map with center:', {
+        centerLat,
+        centerLng,
+        destinationAddress: destination.address,
+        originAddress: origin.address,
+      });
+      
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: getBenjaminMapStyle(), // Light theme with Benjamin brand colors
-        center: [origin.lng, origin.lat],
+        center: [centerLng, centerLat],
         zoom: 13,
         antialias: true,
         pitch: 0,
@@ -460,7 +472,14 @@ export function RunnerDirectionsMap({
     // Fetch route from Mapbox Directions API
     const fetchRoute = async () => {
       try {
+        console.log('[RunnerDirectionsMap] 🗺️ Fetching route:', {
+          origin: { lat: origin.lat, lng: origin.lng, address: origin.address },
+          destination: { lat: destination.lat, lng: destination.lng, address: destination.address },
+        });
+        
         const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
+        
+        console.log('[RunnerDirectionsMap] 📍 Route URL (coordinates only):', `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`);
         
         const response = await fetch(url);
         if (!response.ok) {

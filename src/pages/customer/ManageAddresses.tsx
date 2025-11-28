@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Pencil, Trash2 } from "lucide-react";
+import { X, Pencil, Trash2, MapPin } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { deleteAddress, formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
@@ -291,16 +291,18 @@ export default function ManageAddresses() {
   const topContent = useMemo(() => (
     <div className="space-y-3 pb-6">
       {addresses.length === 0 ? (
-        <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg">
-            +
+        <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
+            <MapPin className="w-5 h-5" />
           </div>
           <div className="space-y-1">
             <p className="text-sm font-semibold text-slate-900">
-              Add your first address
+              Add Your First Address
             </p>
             <p className="text-sm text-slate-500">
-              Save a place where you'd like cash delivered. You can add more later.
+              Save a place where you'd like cash delivered.
+              <br />
+              You can add more later.
             </p>
           </div>
         </div>
@@ -392,7 +394,7 @@ export default function ManageAddresses() {
 
               {/* Edit/Delete buttons - shown when expanded */}
               {isSelected && (
-                <div className="px-4 pb-3 flex gap-3">
+                <div className="px-4 pb-4 flex gap-3">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -401,15 +403,16 @@ export default function ManageAddresses() {
                     }}
                     disabled={deletingId === addr.id}
                     className={cn(
-                      "flex-1 rounded-full border border-red-500 bg-white text-red-500",
-                      "px-4 py-3 flex items-center justify-center",
+                      "flex-1 rounded-full bg-red-600 text-white",
+                      "px-4 py-4 flex items-center justify-center",
+                      "hover:bg-red-700",
                       "disabled:opacity-50 disabled:cursor-not-allowed",
-                      "active:scale-[0.98] transition-transform duration-150",
+                      "active:scale-[0.98] transition-all duration-150",
                       "touch-manipulation"
                     )}
                     aria-label="Delete address"
                   >
-                    <Trash2 className="h-5 w-5" />
+                    <Trash2 className="h-5 w-5 text-white" />
                   </button>
                   <button
                     type="button"
@@ -418,14 +421,15 @@ export default function ManageAddresses() {
                       handleEditAddress(addr);
                     }}
                     className={cn(
-                      "flex-1 rounded-full border border-black bg-white text-black",
-                      "px-4 py-3 flex items-center justify-center",
-                      "active:scale-[0.98] transition-transform duration-150",
+                      "flex-1 rounded-full bg-black text-white",
+                      "px-4 py-4 flex items-center justify-center",
+                      "hover:bg-black/90",
+                      "active:scale-[0.98] transition-all duration-150",
                       "touch-manipulation"
                     )}
                     aria-label="Edit address"
                   >
-                    <Pencil className="h-5 w-5" />
+                    <Pencil className="h-5 w-5 text-white" />
                   </button>
                 </div>
               )}
@@ -691,9 +695,18 @@ export default function ManageAddresses() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="p-0 gap-0">
+        <AlertDialogContent 
+          className="p-0 gap-0 !top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2 !right-auto !bottom-auto"
+          style={{ 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            right: 'auto',
+            bottom: 'auto'
+          }}
+        >
           {/* Illustration */}
-          <div className="h-48 flex items-center justify-center bg-[#F5F5F4] rounded-t-[24px]">
+          <div className="h-48 md:h-56 flex items-center justify-center bg-[#F8D8D2] rounded-t-[24px]">
             <img
               src={AlertIllustration}
               alt="Delete confirmation"
@@ -726,7 +739,7 @@ export default function ManageAddresses() {
               <AlertDialogAction
                 onClick={confirmDelete}
                 className={cn(
-                  "w-full h-12 rounded-full bg-red-600 text-white",
+                  "w-full h-14 rounded-full bg-red-600 text-white",
                   "hover:bg-red-700 active:scale-[0.98]",
                   "text-base font-semibold",
                   "transition-all duration-150 touch-manipulation"
@@ -737,7 +750,7 @@ export default function ManageAddresses() {
               </AlertDialogAction>
               <AlertDialogCancel
                 className={cn(
-                  "w-full h-12 rounded-full border border-black bg-white text-black",
+                  "w-full h-14 rounded-full border border-black bg-white text-black",
                   "hover:bg-slate-50 active:scale-[0.98]",
                   "text-base font-semibold",
                   "transition-all duration-150 touch-manipulation",

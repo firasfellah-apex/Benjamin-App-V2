@@ -13,7 +13,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, X } from "@/lib/icons";
-import { Landmark } from "lucide-react";
+import { Landmark, MapPin } from "lucide-react";
 import { Pencil, Shield } from "lucide-react";
 import { getIconByName } from "@/components/address/IconPicker";
 import { cn } from "@/lib/utils";
@@ -874,22 +874,30 @@ export default function CashRequest() {
       <div className="space-y-4 pb-6">
         {/* 0 addresses – empty state */}
         {addresses.length === 0 && (
-          <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg">
-              +
+          <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
+              <MapPin className="w-5 h-5" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-slate-900">
-                Add your first address
+                Add Your First Address
               </p>
               <p className="text-sm text-slate-500">
-                Save a place where you'd like cash delivered. You can add more later.
+                Save a place where you'd like cash delivered.
+                <br />
+                You can add more later.
               </p>
             </div>
             <button
               type="button"
               onClick={handleAddAddress}
-              className="mt-1 w-full rounded-full bg-slate-900 text-white text-sm font-semibold py-3 px-4 active:scale-[0.98] transition-transform duration-150"
+              className={cn(
+                "w-full h-[52px] rounded-full bg-black text-white",
+                "hover:bg-black/90 active:scale-[0.98]",
+                "text-base font-semibold",
+                "transition-all duration-150 touch-manipulation",
+                "flex items-center justify-center"
+              )}
             >
               Add Address
             </button>

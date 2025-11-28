@@ -356,7 +356,7 @@ export default function CustomerDeliveryDetail() {
         )}
 
         {/* Money Summary Card */}
-        <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm">
+        <div className="text-sm">
           <div className="flex justify-between mb-2">
             <span className="text-slate-500">Cash Received</span>
             <span className="font-medium text-slate-900">
@@ -375,36 +375,37 @@ export default function CustomerDeliveryDetail() {
           </div>
         </div>
 
+        {/* Divider */}
+        <div className="h-[6px] bg-[#F7F7F7] -mx-6 my-5" />
+
         {/* Runner Section */}
         {delivery.runner && (
-          <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-9 w-9 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center text-xs font-medium text-slate-500 flex-shrink-0">
-                {delivery.runner.avatarUrl ? (
-                  <img
-                    src={delivery.runner.avatarUrl}
-                    alt={delivery.runner.displayName}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  runnerInitials
-                )}
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center text-xs font-medium text-slate-500 flex-shrink-0">
+              {delivery.runner.avatarUrl ? (
+                <img
+                  src={delivery.runner.avatarUrl}
+                  alt={delivery.runner.displayName}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                runnerInitials
+              )}
+            </div>
+            <div className="text-sm flex-1 min-w-0">
+              <div className="font-medium text-slate-900 truncate">
+                {delivery.runner.displayName.split(' ')[0]}
               </div>
-              <div className="text-sm flex-1 min-w-0">
-                <div className="font-medium text-slate-900 truncate">
-                  {delivery.runner.displayName.split(' ')[0]}
-                </div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  Your Benjamin runner
-                </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                Your Benjamin runner
               </div>
             </div>
-
+            
             {/* Rating - Yellow button matching LastDeliveryCard */}
             {delivery.status === "delivered" && (
-              <div className="mt-3">
+              <>
                 {delivery.customerRating ? (
-                  <span className="inline-flex items-center text-[11px] text-slate-500">
+                  <span className="inline-flex items-center text-[11px] text-slate-500 flex-shrink-0">
                     <Star className="w-3 h-3 mr-1 fill-amber-400 text-amber-400" />
                     {delivery.customerRating.toFixed(1)} · Your rating
                   </span>
@@ -412,14 +413,14 @@ export default function CustomerDeliveryDetail() {
                   <button
                     type="button"
                     onClick={() => setRatingModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150 flex-shrink-0"
                     style={{ color: '#D97708' }}
                   >
                     <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
                     <span>Rate Runner</span>
                   </button>
                 )}
-              </div>
+              </>
             )}
           </div>
         )}

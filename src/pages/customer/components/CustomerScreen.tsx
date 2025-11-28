@@ -25,6 +25,10 @@ interface CustomerScreenProps {
   useXButton?: boolean;
   /** Custom bottom padding for scroll container (e.g. for pages with taller bottom nav) */
   customBottomPadding?: string;
+  /** Right-side header button in title area (e.g. Help button) */
+  headerRight?: React.ReactNode;
+  /** Right-side button in top row (adjacent to back/X button, like FlowHeader) */
+  headerTopRight?: React.ReactNode;
   className?: string;
 }
 
@@ -48,6 +52,8 @@ export function CustomerScreen({
   onBack,
   useXButton = false,
   customBottomPadding,
+  headerRight,
+  headerTopRight,
   className,
 }: CustomerScreenProps) {
   const showHero = !!title || !!subtitle;
@@ -72,6 +78,8 @@ export function CustomerScreen({
           showBack={showBack}
           onBack={onBack}
           useXButton={useXButton}
+          right={headerRight}
+          topRight={headerTopRight}
         />
         </header>
       )}
