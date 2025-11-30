@@ -17,7 +17,19 @@ interface TrackingMapProps {
 }
 
 const DEFAULT_ZOOM = 14;
-const DEFAULT_STYLE = "mapbox://styles/mapbox/navigation-night-v1";
+
+// Get style from env or use fallback
+function getMapboxStyle(): string {
+  try {
+    const env = getEnv();
+    if (env.MAPBOX_STYLE_URL) {
+      return env.MAPBOX_STYLE_URL;
+    }
+  } catch (error) {
+    // If env module not available, fall back to default
+  }
+  return "mapbox://styles/mapbox/navigation-night-v1";
+}
 
 export const TrackingMap: React.FC<TrackingMapProps> = ({
   center,
@@ -56,7 +68,7 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     try {
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: DEFAULT_STYLE,
+        style: getMapboxStyle(),
         center: [center.lng, center.lat],
         zoom,
       });

@@ -60,6 +60,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
     // Track if address has been selected from autocomplete to show additional fields
     // If editing an existing address, show fields immediately
     const [hasSelectedAddress, setHasSelectedAddress] = useState(!!address?.line1);
+    // Track if user has manually moved the pin - if so, don't overwrite with geocoded coords
+    const [pinManuallyMoved, setPinManuallyMoved] = useState(false);
     const [formData, setFormData] = useState({
       icon: address?.icon || 'Home',
       label: address?.label || "",
@@ -132,12 +134,27 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           const latitude = location.lat();
           const longitude = location.lng();
           
-          // Update coordinates - this will trigger map preview to update
-          setFormData(prev => ({
-            ...prev,
-            latitude,
-            longitude,
-          }));
+          // Only update coordinates if user hasn't manually moved the pin
+          // If pin was moved, pin coordinates take precedence over geocoded coordinates
+          if (!pinManuallyMoved) {
+            console.log('[ADDRESS_FORM] Using geocoded coordinates', {
+              latitude,
+              longitude,
+              address: addressString,
+            });
+            setFormData(prev => ({
+              ...prev,
+              latitude,
+              longitude,
+            }));
+          } else {
+            console.log('[ADDRESS_FORM] Skipping geocoded coordinates - pin was manually moved', {
+              geocodedLat: latitude,
+              geocodedLng: longitude,
+              pinLat: formData.latitude,
+              pinLng: formData.longitude,
+            });
+          }
         }
       } catch (error) {
         // Silently fail - don't show error to user, just don't update map
@@ -222,6 +239,16 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
       updateLoading(true);
 
     try {
+      // Log coordinate source for debugging
+      const coordSource = pinManuallyMoved ? 'pin' : (formData.latitude && formData.longitude ? 'geocoded' : 'none');
+      console.log('[ADDRESS_FORM] Submitting address', {
+        hasAddress: !!address,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        coordSource,
+        pinManuallyMoved,
+      });
+
       if (address) {
         // Update existing address
         const updateFields = {
@@ -262,8 +289,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           state: formData.state,
           postal_code: formData.postal_code,
           delivery_notes: formData.delivery_notes?.trim() || null,
-          latitude: formData.latitude || undefined,
-          longitude: formData.longitude || undefined,
+          latitude: formData.latitude ?? undefined,
+          longitude: formData.longitude ?? undefined,
           is_default: false // Default logic hidden for now
         };
         
@@ -382,6 +409,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               }}
               onAddressSelected={(normalized: NormalizedAddress) => {
                 // When place is selected from autocomplete, set all fields and coordinates
+                // Only update coordinates if pin hasn't been manually moved
+                const shouldUpdateCoords = !pinManuallyMoved && normalized.location;
                 setFormData({
                   ...formData,
                   line1: normalized.streetLine1,
@@ -389,8 +418,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   city: normalized.city || formData.city,
                   state: normalized.state || formData.state,
                   postal_code: normalized.postalCode || formData.postal_code,
-                  latitude: normalized.location?.lat || formData.latitude,
-                  longitude: normalized.location?.lng || formData.longitude,
+                  latitude: shouldUpdateCoords ? normalized.location.lat : formData.latitude,
+                  longitude: shouldUpdateCoords ? normalized.location.lng : formData.longitude,
                 });
                 // Show additional fields after address is selected
                 setHasSelectedAddress(true);
@@ -405,14 +434,16 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               }}
               onPlaceSelect={(place) => {
                 // Legacy callback for backwards compatibility
+                // Only update coordinates if pin hasn't been manually moved
+                const shouldUpdateCoords = !pinManuallyMoved && place.latitude && place.longitude;
                 setFormData({
                   ...formData,
                   line1: place.line1,
                   city: place.city,
                   state: place.state,
                   postal_code: place.postal_code,
-                  latitude: place.latitude,
-                  longitude: place.longitude,
+                  latitude: shouldUpdateCoords ? place.latitude : formData.latitude,
+                  longitude: shouldUpdateCoords ? place.longitude : formData.longitude,
                 });
                 // Show additional fields after address is selected
                 setHasSelectedAddress(true);
@@ -559,6 +590,11 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               minimal={false}
               draggable={true}
               onMarkerDrag={(position) => {
+                console.log('[ADDRESS_FORM] Pin manually moved', {
+                  latitude: position.lat,
+                  longitude: position.lng,
+                });
+                setPinManuallyMoved(true);
                 setFormData(prev => ({
                   ...prev,
                   latitude: position.lat,

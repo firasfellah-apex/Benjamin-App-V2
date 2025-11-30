@@ -319,8 +319,8 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         </button>
       </div>
 
-      {/* Map Background - Half Screen (Top to Middle) */}
-      <div className="absolute inset-x-0 top-0 h-1/2 z-0 pointer-events-none">
+      {/* Map Background - Extended to cover behind bottom sheet button */}
+      <div className="absolute inset-x-0 top-0 h-[60%] z-0 pointer-events-none">
         {mapLocations ? (
           <RunnerDirectionsMap
             origin={mapLocations.origin}

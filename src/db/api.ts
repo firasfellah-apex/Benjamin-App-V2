@@ -562,43 +562,51 @@ export async function createOrder(
     if (address) {
       addressSnapshot = createAddressSnapshot(address);
       
-      // Select ATM for this address if we have coordinates
-      if (address.latitude && address.longitude) {
-        try {
-          const { selectBestAtmForAddress } = await import('@/lib/atm/selectBestAtmForAddress');
-          atmSelection = await selectBestAtmForAddress({
+      // Select ATM for this address - coordinates are required
+      if (!address.latitude || !address.longitude) {
+        console.error('[ORDER_CREATE][ATM_MISSING] Address missing coordinates', {
+          addressId: addressId,
+          line1: address.line1,
+          city: address.city,
+          hasLatitude: !!address.latitude,
+          hasLongitude: !!address.longitude,
+          latitude: address.latitude,
+          longitude: address.longitude,
+        });
+        // Throw an error so we don't silently create an order with missing coordinates
+        throw new Error(`Address ${addressId} (${address.line1}, ${address.city}) is missing coordinates. Please update the address with valid latitude and longitude.`);
+      }
+
+      try {
+        const { selectBestAtmForAddress } = await import('@/lib/atm/selectBestAtmForAddress');
+        atmSelection = await selectBestAtmForAddress({
+          addressId: addressId,
+          addressLat: address.latitude,
+          addressLng: address.longitude,
+        });
+        
+        if (atmSelection) {
+          console.log('[ORDER_CREATE] ATM selection result', {
+            addressId: addressId,
+            atmId: atmSelection.atmId,
+            atmName: atmSelection.atmName,
+            pickup_lat: atmSelection.atmLat,
+            pickup_lng: atmSelection.atmLng,
+            distanceMeters: atmSelection.distanceMeters,
+            score: atmSelection.score,
+          });
+        } else {
+          console.warn('[ORDER_CREATE][ATM_MISSING] No ATM found for address', {
             addressId: addressId,
             addressLat: address.latitude,
             addressLng: address.longitude,
           });
-          
-          if (atmSelection) {
-            console.log('[ORDER_CREATE] ATM selection result', {
-              addressId: addressId,
-              atmId: atmSelection.atmId,
-              atmName: atmSelection.atmName,
-              pickup_lat: atmSelection.atmLat,
-              pickup_lng: atmSelection.atmLng,
-              distanceMeters: atmSelection.distanceMeters,
-              score: atmSelection.score,
-            });
-          } else {
-            console.warn('[ORDER_CREATE][ATM_MISSING] No ATM found for address', {
-              addressId: addressId,
-              addressLat: address.latitude,
-              addressLng: address.longitude,
-            });
-          }
-        } catch (error) {
-          console.error('[ORDER_CREATE][ATM_ERROR] Failed to select ATM:', error);
-          // Don't block order creation if ATM selection fails
         }
-      } else {
-        console.warn('[ORDER_CREATE][ATM_MISSING] Address missing coordinates', {
-          addressId: addressId,
-          hasLatitude: !!address.latitude,
-          hasLongitude: !!address.longitude,
-        });
+      } catch (error) {
+        console.error('[ORDER_CREATE][ATM_ERROR] Failed to select ATM:', error);
+        // Re-throw the error so order creation fails if coordinates are missing
+        // This ensures we never create orders with invalid ATM selections
+        throw error;
       }
     }
   }

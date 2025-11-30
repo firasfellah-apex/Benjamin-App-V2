@@ -310,6 +310,126 @@ All colors MUST be HSL.
 }
 
 /* Benjamin Pulse Animation for New Delivery Cards */
+@keyframes route-glow-horizontal {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+
+@keyframes route-glow-vertical {
+  0%   { transform: translateY(-120%); opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateY(120%); opacity: 0; }
+}
+
+@keyframes route-glow-diagonal {
+  0%   { transform: translateX(-120%) translateY(120%); opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateX(120%) translateY(-120%); opacity: 0; }
+}
+
+@keyframes route-zigzag-horizontal-first {
+  0%   { transform: translateX(-100%) translateY(0); opacity: 0; }
+  10%  { opacity: 1; }
+  40%  { transform: translateX(0%) translateY(0); opacity: 1; }
+  50%  { transform: translateX(0%) translateY(0); opacity: 1; }
+  90%  { transform: translateX(0%) translateY(0); opacity: 1; }
+  100% { transform: translateX(0%) translateY(0); opacity: 0; }
+}
+
+@keyframes route-zigzag-vertical-first {
+  0%   { transform: translateX(0) translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  40%  { transform: translateX(0%) translateY(0%); opacity: 1; }
+  50%  { transform: translateX(0%) translateY(0%); opacity: 1; }
+  90%  { transform: translateX(0%) translateY(0%); opacity: 1; }
+  100% { transform: translateX(0%) translateY(0%); opacity: 0; }
+}
+
+/* Converging routes - travel from edge to center */
+@keyframes route-converge-left-to-right {
+  0%   { 
+    transform: translateX(-100%); 
+    opacity: 0; 
+  }
+  10%  { 
+    opacity: 1; 
+  }
+  90%  { 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translateX(0%); 
+    opacity: 1; 
+  }
+}
+
+@keyframes route-converge-right-to-left {
+  0%   { 
+    transform: translateX(100%); 
+    opacity: 0; 
+  }
+  10%  { 
+    opacity: 1; 
+  }
+  90%  { 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translateX(0%); 
+    opacity: 1; 
+  }
+}
+
+@keyframes route-converge-top-to-bottom {
+  0%   { 
+    transform: translateY(-100%); 
+    opacity: 0; 
+  }
+  10%  { 
+    opacity: 1; 
+  }
+  90%  { 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translateY(0%); 
+    opacity: 1; 
+  }
+}
+
+@keyframes route-converge-bottom-to-top {
+  0%   { 
+    transform: translateY(100%); 
+    opacity: 0; 
+  }
+  10%  { 
+    opacity: 1; 
+  }
+  90%  { 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translateY(0%); 
+    opacity: 1; 
+  }
+}
+
+/* Dot pulsation - starts after routes converge */
+@keyframes dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
 @keyframes benjamin-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(64, 245, 140, 0.18);

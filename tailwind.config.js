@@ -146,6 +146,137 @@ export default {
             backgroundPosition: '100% 100%',
           },
         },
+        'route-glow-horizontal': {
+          '0%': {
+            transform: 'translateX(-120%)',
+            opacity: '0',
+          },
+          '30%': {
+            opacity: '1',
+          },
+          '70%': {
+            opacity: '1',
+          },
+          '100%': {
+            transform: 'translateX(120%)',
+            opacity: '0',
+          },
+        },
+        'route-glow-vertical': {
+          '0%': {
+            transform: 'translateY(-120%)',
+            opacity: '0',
+          },
+          '30%': {
+            opacity: '1',
+          },
+          '70%': {
+            opacity: '1',
+          },
+          '100%': {
+            transform: 'translateY(120%)',
+            opacity: '0',
+          },
+        },
+        'route-glow-diagonal': {
+          '0%': {
+            transform: 'translateX(-120%) translateY(120%)',
+            opacity: '0',
+          },
+          '30%': {
+            opacity: '1',
+          },
+          '70%': {
+            opacity: '1',
+          },
+          '100%': {
+            transform: 'translateX(120%) translateY(-120%)',
+            opacity: '0',
+          },
+        },
+        // SYNCHRONIZED DASH ANIMATION
+        // Path length is normalized to ~80 units.
+        // Dash length is 25 units.
+        // Start offset: 25 (Just before path start)
+        // End offset: -80 (Just after path end)
+        'dash-travel': {
+          '0%': {
+            strokeDashoffset: '25',
+            opacity: '0',
+          },
+          '5%': {
+            opacity: '1',
+          },
+          '45%': {
+            opacity: '1',
+          },
+          '50%': {
+            strokeDashoffset: '-80', // IMPACT CENTER
+            opacity: '0', // Vanish on impact
+          },
+          '100%': {
+            strokeDashoffset: '-80',
+            opacity: '0',
+          },
+        },
+        // DOT PULSE (Synced to hit at 50%)
+        'dot-impact': {
+          '0%, 45%': {
+            transform: 'scale(0)',
+            opacity: '0',
+          },
+          '50%': {
+            transform: 'scale(1.2)',
+            opacity: '1',
+          },
+          '55%': {
+            transform: 'scale(1)',
+            opacity: '1',
+          },
+          '65%': {
+            transform: 'scale(1)',
+            opacity: '1',
+          },
+          '80%': {
+            transform: 'scale(0)',
+            opacity: '0',
+          },
+          '100%': {
+            transform: 'scale(0)',
+            opacity: '0',
+          },
+        },
+        // RADAR SHOCKWAVE (Synced to hit at 50%)
+        'radar-shockwave': {
+          '0%, 49%': {
+            transform: 'scale(0.1)',
+            opacity: '0',
+          },
+          '50%': {
+            opacity: '0.8', // Flash on impact
+          },
+          '80%': {
+            transform: 'scale(3)', // Expand out
+            opacity: '0',
+          },
+          '100%': {
+            opacity: '0',
+          },
+        },
+        // Keep the old radar-pulse for backward compatibility
+        'radar-pulse': {
+          '0%': {
+            transform: 'scale(0.1)',
+            opacity: '0',
+          },
+          '50%': {
+            opacity: '0.8',
+          },
+          '100%': {
+            transform: 'scale(3)', // Expands outward
+            opacity: '0',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -154,6 +285,13 @@ export default {
         'slide-in': 'slide-in 0.5s ease-out',
         'gradient-pulse': 'gradient-pulse 3s ease-in-out infinite',
         'gradient-sweep': 'gradient-sweep 8s ease-in-out infinite',
+        'route-h': 'route-glow-horizontal 1.4s linear infinite',
+        'route-v': 'route-glow-vertical 1.4s linear infinite',
+        'route-d': 'route-glow-diagonal 1.6s linear infinite',
+        'dash-travel': 'dash-travel 3s linear infinite',
+        'dot-impact': 'dot-impact 3s ease-out infinite',
+        'radar-shockwave': 'radar-shockwave 3s ease-out infinite',
+        'radar-pulse': 'radar-pulse 2s ease-out infinite',
       },
     },
   },

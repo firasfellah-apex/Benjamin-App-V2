@@ -89,6 +89,19 @@ export async function selectBestAtmForAddress(
   const { addressId, addressLat, addressLng } = opts;
   const supabase = getSupabaseClient();
 
+  // Guard: Ensure coordinates are present and valid
+  if (!addressLat || !addressLng || typeof addressLat !== 'number' || typeof addressLng !== 'number') {
+    console.error('[ATM_SELECTION] Address missing coordinates', {
+      addressId,
+      addressLat,
+      addressLng,
+      latType: typeof addressLat,
+      lngType: typeof addressLng,
+    });
+    // Throw an error so we don't silently pick a garbage ATM
+    throw new Error(`Address ${addressId} is missing valid coordinates (lat: ${addressLat}, lng: ${addressLng})`);
+  }
+
   console.log('[ATM_SELECTION] start', { 
     addressId, 
     addressLat, 

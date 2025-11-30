@@ -93,7 +93,7 @@ export function getCustomerFacingStatus(
       return {
         label: 'Runner Assigned',
         step: 'ASSIGNED',
-        description: 'Your request has been assigned to a vetted Benjamin runner.'
+        description: 'Your order has been assigned to a vetted Benjamin runner.'
       };
     
     case 'Runner at ATM':

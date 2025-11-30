@@ -8,30 +8,33 @@
  */
 
 import mapboxgl from 'mapbox-gl';
+import { getEnv } from './env';
 
 export const BENJAMIN_COLORS = {
-  // Base
+  // Base / Land - Very dark almost-black blue
   canvas: '#05060A',  // very dark background
-  land: '#0B0D13',
-  water: '#05070C',
+  land: '#0C1016',    // slightly lighter than canvas
+  water: '#050A12',   // very dark blue-green
 
-  // Surfaces
-  buildingFill: '#141821',
-  buildingOutline: '#1D2230',
+  // Surfaces / Buildings
+  buildingFill: '#151923',    // building fill
+  buildingOutline: '#1F2430', // building outline at low opacity
 
   // Roads
-  roadPrimary: '#2F343F',  // main roads
-  roadSecondary: '#232731',  // minor roads
-  roadTertiary: '#1B1F28',
+  roadPrimary: '#1F2430',     // main/primary roads (darker)
+  roadSecondary: '#262C3A',   // secondary roads
+  roadTertiary: 'rgba(31, 36, 48, 0.7)', // minor/local roads (darker with opacity)
 
-  // Labels
-  roadLabel: '#AEB4C5',
-  placeLabel: '#8F95A6',
-  poiLabel: '#6E7383',
+  // Labels / POIs - Very subtle, light gray
+  roadLabel: '#9CA3AF',       // text at low opacity
+  placeLabel: '#9CA3AF',     // reduced font size and opacity
+  poiLabel: '#9CA3AF',        // very subtle
 
-  // Accents
-  emeraldGreen: '#22C55E',
-  emeraldSoft: '#4ADE80',
+  // Accents - Benjamin greens
+  emeraldGreen: '#02C97A',    // Primary green (route line)
+  emeraldSoft: '#4BF5A7',     // Highlight green (outline/glow)
+  emeraldDeep: '#007A4B',      // Deep glow base
+  emeraldAmbient: '#10231A',   // Ambient dark green
 
   // Misc
   boundary: '#262B37',
@@ -156,16 +159,28 @@ export function applyBenjaminTheme(map: mapboxgl.Map) {
 
 /**
  * Gets the base style URL for Benjamin theme
- * Uses dark style as base - we'll override colors with applyBenjaminTheme
+ * Uses custom style from env if available, otherwise falls back to dark-v11
+ * We'll override colors with applyBenjaminTheme if using fallback
  */
 export function getBenjaminMapStyle(): string {
-  // Dark base – we'll override colors with applyBenjaminTheme
+  // Try to get custom style URL from env
+  try {
+    const env = getEnv();
+    if (env.MAPBOX_STYLE_URL) {
+      return env.MAPBOX_STYLE_URL;
+    }
+  } catch (error) {
+    // If env module not available, fall back to default
+    console.log('[mapboxTheme] Could not read MAPBOX_STYLE_URL from env, using fallback');
+  }
+  
+  // Fallback to dark base – we'll override colors with applyBenjaminTheme
   return 'mapbox://styles/mapbox/dark-v11';
 }
 
 /**
  * Creates a custom route layer with Benjamin emerald green
- * Bright emerald accent on dark background
+ * Primary green stroke with highlight green outline/glow
  */
 export function createBenjaminRouteLayer(
   sourceId: string,
@@ -180,11 +195,42 @@ export function createBenjaminRouteLayer(
       'line-cap': 'round',
     },
     paint: {
-      'line-color': BENJAMIN_COLORS.emeraldGreen,
+      'line-color': BENJAMIN_COLORS.emeraldGreen, // #02C97A
       'line-width': 4,
       'line-opacity': 0.9,
       'line-blur': 0.5,
     },
   };
+}
+
+/**
+ * Creates a route layer with outline/glow effect
+ * Uses highlight green (#4BF5A7) at low opacity for glow
+ */
+export function createBenjaminRouteLayerWithGlow(
+  sourceId: string,
+  routeData: GeoJSON.Feature<GeoJSON.LineString>
+): mapboxgl.LayerSpecification[] {
+  // Glow layer (wider, lower opacity)
+  const glowLayer: mapboxgl.LayerSpecification = {
+    id: `benjamin-route-glow-${sourceId}`,
+    type: 'line',
+    source: sourceId,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+    },
+    paint: {
+      'line-color': BENJAMIN_COLORS.emeraldSoft, // #4BF5A7
+      'line-width': 6,
+      'line-opacity': 0.3,
+      'line-blur': 1,
+    },
+  };
+  
+  // Main route layer
+  const mainLayer = createBenjaminRouteLayer(sourceId, routeData);
+  
+  return [glowLayer, mainLayer];
 }
 
