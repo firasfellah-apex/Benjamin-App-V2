@@ -878,11 +878,11 @@ export function ActiveDeliverySheet({
                       <p className="text-xs text-slate-500">Your Benjamin runner</p>
                     </div>
                     
-                    {/* Message Button - Black Circle with Chat Icon */}
+                    {/* Message Button - Canonical IconButton */}
                     {allowContact && !isCompleted && !isCancelled && (
-                      <button
+                      <IconButton
                         onClick={() => navigate(`/customer/chat/${order.id}`)}
-                        className="relative w-10 h-10 rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center transition-colors shrink-0"
+                        className="relative shrink-0"
                         aria-label="Message runner"
                       >
                         <MessageCircle className="h-5 w-5" />
@@ -891,7 +891,7 @@ export function ActiveDeliverySheet({
                             {unreadCount > 9 ? '9+' : unreadCount}
                           </span>
                         )}
-                      </button>
+                      </IconButton>
                     )}
                   </div>
                   
@@ -1031,11 +1031,11 @@ export function ActiveDeliverySheet({
                     <p className="text-xs text-slate-500">Your Benjamin runner</p>
                   </div>
                   
-                  {/* Message Button - Black Circle with Chat Icon */}
+                  {/* Message Button - Canonical IconButton */}
                   {allowContact && !isCompleted && !isCancelled && (
-                    <button
+                    <IconButton
                       onClick={() => navigate(`/customer/chat/${order.id}`)}
-                      className="relative w-10 h-10 rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center transition-colors shrink-0"
+                      className="relative shrink-0"
                       aria-label="Message runner"
                     >
                       <MessageCircle className="h-5 w-5" />
@@ -1044,7 +1044,7 @@ export function ActiveDeliverySheet({
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
-                    </button>
+                    </IconButton>
                   )}
                 </div>
                 
