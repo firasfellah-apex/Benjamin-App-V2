@@ -399,10 +399,46 @@ export default function CustomerHome() {
       );
     }
     
+    // Show bank connection prompt if no bank is connected (after last delivery card or KYC reminder)
+    const hasBankConnection = !!profile?.plaid_item_id;
+    if (!hasBankConnection && !ordersLoading && isReady) {
+      const topPadding = (needsKycReminder || lastCompletedOrder) ? '24px' : '24px';
+      content.push(
+        <div key="bank-prompt" style={{ paddingTop: topPadding }}>
+          <div className="rounded-2xl border border-[#F0F0F0] bg-white p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                </svg>
+              </div>
+              <div className="flex-1 space-y-2">
+                <h3 className="text-base font-semibold text-slate-900">
+                  Connect your bank to order cash
+                </h3>
+                <p className="text-sm text-slate-600">
+                  Link a bank account to verify your identity and start ordering cash delivered to your door.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/customer/bank-accounts')}
+              className="w-full h-14 rounded-xl bg-black text-white hover:bg-black/90 font-semibold text-[15px] transition-colors"
+            >
+              Connect Bank Account
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
     // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
     if (!lastCompletedOrder && !ordersLoading) {
+      const topPadding = (needsKycReminder || !hasBankConnection) ? '24px' : '24px';
       content.push(
-        <div key="trust-carousel" style={{ paddingTop: needsKycReminder ? '24px' : '24px' }}>
+        <div key="trust-carousel" style={{ paddingTop: topPadding }}>
           <TrustCarousel cards={trustCards} />
         </div>
       );

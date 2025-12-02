@@ -20,6 +20,15 @@ import { format } from "date-fns";
 import { BankingHelpStories } from "@/components/customer/BankingHelpStories";
 import { supabase } from "@/db/supabase";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import disconnectBankIllustration from "@/assets/illustrations/Alert.png";
 
 function getKycStatusBadge(kycStatus: string) {
   const status = kycStatus?.toLowerCase();
@@ -58,6 +67,8 @@ export default function BankAccounts() {
   const { profile, isReady } = useProfile(user?.id);
   const queryClient = useQueryClient();
   const [showHelpStories, setShowHelpStories] = useState(false);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const { isLoading } = usePlaidLinkKyc(async () => {
     // After successful KYC, refetch profile
@@ -340,37 +351,7 @@ export default function BankAccounts() {
                   />
                   <Button
                     variant="outline"
-                    onClick={async () => {
-                      if (confirm('Are you sure you want to disconnect your bank account? You will need to reconnect a bank to place cash orders.')) {
-                        try {
-                          const { data: { user } } = await supabase.auth.getUser();
-                          if (!user) return;
-                          
-                          const { error } = await supabase
-                            .from('profiles')
-                            .update({
-                              plaid_item_id: null,
-                              plaid_access_token: null,
-                              kyc_status: 'unverified',
-                              bank_institution_name: null,
-                              bank_last4: null,
-                              bank_institution_logo_url: null,
-                              updated_at: new Date().toISOString()
-                            })
-                            .eq('id', user.id);
-                          
-                          if (error) throw error;
-                          
-                          // Invalidate profile cache to refetch
-                          await queryClient.invalidateQueries({ queryKey: ['profile'] });
-                          
-                          toast.success('Bank account disconnected');
-                        } catch (error) {
-                          console.error('Error disconnecting bank:', error);
-                          toast.error('Failed to disconnect bank account');
-                        }
-                      }
-                    }}
+                    onClick={() => setShowDisconnectDialog(true)}
                     className="w-full h-14 rounded-xl text-[15px] font-medium"
                   >
                     Disconnect Bank
@@ -418,6 +399,82 @@ export default function BankAccounts() {
         onClose={() => setShowHelpStories(false)}
         pages={storyPages}
       />
+
+      {/* Disconnect Bank Confirmation Dialog */}
+      <AlertDialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
+        <AlertDialogContent className="max-w-sm mx-auto">
+          <AlertDialogHeader className="flex flex-col items-center text-center space-y-4">
+            {/* Illustration */}
+            <div className="w-full h-48 md:h-56 flex items-center justify-center bg-[#F8D8D2] rounded-2xl">
+              <img
+                src={disconnectBankIllustration}
+                alt="Disconnect bank"
+                className="w-3/4 h-3/4 object-contain"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-xl font-semibold text-slate-900">
+                Disconnect Bank Account?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm text-slate-600">
+                You'll need to reconnect a bank account before you can place cash orders. Your order history will remain intact.
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="flex flex-col gap-3 sm:flex-col">
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setIsDisconnecting(true);
+                try {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (!user) return;
+                  
+                  const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                      plaid_item_id: null,
+                      plaid_access_token: null,
+                      kyc_status: 'unverified',
+                      bank_institution_name: null,
+                      bank_last4: null,
+                      bank_institution_logo_url: null,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', user.id);
+                  
+                  if (error) throw error;
+                  
+                  // Invalidate profile cache to refetch
+                  await queryClient.invalidateQueries({ queryKey: ['profile'] });
+                  
+                  toast.success('Bank account disconnected');
+                  setShowDisconnectDialog(false);
+                } catch (error) {
+                  console.error('Error disconnecting bank:', error);
+                  toast.error('Failed to disconnect bank account');
+                } finally {
+                  setIsDisconnecting(false);
+                }
+              }}
+              disabled={isDisconnecting}
+              className="w-full h-14 rounded-xl"
+            >
+              {isDisconnecting ? 'Disconnecting...' : 'Disconnect Bank'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectDialog(false)}
+              disabled={isDisconnecting}
+              className="w-full h-14 rounded-xl"
+            >
+              Cancel
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
