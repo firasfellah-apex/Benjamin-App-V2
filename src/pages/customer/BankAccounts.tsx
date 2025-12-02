@@ -114,7 +114,7 @@ export default function BankAccounts() {
   const helpButton = (
     <button
       onClick={() => setShowHelpStories(true)}
-      className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+      className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60 transition-colors touch-manipulation"
       aria-label="Help"
     >
       <HelpCircle className="h-5 w-5 text-slate-900" strokeWidth={2} />

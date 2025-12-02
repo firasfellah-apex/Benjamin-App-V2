@@ -27,10 +27,10 @@ export function SlideToConfirm({
   const [progress, setProgress] = useState(0); // 0 → 1
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  const TRACK_HEIGHT = 56; // 56px
-  const HANDLE_HEIGHT = 44; // 44px
-  const HANDLE_WIDTH = 96; // 96px
-  const HANDLE_MARGIN = (TRACK_HEIGHT - HANDLE_HEIGHT) / 2; // 6px top/bottom
+  const TRACK_HEIGHT = 56;
+  const HANDLE_HEIGHT = 50;
+  const HANDLE_WIDTH = 96; // keep width logic unchanged
+  const HANDLE_MARGIN = 3; // explicitly set to 3px, not computed
   const CONFIRM_THRESHOLD = 0.8; // 80%
 
   // Measure track width
@@ -132,7 +132,7 @@ export function SlideToConfirm({
           disabled && "opacity-60 cursor-not-allowed",
           !disabled && "cursor-pointer",
           // Default styles if no custom className provided
-          !trackClassName && "rounded-full bg-black",
+          !trackClassName && "rounded-[12px] bg-black",
           trackClassName
         )}
         style={{ height: TRACK_HEIGHT }}
@@ -142,7 +142,7 @@ export function SlideToConfirm({
           {/* Base layer: white text, full width, centered */}
           <div
             className="flex h-full items-center justify-center"
-            style={{ paddingLeft: LABEL_PADDING_LEFT }}
+            style={{ paddingLeft: LABEL_PADDING_LEFT - 6 }}
           >
             <span className="text-[15px] font-medium text-white">
               {labelText}
@@ -160,7 +160,7 @@ export function SlideToConfirm({
             >
               <div
                 className="flex h-full items-center justify-center"
-                style={{ paddingLeft: LABEL_PADDING_LEFT }}
+                style={{ paddingLeft: LABEL_PADDING_LEFT - 6 }}
               >
                 <span className="text-[15px] font-medium text-black">
                   {labelText}
@@ -173,7 +173,7 @@ export function SlideToConfirm({
         {/* Green Pill Handle - pinned to left, stretches right */}
         <div
           className={cn(
-            "absolute rounded-full bg-[#22C55E] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20",
+            "absolute rounded-[9px] bg-[#13F287] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20",
             handleClassName
           )}
           style={{

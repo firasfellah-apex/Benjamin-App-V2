@@ -7,6 +7,7 @@
  */
 
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import type { OrderWithDetails } from "@/types/types";
 import { formatOrderTitle, formatOrderListTimestamp, getOrderStatusLabel, hasRunnerRating } from "@/lib/orderDisplay";
 
@@ -58,7 +59,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
             {/* Status pill */}
             <div className={`flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium border ${
               isCancelled
-                ? "bg-slate-100 text-slate-600 border-slate-200"
+                ? "bg-red-50 text-red-700 border-red-200"
                 : "bg-emerald-50 text-emerald-700 border-emerald-200"
             }`}>
               {getOrderStatusLabel(order)}
@@ -71,15 +72,15 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
           {/* Actions */}
           <div className="flex items-center justify-between gap-4">
             {canRate ? (
-              <button
+              <Button
                 type="button"
                 onClick={handleRateClick}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                className="w-full h-14 items-center justify-center gap-2 bg-yellow-400 text-base font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
                 style={{ color: '#D97708' }}
               >
                 <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
-                <span>Rate runner</span>
-              </button>
+                <span>Rate Runner</span>
+              </Button>
             ) : hasIssue && !isRated ? (
               <div className="flex items-center justify-between w-full">
                 <span className="text-xs text-slate-600">This delivery is being investigated.</span>

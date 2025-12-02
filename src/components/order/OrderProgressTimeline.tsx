@@ -163,8 +163,8 @@ export function OrderProgressTimeline({
             className={cn(
               "absolute left-[7px] w-px z-0",
               isRunner
-                ? "bg-gradient-to-b from-[#4F46E5] via-[#22C55E]"
-                : "bg-gradient-to-b from-emerald-400 to-emerald-500"
+                ? "bg-gradient-to-b from-[#4F46E5] via-[#13F287]"
+                : "bg-gradient-to-b from-[#13F287] to-[#13F287]"
             )}
             style={{
               top: '0px',
@@ -206,9 +206,9 @@ export function OrderProgressTimeline({
                           isFuture &&
                             "w-3.5 h-3.5 border border-slate-600 bg-[#050816]"
                         : showAsCompleted &&
-                            "w-3.5 h-3.5 bg-emerald-500" ||
+                            "w-3.5 h-3.5 bg-[#13F287]" ||
                           isCurrent &&
-                            "w-4 h-4 bg-emerald-500 ring-4 ring-emerald-400/30" ||
+                            "w-4 h-4 bg-[#13F287] ring-4 ring-[#13F287]/30" ||
                           isFuture &&
                             "w-3.5 h-3.5 border border-neutral-300 bg-white"
                     )}
@@ -260,32 +260,28 @@ export function OrderProgressTimeline({
                 {/* Right-side meta (timestamp or status) */}
                 <div className="text-right min-w-[72px]">
                   {!isCanceled && (
-                    <span
-                      className={cn(
-                        "text-[11px] font-medium",
-                        isRunner
-                          ? isCurrent
-                            ? "text-emerald-300"
-                            : showAsCompleted
-                            ? "text-slate-400"
-                            : ""
-                          : isCurrent
-                          ? "text-emerald-600"
-                          : showAsCompleted
-                          ? "text-slate-400"
-                          : ""
-                      )}
-                    >
-                      {isCurrent
-                        ? "In progress"
-                        : showAsCompleted
-                        ? (() => {
+                    <>
+                      {isCurrent ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-black text-[#13F287] text-xs font-medium whitespace-nowrap">
+                          In Progress
+                        </span>
+                      ) : showAsCompleted ? (
+                        <span
+                          className={cn(
+                            "text-[11px] font-medium",
+                            isRunner
+                              ? "text-slate-400"
+                              : "text-slate-400"
+                          )}
+                        >
+                          {(() => {
                             const stepId = step.id as CustomerFacingStep;
                             const timestamp = getStepTimestamp(stepId);
                             return timestamp ? formatTimestamp(timestamp) || "" : "";
-                          })()
-                        : null}
-                    </span>
+                          })()}
+                        </span>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </div>

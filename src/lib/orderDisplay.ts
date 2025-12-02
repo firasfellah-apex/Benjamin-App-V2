@@ -8,7 +8,7 @@
 import type { OrderWithDetails } from "@/types/types";
 
 /**
- * Format order title (e.g., "$200 delivered to Maria's")
+ * Format order title (e.g., "$200 ordered to Maria's")
  * - Uses label if available, otherwise street address (line1)
  * - Abbreviates common street suffixes
  */
@@ -40,7 +40,7 @@ export function formatOrderTitle(order: OrderWithDetails): string {
 
   const destination = label || line1 || "your address";
 
-  return `${formattedAmount} delivered to ${destination}`;
+  return `${formattedAmount} ordered to ${destination}`;
 }
 
 /**

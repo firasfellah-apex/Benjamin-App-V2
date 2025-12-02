@@ -73,7 +73,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
         <button
           type="button"
           className={cn(
-            "flex items-center justify-center w-12 h-12 rounded-full border border-slate-200 bg-white hover:border-[#22C55E] hover:bg-green-50 transition-colors touch-manipulation",
+            "flex items-center justify-center w-12 h-11 rounded-l-[12px] rounded-tr-none rounded-br-none border border-slate-200 bg-white hover:border-[#22C55E] hover:bg-green-50 transition-colors touch-manipulation",
             className
           )}
         >
@@ -96,7 +96,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex items-center justify-center w-12 h-12 rounded-full border border-slate-200 transition-all touch-manipulation",
+                      "flex items-center justify-center w-12 h-12 rounded-xl border border-slate-200 transition-all touch-manipulation",
                       "hover:scale-105 active:scale-95",
                       isSelected
                         ? "border-[#22C55E] bg-green-50"
@@ -122,7 +122,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex items-center justify-center w-12 h-12 rounded-full border border-slate-200 transition-all touch-manipulation",
+                      "flex items-center justify-center w-12 h-12 rounded-xl border border-slate-200 transition-all touch-manipulation",
                       "hover:scale-105 active:scale-95",
                       isSelected
                         ? "border-[#22C55E] bg-green-50"

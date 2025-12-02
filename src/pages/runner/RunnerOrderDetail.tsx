@@ -242,7 +242,7 @@ export default function RunnerOrderDetail() {
   };
 
   const handleVerifyOTP = async () => {
-    if (!orderId || otpValue.length !== 6) {
+    if (!orderId || otpValue.length !== 4) {
       toast.error(strings.errors.invalidOTP);
       return;
     }
@@ -904,21 +904,19 @@ export default function RunnerOrderDetail() {
                       <InputOTP
                         value={otpValue}
                         onChange={setOtpValue}
-                        maxLength={6}
+                        maxLength={4}
                       >
                         <InputOTPGroup>
                           <InputOTPSlot index={0} />
                           <InputOTPSlot index={1} />
                           <InputOTPSlot index={2} />
                           <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
                         </InputOTPGroup>
                       </InputOTP>
                     </div>
                     <Button
                       onClick={handleVerifyOTP}
-                      disabled={updating || otpValue.length !== 6}
+                      disabled={updating || otpValue.length !== 4}
                       className="w-full bg-[#4F46E5] text-white hover:bg-[#4338CA]"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />

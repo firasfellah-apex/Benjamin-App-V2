@@ -44,10 +44,10 @@ export function FlowHeader({
           onClick={onPrimaryNavClick}
           className={cn(
             "inline-flex items-center justify-center",
-            "rounded-full border border-[#F0F0F0] bg-white",
+            "rounded-xl bg-[#F7F7F7]",
             "w-12 h-12", // 48x48px circle
             "text-slate-900",
-            "hover:bg-slate-50 active:bg-slate-100",
+            "hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60",
             "transition-colors",
             "touch-manipulation"
           )}
@@ -86,10 +86,10 @@ export function FlowHeader({
             onClick={onSecondaryAction}
             className={cn(
               "inline-flex items-center justify-center",
-              "rounded-full border border-[#F0F0F0] bg-white",
+              "rounded-xl bg-[#F7F7F7]",
               "w-12 h-12", // 48x48px circle
               "text-slate-900",
-              "hover:bg-slate-50 active:bg-slate-100",
+              "hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60",
               "transition-colors",
               "touch-manipulation"
             )}

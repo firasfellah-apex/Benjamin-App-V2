@@ -18,6 +18,7 @@ import { getOrderById } from "@/db/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/common/Skeleton";
+import { Button } from "@/components/ui/button";
 import type { CustomerDelivery } from "@/types/delivery";
 import type { OrderWithDetails } from "@/types/types";
 
@@ -231,22 +232,14 @@ export default function CustomerDeliveryDetail() {
         <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           {/* Primary CTA */}
           <div className="flex w-full gap-3 items-center justify-center mb-2">
-            <button
+            <Button
               type="button"
               onClick={handleReorder}
               disabled={!order || loadingOrder || isNavigating}
-              className={cn(
-                "w-full rounded-full py-4 px-6",
-                "text-base font-semibold",
-                "flex items-center justify-center",
-                "transition-colors duration-200",
-                (!order || loadingOrder || isNavigating)
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-black text-white hover:bg-black/90 active:scale-[0.98]"
-              )}
+              className="w-full h-14 text-base font-semibold"
             >
               {loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}
-            </button>
+            </Button>
           </div>
           
           {/* Secondary Action: Report Problem */}
@@ -332,10 +325,15 @@ export default function CustomerDeliveryDetail() {
     </>
   );
 
+  // Show appropriate subtitle based on order status
+  const subtitle = delivery.status === 'cancelled' 
+    ? "Cancelled"
+    : (formattedDeliveryTime ? `Delivered • ${formattedDeliveryTime}` : "Delivered");
+
   return (
     <CustomerScreen
       title={`Cash delivery to ${delivery.locationLabel}`}
-      subtitle={formattedDeliveryTime ? `Delivered • ${formattedDeliveryTime}` : "Delivered"}
+      subtitle={subtitle}
       showBack={true}
       onBack={handleBack}
       fixedContent={fixedContent}
@@ -410,15 +408,15 @@ export default function CustomerDeliveryDetail() {
                     {delivery.customerRating.toFixed(1)} · Your rating
                   </span>
                 ) : (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setRatingModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150 flex-shrink-0"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150 flex-shrink-0"
                     style={{ color: '#D97708' }}
                   >
                     <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
                     <span>Rate Runner</span>
-                  </button>
+                  </Button>
                 )}
               </>
             )}

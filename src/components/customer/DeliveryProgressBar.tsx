@@ -39,7 +39,7 @@ export function DeliveryProgressBar({ currentStep, className }: DeliveryProgress
             className={cn(
               "h-1 flex-1 rounded-full transition-all duration-300",
               isFilled 
-                ? "bg-emerald-500" 
+                ? "bg-[#13F287]" 
                 : "bg-slate-200"
             )}
           />

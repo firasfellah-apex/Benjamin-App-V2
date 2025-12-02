@@ -376,8 +376,8 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           </p>
         </div>
 
-        {/* Icon Picker and Label Input */}
-        <div className="flex items-center gap-3">
+        {/* Icon Picker and Label Input - Unified button design */}
+        <div className="flex items-center gap-[3px]">
           <IconPicker
             value={formData.icon}
             onChange={handleIconChange}
@@ -389,7 +389,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
             placeholder={addAddressCopy.addressPlaceholder}
             value={formData.label}
             onChange={(e) => handleLabelChange(e.target.value)}
-            className="flex-1 h-11 rounded-xl border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0"
+            className="flex-1 rounded-r-[12px] rounded-tl-none rounded-bl-none border border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0"
           />
         </div>
       </div>
@@ -478,7 +478,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   placeholder="Apt 4B (optional)"
                   value={formData.line2}
                   onChange={(e) => setFormData({ ...formData, line2: e.target.value })}
-                  className="h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                  className="border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
                 />
               </div>
 
@@ -496,7 +496,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                       if (errors.city) setErrors({ ...errors, city: undefined });
                     }}
                     className={cn(
-                      "h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
+                      "border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
                       errors.city && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]"
                     )}
                   />
@@ -521,7 +521,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                     }}
                     maxLength={2}
                     className={cn(
-                      "h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
+                      "border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
                       errors.state && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]"
                     )}
                   />
@@ -547,7 +547,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
                   }}
                   maxLength={10}
                     className={cn(
-                      "h-11 rounded-xl border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
+                      "border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0",
                       errors.postal_code && "border-[#FF5A5F] bg-[#FFF7F7] focus:border-[#FF5A5F] focus-visible:border-[#FF5A5F] focus:bg-[#FFF7F7]"
                     )}
                 />

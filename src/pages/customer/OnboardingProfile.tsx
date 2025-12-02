@@ -16,11 +16,12 @@ import { saveProfile } from '@/lib/profileMutations';
 import { AvatarCropModal } from '@/components/common/AvatarCropModal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload } from '@/lib/icons';
+import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { supabase } from '@/db/supabase';
 import { track } from '@/lib/analytics';
+import { Avatar } from '@/components/common/Avatar';
 
 // Phone masking utility
 function formatPhoneNumber(value: string): string {
@@ -234,31 +235,27 @@ export default function OnboardingProfile() {
         <p className="mt-2 text-slate-500">Tell us a few basics to get started.</p>
 
         {/* Avatar */}
-        <section className="mt-8 flex flex-col items-center">
-          <button
-            type="button"
-            className="relative h-28 w-28 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-semibold shadow-sm overflow-hidden"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Upload profile picture"
-          >
-            {avatarPreview ? (
-              <img
-                src={avatarPreview}
-                alt=""
-                className="absolute inset-0 h-full w-full rounded-full object-cover"
-              />
-            ) : (
-              <span>{getInitials(firstName, lastName)}</span>
-            )}
-          </button>
-          <button
-            type="button"
-            className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm active:scale-[0.98] transition-transform"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4" /> Upload
-          </button>
-          <p className="mt-2 text-xs text-slate-500">JPG, PNG, or WebP · Max 5MB</p>
+        <section className="mt-8 flex flex-col items-start gap-3">
+          <div className="relative">
+            <Avatar
+              src={avatarPreview || undefined}
+              alt={[firstName, lastName].filter(Boolean).join(" ") || "User"}
+              fallback={[firstName, lastName].filter(Boolean).join(" ") || "User"}
+              size="2xl"
+            />
+            
+            {/* Upload button - same style as Account page */}
+            <div className="absolute bottom-0 right-0">
+              <button
+                type="button"
+                aria-label="Upload profile photo"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-10 w-10 rounded-full bg-black text-white flex items-center justify-center shadow-sm border border-white"
+              >
+                <Camera className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
           
           <input
             ref={fileInputRef}
@@ -273,65 +270,71 @@ export default function OnboardingProfile() {
         </section>
 
         {/* Fields */}
-        <section className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* First name */}
-          <div className="space-y-2">
-            <Label htmlFor="first_name" className="text-sm font-medium text-slate-900">
-              First name
-            </Label>
-            <Input
-              id="first_name"
-              value={firstName}
-              onChange={(e) => {
-                setFirstName(e.target.value);
-                if (errors.firstName) {
-                  setErrors((prev) => ({ ...prev, firstName: undefined }));
-                }
-              }}
-              placeholder="Jane"
-              className="rounded-full h-12 text-base"
-              aria-invalid={!!errors.firstName}
-              aria-describedby={errors.firstName ? 'first_name_error' : undefined}
-            />
-            {errors.firstName && (
-              <p id="first_name_error" className="text-xs text-red-500 mt-1">
-                {errors.firstName}
-              </p>
-            )}
+        <section className="mt-8 space-y-4">
+          {/* First name and Last name in same row */}
+          <div className="space-y-1.5">
+            <div className="flex gap-3">
+              {/* First name */}
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="first_name" className="text-sm font-semibold text-gray-900">
+                  First Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="first_name"
+                  value={firstName}
+                  onChange={(e) => {
+                    setFirstName(e.target.value);
+                    if (errors.firstName) {
+                      setErrors((prev) => ({ ...prev, firstName: undefined }));
+                    }
+                  }}
+                  placeholder="First name"
+                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                  aria-invalid={!!errors.firstName}
+                  aria-describedby={errors.firstName ? 'first_name_error' : undefined}
+                />
+                {errors.firstName && (
+                  <p id="first_name_error" className="text-xs text-red-500 mt-1">
+                    {errors.firstName}
+                  </p>
+                )}
+              </div>
+
+              {/* Last name */}
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="last_name" className="text-sm font-semibold text-gray-900">
+                  Last Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="last_name"
+                  value={lastName}
+                  onChange={(e) => {
+                    setLastName(e.target.value);
+                    if (errors.lastName) {
+                      setErrors((prev) => ({ ...prev, lastName: undefined }));
+                    }
+                  }}
+                  placeholder="Last name"
+                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                  aria-invalid={!!errors.lastName}
+                  aria-describedby={errors.lastName ? 'last_name_error' : undefined}
+                />
+                {errors.lastName && (
+                  <p id="last_name_error" className="text-xs text-red-500 mt-1">
+                    {errors.lastName}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Use the same name as on your bank account to avoid delays.
+            </p>
           </div>
 
-          {/* Last name */}
-          <div className="space-y-2">
-            <Label htmlFor="last_name" className="text-sm font-medium text-slate-900">
-              Last name
-            </Label>
-            <Input
-              id="last_name"
-              value={lastName}
-              onChange={(e) => {
-                setLastName(e.target.value);
-                if (errors.lastName) {
-                  setErrors((prev) => ({ ...prev, lastName: undefined }));
-                }
-              }}
-              placeholder="Doe"
-              className="rounded-full h-12 text-base"
-              aria-invalid={!!errors.lastName}
-              aria-describedby={errors.lastName ? 'last_name_error' : undefined}
-            />
-            {errors.lastName && (
-              <p id="last_name_error" className="text-xs text-red-500 mt-1">
-                {errors.lastName}
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* Phone */}
-        <section className="mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-sm font-medium text-slate-900">
-              Phone <span className="text-slate-400 font-normal">(optional)</span>
+          {/* Phone number */}
+          <div className="space-y-1.5">
+            <Label htmlFor="phone" className="text-sm font-semibold text-gray-900">
+              Phone Number
             </Label>
             <Input
               id="phone"
@@ -345,8 +348,8 @@ export default function OnboardingProfile() {
                   setErrors((prev) => ({ ...prev, phone: undefined }));
                 }
               }}
-              placeholder="(305) 555-0123"
-              className="rounded-full h-12 text-base"
+              placeholder="+1 (555) 123-4567"
+              className="text-base border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0"
               aria-invalid={!!errors.phone}
               aria-describedby={errors.phone ? 'phone_error' : undefined}
             />
@@ -355,6 +358,9 @@ export default function OnboardingProfile() {
                 {errors.phone}
               </p>
             )}
+            <p className="text-[11px] text-slate-500">
+              Used only for delivery updates and important account alerts.
+            </p>
           </div>
         </section>
       </main>

@@ -211,7 +211,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
             type="button"
             onClick={onAddAddress}
             className={cn(
-              "w-full rounded-full border border-[#F0F0F0] bg-white px-6 py-4 mb-3",
+              "w-full h-14 rounded-xl border border-[#F0F0F0] bg-white px-6 mb-3",
               "text-base font-semibold text-slate-900",
               "flex items-center justify-center",
               "active:scale-[0.98] transition-transform duration-150"
@@ -247,7 +247,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
               onClick={onPrimary}
               disabled={isLoading || primaryDisabled}
               className={cn(
-                "w-full rounded-full py-4 px-6",
+                "w-full rounded-xl py-4 px-6",
                 "text-base font-semibold",
                 "flex items-center justify-center",
                 "transition-colors duration-200",
@@ -307,7 +307,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                   onClick={onSecondary}
                   disabled={isLoading}
                   className={cn(
-                    "flex-1 rounded-full py-4 px-6",
+                    "flex-1 rounded-xl py-4 px-6",
                     "border border-gray-300",
                     "bg-white text-gray-900",
                     "text-base font-semibold",
@@ -362,7 +362,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                   onClick={onPrimary}
                   disabled={isLoading || primaryDisabled}
                   className={cn(
-                    "flex-[2] rounded-full py-4 px-6",
+                    "flex-[2] rounded-xl py-4 px-6",
                     "text-base font-semibold",
                     "flex items-center justify-center",
                     "transition-colors duration-200",

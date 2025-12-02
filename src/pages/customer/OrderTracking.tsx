@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { toast } from "sonner";
 import { getOrderById, cancelOrder, hasOrderIssue } from "@/db/api";
 import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
@@ -310,13 +311,15 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       {/* Back Button - Fixed Top Left - Circular */}
       {/* Standardized spacing: px-6 (24px) for consistent alignment */}
       <div className="absolute top-6 left-6 z-30">
-        <button
+        <IconButton
           onClick={() => navigate("/customer/home")}
-          className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white/95 backdrop-blur hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+          variant="default"
+          size="lg"
+          className="bg-white/95 backdrop-blur"
           aria-label="Go back"
         >
           <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
+        </IconButton>
       </div>
 
       {/* Map Background - Extended to cover behind bottom sheet button */}

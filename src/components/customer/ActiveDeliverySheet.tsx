@@ -27,6 +27,7 @@ import { supabase } from '@/db/supabase';
 import { resolveDeliveryStyleFromOrder } from '@/lib/deliveryStyle';
 import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
 import { X } from 'lucide-react';
+import { IconButton } from '@/components/ui/icon-button';
 import moneyCountIllustration from '@/assets/illustrations/MoneyCount.png';
 
 // Loader component for runner assignment state
@@ -1125,7 +1126,7 @@ export function ActiveDeliverySheet({
                 onClick={onCancel}
                 variant="outline"
                 size="default"
-                className="w-full h-[56px] rounded-full border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600"
+                className="w-full h-[56px] border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600"
               >
                 Cancel Delivery
               </Button>
@@ -1171,29 +1172,32 @@ export function ActiveDeliverySheet({
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-sm rounded-3xl bg-white shadow-xl p-6 space-y-4 relative">
             {/* Close button */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowCountGuardrail(false);
-                setHasDismissedGuardrail(true);
-                try {
-                  const key = makeGuardrailKey(order.id);
-                  const raw = localStorage.getItem(key);
-                  const parsed = raw ? JSON.parse(raw) : {};
-                  const expiresAt = parsed?.expiresAt ?? Date.now();
-                  localStorage.setItem(
-                    key,
-                    JSON.stringify({ ...parsed, dismissed: true, expiresAt })
-                  );
-                } catch (e) {
-                  console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
-                }
-              }}
-              className="absolute top-4 right-4 w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5 text-slate-900" />
-            </button>
+            <div className="absolute top-4 right-4">
+              <IconButton
+                type="button"
+                variant="default"
+                size="lg"
+                onClick={() => {
+                  setShowCountGuardrail(false);
+                  setHasDismissedGuardrail(true);
+                  try {
+                    const key = makeGuardrailKey(order.id);
+                    const raw = localStorage.getItem(key);
+                    const parsed = raw ? JSON.parse(raw) : {};
+                    const expiresAt = parsed?.expiresAt ?? Date.now();
+                    localStorage.setItem(
+                      key,
+                      JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                    );
+                  } catch (e) {
+                    console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                  }
+                }}
+                aria-label="Close"
+              >
+                <X className="h-5 w-5 text-slate-900" />
+              </IconButton>
+            </div>
 
             {/* Illustration */}
             <div className="flex justify-center -mt-2">
@@ -1210,7 +1214,10 @@ export function ActiveDeliverySheet({
                 How did the count go?
               </h3>
               <p className="text-sm text-slate-600 leading-relaxed">
-                Take a moment to count the cash while your runner is still with you. If the amount doesn&apos;t match what you requested, tell us and we&apos;ll review it with your runner.
+                Take a moment to count your cash with the runner present.
+              </p>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Report any mismatch and we&apos;ll take care of it.
               </p>
               <p className="text-[11px] text-slate-500 mt-1.5">
                 You&apos;ll have about 3 minutes to flag any issue for this delivery.
@@ -1245,7 +1252,7 @@ export function ActiveDeliverySheet({
                     navigate('/customer/home', { replace: true });
                   }
                 }}
-                className="w-full h-12 rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
+                className="w-full h-14 text-base font-medium"
               >
                 Looks Correct
               </Button>
@@ -1271,7 +1278,7 @@ export function ActiveDeliverySheet({
                   // Open the issue report sheet
                   setShowCountIssueSheet(true);
                 }}
-                className="w-full h-12 rounded-full border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600 text-base font-medium"
+                className="w-full h-14 border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600 text-base font-medium"
               >
                 Incorrect Amount
               </Button>

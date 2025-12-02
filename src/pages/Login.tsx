@@ -5,12 +5,14 @@ import { supabase } from "@/db/supabase";
 import { validateInvitationToken, acceptInvitation, getCurrentProfile } from "@/db/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import { AppleLogo } from "@/components/common/AppleLogo";
 import { GoogleLogo } from "@/components/common/GoogleLogo";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import signUpInIllustration from "@/assets/illustrations/SignUpIn.png";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -21,13 +23,16 @@ export default function Login() {
   const [redirecting, setRedirecting] = useState(false);
   
   // Auth state
-  const [emailMode, setEmailMode] = useState<'signup' | 'signin'>('signup');
+  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<'apple' | 'google' | 'email' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isSignup = emailMode === 'signup';
+  const isSignup = mode === 'signup';
 
   useEffect(() => {
     const token = searchParams.get('invitation');
@@ -165,6 +170,11 @@ export default function Login() {
       setFormError('Add your email and a password to continue.');
       return;
     }
+
+    if (!firstName.trim() || !lastName.trim()) {
+      setFormError('Please enter your first and last name.');
+      return;
+    }
     
     if (password.length < 8) {
       setFormError('Password should be at least 8 characters.');
@@ -178,6 +188,10 @@ export default function Login() {
         password: password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+          },
         },
       });
 
@@ -185,7 +199,7 @@ export default function Login() {
         // Friendly handling if user already exists
         if (error.message.toLowerCase().includes('user already registered')) {
           setFormError('Looks like you already have a Benjamin account. Try signing in instead.');
-          setEmailMode('signin');
+          setMode('signin');
         } else {
           setFormError(error.message);
         }
@@ -196,6 +210,8 @@ export default function Login() {
       // Reset form
       setEmail('');
       setPassword('');
+      setFirstName('');
+      setLastName('');
     } catch (err: any) {
       console.error(err);
       setFormError(err?.message || 'Could not create your account');
@@ -204,18 +220,93 @@ export default function Login() {
     }
   };
 
+  const resetForm = () => {
+    setShowEmailForm(false);
+    setFormError(null);
+    setEmail('');
+    setPassword('');
+    setFirstName('');
+    setLastName('');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <div className="flex-1 flex flex-col justify-between px-6 pb-8 pt-10">
+      <div className="flex-1 flex flex-col px-6 pb-8 pt-10">
         {/* Top: logo / brand */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-8">
             <BenjaminLogo variant="customer" height={28} />
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900">Sign in or create an account</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Benjamin delivers cash to your door — securely and discreetly.
-          </p>
+          
+          {/* Illustration */}
+          <div className="flex justify-center mb-6">
+            <img 
+              src={signUpInIllustration} 
+              alt="Sign up illustration" 
+              className="w-full max-w-[200px] h-auto"
+            />
+          </div>
+
+          {/* Sign Up / Log In Toggle - Reusing DeliveryModeSelector style */}
+          <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 mb-6 relative">
+            {/* Sliding background indicator */}
+            <motion.div
+              className="absolute top-1 bottom-1 rounded-full bg-white border border-black z-0"
+              initial={false}
+              animate={{
+                left: mode === 'signup' ? '4px' : 'calc(50% + 2px)',
+                width: 'calc(50% - 4px)',
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+              }}
+              style={{ height: '52px' }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signup');
+                resetForm();
+              }}
+              className={cn(
+                "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 z-10",
+                mode === 'signup'
+                  ? "text-slate-900"
+                  : "text-slate-900"
+              )}
+              style={{ height: '52px' }}
+            >
+              Sign Up
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                resetForm();
+              }}
+              className={cn(
+                "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 z-10",
+                mode === 'signin'
+                  ? "text-slate-900"
+                  : "text-slate-900"
+              )}
+              style={{ height: '52px' }}
+            >
+              Log In
+            </button>
+          </div>
+
+          {/* Welcome message */}
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 mb-2">
+              {mode === 'signup' ? "Welcome! Let's get you in!" : "Welcome Back!"}
+            </h1>
+            <p className="text-sm text-slate-600">
+              How would you like to continue?
+            </p>
+          </div>
         </div>
 
         {/* Invitation notices */}
@@ -237,149 +328,188 @@ export default function Login() {
         )}
 
         {/* Middle: unified auth options */}
-        <div className="flex-1 flex flex-col justify-center">
-          <div className="mt-10 space-y-6">
-            {/* Apple button */}
-            <Button
-              type="button"
-              className="w-full h-[52px] rounded-full bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-              onClick={handleAppleSignIn}
-              disabled={!!loadingProvider}
-            >
-              {loadingProvider === 'apple' ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <AppleLogo size={20} className="text-white" />
-              )}
-              <span className="text-[15px] font-medium">Continue with Apple</span>
-            </Button>
-
-            {/* Google button */}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-[52px] rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
-              onClick={handleGoogleSignIn}
-              disabled={!!loadingProvider}
-            >
-              {loadingProvider === 'google' ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <GoogleLogo size={20} />
-              )}
-              <span className="text-[15px] font-medium">Continue with Google</span>
-            </Button>
-
-            {/* OR separator */}
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
-                or
-              </span>
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            {/* Email block */}
-            <div className="space-y-4">
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {isSignup ? 'Sign up with Email' : 'Sign in with Email'}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmailMode(isSignup ? 'signin' : 'signup');
-                    setFormError(null);
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-700"
+        <div className="flex-1 flex flex-col">
+          <div className="space-y-4 mt-6 relative">
+            <AnimatePresence mode="wait">
+              {!showEmailForm ? (
+                <motion.div
+                  key="social-buttons"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="space-y-4"
                 >
-                  {isSignup ? (
-                    <>
-                      Already have an account?{' '}
-                      <span className="underline">Sign in</span>
-                    </>
-                  ) : (
-                    <>
-                      New to Benjamin?{' '}
-                      <span className="underline">Create account</span>
-                    </>
+                  {/* Google button */}
+                  <Button
+                    type="button"
+                    className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+                    onClick={handleGoogleSignIn}
+                    disabled={!!loadingProvider}
+                  >
+                    {loadingProvider === 'google' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <GoogleLogo size={20} />
+                    )}
+                    <span className="text-[15px] font-medium">Continue with Google</span>
+                  </Button>
+
+                  {/* Apple button */}
+                  <Button
+                    type="button"
+                    className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+                    onClick={handleAppleSignIn}
+                    disabled={!!loadingProvider}
+                  >
+                    {loadingProvider === 'apple' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <AppleLogo size={20} className="text-white" />
+                    )}
+                    <span className="text-[15px] font-medium">Continue with Apple</span>
+                  </Button>
+
+                  {/* Email button */}
+                  <Button
+                    type="button"
+                    className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+                    onClick={() => {
+                      setShowEmailForm(true);
+                      setFormError(null);
+                    }}
+                    disabled={!!loadingProvider}
+                  >
+                    <Mail className="h-5 w-5" />
+                    <span className="text-[15px] font-medium">Continue with Email</span>
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="email-form"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                >
+                  <form
+                    onSubmit={isSignup ? handleEmailSignUp : handleEmailSignIn}
+                    className="space-y-4"
+                  >
+                  {formError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <p className="text-xs text-red-600">{formError}</p>
+                    </div>
                   )}
-                </button>
-              </div>
 
-              <form
-                onSubmit={isSignup ? handleEmailSignUp : handleEmailSignIn}
-                className="space-y-3"
-              >
-                {formError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-xs text-red-600">{formError}</p>
-                  </div>
-                )}
+                  {/* First name and Last name - only for signup */}
+                  {isSignup && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        id="first_name"
+                        type="text"
+                        placeholder="First name"
+                        value={firstName}
+                        onChange={(e) => {
+                          setFirstName(e.target.value);
+                          setFormError(null);
+                        }}
+                        className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                        disabled={loadingProvider === 'email'}
+                      />
+                      <Input
+                        id="last_name"
+                        type="text"
+                        placeholder="Last name"
+                        value={lastName}
+                        onChange={(e) => {
+                          setLastName(e.target.value);
+                          setFormError(null);
+                        }}
+                        className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                        disabled={loadingProvider === 'email'}
+                      />
+                    </div>
+                  )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-900">
-                    Email
-                  </Label>
                   <Input
                     id="email"
                     type="email"
                     inputMode="email"
                     autoComplete="email"
-                    placeholder="you@example.com"
+                    placeholder="Email"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
                       setFormError(null);
                     }}
-                    className="rounded-full h-12 text-base border-slate-200 placeholder:text-slate-400"
+                    className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
                     required
                     disabled={loadingProvider === 'email'}
                   />
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-900">
-                    Password
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    autoComplete={isSignup ? 'new-password' : 'current-password'}
-                    placeholder={isSignup ? 'Create a password' : 'Enter your password'}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setFormError(null);
-                    }}
-                    className="rounded-full h-12 text-base border-slate-200 placeholder:text-slate-400"
-                    required
-                    minLength={isSignup ? 8 : undefined}
-                    disabled={loadingProvider === 'email'}
-                  />
-                  {isSignup && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      We'll only use this to sign you in. No spam, no surprises.
-                    </p>
-                  )}
-                </div>
+                  <div className="space-y-2">
+                    <Input
+                      id="password"
+                      type="password"
+                      autoComplete={isSignup ? 'new-password' : 'current-password'}
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setFormError(null);
+                      }}
+                      className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                      required
+                      minLength={isSignup ? 8 : undefined}
+                      disabled={loadingProvider === 'email'}
+                    />
+                    {/* Forgot password link - only for signin */}
+                    {!isSignup && (
+                      <div className="text-right">
+                        <button
+                          type="button"
+                          className="text-xs text-slate-500 hover:text-slate-700"
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                <Button
-                  type="submit"
-                  disabled={loadingProvider === 'email'}
-                  className="w-full h-[52px] rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
-                >
-                  {loadingProvider === 'email' ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      {isSignup ? 'Creating account…' : 'Signing in…'}
-                    </>
-                  ) : (
-                    isSignup ? 'Create account' : 'Sign in'
-                  )}
-                </Button>
-              </form>
-            </div>
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 h-[58px] rounded-xl border-slate-200 text-slate-900 hover:bg-slate-50"
+                      onClick={resetForm}
+                      disabled={loadingProvider === 'email'}
+                    >
+                      <span className="text-[15px] font-medium">Cancel</span>
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loadingProvider === 'email'}
+                      className="flex-1 h-[58px] rounded-xl bg-black text-white hover:bg-black/90"
+                    >
+                      {loadingProvider === 'email' ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-[15px] font-medium">
+                            {isSignup ? 'Creating account…' : 'Signing in…'}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[15px] font-medium">
+                          {isSignup ? 'Create Account' : 'Log In'}
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

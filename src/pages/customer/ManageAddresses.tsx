@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil, Trash2, MapPin } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { deleteAddress, formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
@@ -16,7 +18,6 @@ import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapVie
 import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 import { RequestFlowBottomBar } from "@/components/customer/RequestFlowBottomBar";
-import AlertIllustration from "@/assets/illustrations/Alert.png";
 
 // Spring animation for modal (matches CashRequest)
 const iosSpring = {
@@ -403,7 +404,7 @@ export default function ManageAddresses() {
                     }}
                     disabled={deletingId === addr.id}
                     className={cn(
-                      "flex-1 rounded-full bg-red-600 text-white",
+                      "flex-1 rounded-xl bg-red-600 text-white",
                       "px-4 py-4 flex items-center justify-center",
                       "hover:bg-red-700",
                       "disabled:opacity-50 disabled:cursor-not-allowed",
@@ -421,7 +422,7 @@ export default function ManageAddresses() {
                       handleEditAddress(addr);
                     }}
                     className={cn(
-                      "flex-1 rounded-full bg-black text-white",
+                      "flex-1 rounded-xl bg-black text-white",
                       "px-4 py-4 flex items-center justify-center",
                       "hover:bg-black/90",
                       "active:scale-[0.98] transition-all duration-150",
@@ -503,14 +504,15 @@ export default function ManageAddresses() {
                         You can edit or remove it anytime.
                       </p>
                     </div>
-          <button
+          <IconButton
                       type="button"
                       onClick={handleCloseAddAddressModal}
-                      className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                      variant="default"
+                      size="lg"
                       aria-label="Close"
                     >
                       <X className="h-5 w-5 text-slate-900" />
-          </button>
+          </IconButton>
                   </motion.div>
                   
                   <motion.div
@@ -535,36 +537,34 @@ export default function ManageAddresses() {
                 >
                   <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                     <div className="flex gap-3">
-                      <button
+                      <Button
                         type="button"
                         onClick={handleCloseAddAddressModal}
                         disabled={addAddressLoading}
+                        variant="outline"
                         className={cn(
-                          "flex-1 rounded-full py-4 px-6",
-                          "border border-gray-300 bg-white text-gray-900",
+                          "flex-1 h-12 px-6",
                           "text-base font-semibold",
-                          "disabled:opacity-50 disabled:cursor-not-allowed",
-                          "active:scale-[0.98] transition-transform duration-150",
+                          "active:scale-[0.97]",
                           "touch-manipulation"
                         )}
                       >
                         Cancel
-                      </button>
-            <button
+                      </Button>
+            <Button
                         type="button"
                         onClick={handleSaveAddAddressForm}
                         disabled={addAddressLoading}
                         className={cn(
-                          "flex-[2] rounded-full py-4 px-6",
-                          "bg-black text-white",
+                          "flex-[2] h-12 px-6",
+                          "bg-black text-white hover:bg-black/90",
                           "text-base font-semibold",
-                          "disabled:opacity-50 disabled:cursor-not-allowed",
-                          "active:scale-[0.98] transition-transform duration-150",
+                          "active:scale-[0.97]",
                           "touch-manipulation"
                         )}
                       >
                         {addAddressLoading ? "Saving..." : "Save Address"}
-            </button>
+            </Button>
           </div>
                   </div>
                 </motion.div>
@@ -621,14 +621,15 @@ export default function ManageAddresses() {
                         Update your address details.
                 </p>
               </div>
-              <button
+              <IconButton
                 type="button"
                       onClick={handleCloseEditAddressModal}
-                      className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                      variant="default"
+                      size="lg"
                       aria-label="Close"
               >
                       <X className="h-5 w-5 text-slate-900" />
-              </button>
+              </IconButton>
                   </motion.div>
                   
                   <motion.div
@@ -653,36 +654,34 @@ export default function ManageAddresses() {
                 >
                   <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                     <div className="flex gap-3">
-                      <button
+                      <Button
                         type="button"
                         onClick={handleCloseEditAddressModal}
                         disabled={editAddressLoading}
+                        variant="outline"
                         className={cn(
-                          "flex-1 rounded-full py-4 px-6",
-                          "border border-gray-300 bg-white text-gray-900",
+                          "flex-1 h-12 px-6",
                           "text-base font-semibold",
-                          "disabled:opacity-50 disabled:cursor-not-allowed",
-                          "active:scale-[0.98] transition-transform duration-150",
+                          "active:scale-[0.97]",
                           "touch-manipulation"
                         )}
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         onClick={handleSaveEditAddressForm}
                         disabled={editAddressLoading}
                         className={cn(
-                          "flex-[2] rounded-full py-4 px-6",
-                          "bg-black text-white",
+                          "flex-[2] h-12 px-6",
+                          "bg-black text-white hover:bg-black/90",
                           "text-base font-semibold",
-                          "disabled:opacity-50 disabled:cursor-not-allowed",
-                          "active:scale-[0.98] transition-transform duration-150",
+                          "active:scale-[0.97]",
                           "touch-manipulation"
                         )}
                       >
                         {editAddressLoading ? "Saving..." : "Save Address"}
-                      </button>
+                      </Button>
           </div>
         </div>
                 </motion.div>
@@ -705,15 +704,6 @@ export default function ManageAddresses() {
             bottom: 'auto'
           }}
         >
-          {/* Illustration */}
-          <div className="h-48 md:h-56 flex items-center justify-center bg-[#F8D8D2] rounded-t-[24px]">
-            <img
-              src={AlertIllustration}
-              alt="Delete confirmation"
-              className="w-3/4 h-3/4 object-contain"
-            />
-          </div>
-
           <div className="px-6 py-6 space-y-4">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
@@ -739,7 +729,7 @@ export default function ManageAddresses() {
               <AlertDialogAction
                 onClick={confirmDelete}
                 className={cn(
-                  "w-full h-14 rounded-full bg-red-600 text-white",
+                  "w-full h-14 bg-red-600 text-white",
                   "hover:bg-red-700 active:scale-[0.98]",
                   "text-base font-semibold",
                   "transition-all duration-150 touch-manipulation"
@@ -750,7 +740,7 @@ export default function ManageAddresses() {
               </AlertDialogAction>
               <AlertDialogCancel
                 className={cn(
-                  "w-full h-14 rounded-full border border-black bg-white text-black",
+                  "w-full h-14 border border-black bg-white text-black",
                   "hover:bg-slate-50 active:scale-[0.98]",
                   "text-base font-semibold",
                   "transition-all duration-150 touch-manipulation",

@@ -91,7 +91,7 @@ export function CustomerHeader({
         <Button 
           variant="ghost" 
           size="sm" 
-          className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100"
+          className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60"
         >
           <EllipsisVertical className="h-5 w-5 text-slate-900" />
           <span className="sr-only">Open menu</span>
@@ -112,7 +112,7 @@ export function CustomerHeader({
           <SheetClose asChild>
             <button
               type="button"
-              className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+              className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60 transition-colors touch-manipulation"
               aria-label="Close menu"
             >
               <X className="h-5 w-5 text-slate-900" />
@@ -260,7 +260,7 @@ export function CustomerHeader({
           <div className="px-6 pt-4 pb-6">
             <button
               onClick={handleLogoutClick}
-              className="w-full flex items-center justify-center gap-2 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border border-red-500 text-red-600 bg-transparent hover:bg-red-50 active:bg-red-100 transition-all"
+              className="w-full flex items-center justify-center gap-2 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-xl border border-red-500 text-red-600 bg-transparent hover:bg-red-50 active:bg-red-100 transition-all"
             >
               <LogOut className="h-5 w-5 text-red-600" />
               <span>Log Out</span>
@@ -275,7 +275,7 @@ export function CustomerHeader({
     <button
       onClick={onBack || (() => navigate(-1))}
       className={cn(
-        "w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+        "w-12 h-12 p-0 inline-flex items-center justify-center rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60 transition-colors touch-manipulation"
       )}
       aria-label={useXButton ? "Close" : "Go back"}
     >

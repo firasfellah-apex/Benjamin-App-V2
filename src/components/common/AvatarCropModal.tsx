@@ -6,6 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { X } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
@@ -150,13 +151,14 @@ export function AvatarCropModal({
               Drag to reposition • Use slider to zoom
             </p>
           </div>
-          <button
+          <IconButton
             onClick={onCancel}
-            className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+            variant="default"
+            size="lg"
             aria-label="Close"
           >
             <X className="h-5 w-5 text-slate-900" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Cropper Container */}

@@ -12,7 +12,8 @@ interface TrustCard {
   id: string;
   image?: string; // URL or path to image
   title: string;
-  bullets: TrustCardBullet[];
+  body: string; // Body text instead of bullets
+  bullets?: TrustCardBullet[]; // Keep for backward compatibility
   backgroundColor?: string; // Background color for illustration
 }
 
@@ -129,7 +130,7 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
     <div className={cn("w-full", className)}>
       <div className="w-full flex justify-center">
         {/* Fixed outer frame */}
-              <div className="w-full max-w-sm rounded-2xl bg-white border border-[#F0F0F0] overflow-hidden">
+              <div className="w-full max-w-sm rounded-[24px] bg-white border border-[#F0F0F0] overflow-hidden">
           {/* Horizontal scrolling container inside the frame */}
           <div
             ref={carouselRef}
@@ -156,57 +157,72 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
                   padding: 0,
                 }}
                 animate={{
-                  scale: currentIndex === index ? 1 : 0.98,
-                  opacity: currentIndex === index ? 1 : 0.7,
+                  scale: currentIndex === index ? 1 : 0.995,
+                  opacity: currentIndex === index ? 1 : 0.85,
                 }}
                 transition={{
                   type: "spring",
-                  stiffness: 300,
-                  damping: 30,
-                  mass: 0.5,
+                  stiffness: 200,
+                  damping: 25,
+                  mass: 0.8,
                 }}
               >
-                  <div className="w-full flex flex-col md:flex-row">
-                  {/* Image half - extends to top and sides, ignoring parent padding */}
-                  <div className="w-full md:w-1/2 h-48 md:h-56 flex items-center justify-center" style={{ backgroundColor: card.backgroundColor || '#F5F5F4' }}>
-                    {card.image ? (
-                      <img
-                        src={card.image}
-                        alt={card.title}
-                        className="w-3/4 h-3/4 object-contain"
-                      />
-                    ) : (
-                      <div className="w-3/4 h-3/4 bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center rounded-lg">
-                        <span className="text-slate-400 text-sm">Image placeholder</span>
+                   <div className="w-full flex flex-col">
+                     {/* Illustration frame - inset from card edges */}
+                     <div className="w-full px-[6px] pt-[6px]">
+                      <div
+                        className="w-full h-[260px] flex items-center justify-center rounded-[18px]"
+                        style={{ backgroundColor: '#F1F1F1' }}
+                      >
+                        {card.image ? (
+                          <div className="w-[193px] h-[193px] flex items-center justify-center overflow-hidden rounded-[18px]">
+                            <img
+                              src={card.image}
+                              alt={card.title}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-[193px] h-[193px] flex items-center justify-center overflow-hidden rounded-[18px]">
+                            <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+                              <span className="text-slate-400 text-sm">Image placeholder</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Text half */}
-                  <div className="w-full md:w-1/2 p-6 flex flex-col justify-center">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-3">
-                      {card.title}
-                    </h3>
-                    <ul className="space-y-2.5">
-                      {card.bullets.map((bullet, i) => {
-                        const Icon = bullet.icon;
-                        return (
-                          <li key={i} className="flex items-center gap-3">
-                            <Icon className="w-4 h-4 text-black shrink-0" />
-                            <span className="text-sm text-slate-600 leading-relaxed">{bullet.text}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    {/* Text block */}
+                    <div className="w-full px-6 pb-0 pt-5 flex flex-col justify-center">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-1.5">
+                        {card.title}
+                      </h3>
+                      {card.body ? (
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                          {card.body}
+                        </p>
+                      ) : card.bullets ? (
+                        <ul className="space-y-2.5">
+                          {card.bullets.map((bullet, i) => {
+                            const Icon = bullet.icon;
+                            return (
+                              <li key={i} className="flex items-center gap-3">
+                                <Icon className="w-4 h-4 text-black shrink-0" />
+                                <span className="text-sm text-slate-600 leading-relaxed">{bullet.text}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
               </motion.div>
             ))}
           </div>
           
           {/* Dots indicator - outside scrolling container, always visible - iOS-style spring animations */}
           {cards.length > 1 && (
-            <div className="flex justify-center gap-2 pb-6 px-6 bg-white">
+            <div className="flex justify-center gap-2 pt-3 pb-6 px-6 bg-white">
               {cards.map((_, idx) => (
                 <motion.button
                   key={idx}
@@ -239,4 +255,3 @@ export function TrustCarousel({ cards, className }: TrustCarouselProps) {
     </div>
   );
 }
-

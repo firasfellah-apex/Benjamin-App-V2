@@ -1183,8 +1183,8 @@ export async function acceptOrder(orderId: string): Promise<{ success: boolean; 
 
 export async function generateOTP(orderId: string): Promise<string | null> {
   try {
-    // Generate OTP using helper (6-digit numeric)
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate OTP using helper (4-digit numeric)
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
     // MVP: Set expiry far in the future (1 year) - OTPs valid until order completion
     // TODO: Set proper expiry (e.g., 15 minutes) for production
     const expiresAt = new Date();

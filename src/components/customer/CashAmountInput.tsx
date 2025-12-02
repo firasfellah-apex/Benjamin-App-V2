@@ -202,7 +202,7 @@ export default function CashAmountInput({
           <motion.div 
             className="absolute left-0 h-full rounded-full pointer-events-none"
             style={{ 
-              background: '#22C55E', // emerald-500
+              background: '#13F287',
               height: '10px'
             }}
             initial={false}

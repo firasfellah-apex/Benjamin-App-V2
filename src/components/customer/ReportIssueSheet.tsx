@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails } from '@/types/types';
 import { createOrderIssue, type OrderIssueCategory } from '@/db/api';
@@ -119,14 +120,15 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
               <div className="h-1 w-10 bg-slate-200 rounded-full mx-auto" />
 
               <div className="absolute top-4 right-4 z-10">
-                <button
+                <IconButton
                   type="button"
                   onClick={onClose}
-                  className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                  variant="default"
+                  size="lg"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5 text-slate-900" />
-                </button>
+                </IconButton>
               </div>
             </div>
 
@@ -194,7 +196,7 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
                   type="button"
                   disabled={submitting || selectedCategories.length === 0}
                   onClick={handleSubmit}
-                  className="w-full h-[56px] rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
+                  className="w-full h-14 text-base font-medium"
                 >
                   {submitting ? 'Sending...' : 'Send to Benjamin'}
                 </Button>

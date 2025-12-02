@@ -23,20 +23,9 @@ import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
 import { useQueryClient } from '@tanstack/react-query';
 import type { OrderWithDetails, Order } from '@/types/types';
-import bankIllustration from '@/assets/illustrations/Bank.png';
-import atmIllustration from '@/assets/illustrations/ATM.png';
-import runnersIllustration from '@/assets/illustrations/Runners.png';
-import {
-  ShieldCheckIcon,
-  KeyIcon,
-  LockClosedIcon,
-  BoltIcon,
-  EyeSlashIcon,
-  ClockIcon,
-  CheckBadgeIcon,
-  MapPinIcon,
-  HomeIcon,
-} from '@heroicons/react/24/solid';
+import protectedIllustration from '@/assets/illustrations/Protected.png';
+import noAtmIllustration from '@/assets/illustrations/NoATM.png';
+import trustedRunnerIllustration from '@/assets/illustrations/TrustedRunner.png';
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
@@ -310,37 +299,25 @@ export default function CustomerHome() {
   // Trust carousel data
   const trustCards = [
     {
-      id: 'bank-linked',
-      image: bankIllustration,
-      title: 'Bank-linked, OTP protected',
-      backgroundColor: '#EFE2D1', // Bank illustration background
-      bullets: [
-        { text: 'Secure, bank-level encryption', icon: ShieldCheckIcon },
-        { text: 'One-time verification codes for handoff', icon: KeyIcon },
-        { text: 'Your cash stays protected end-to-end', icon: LockClosedIcon },
-      ],
+      id: 'protected',
+      image: protectedIllustration,
+      title: 'Protected end-to-end.',
+      body: 'Your identity and transaction stay secured with bank-grade encryption.',
+      backgroundColor: '#EFE2D1', // Protected illustration background
     },
     {
       id: 'no-atm-runs',
-      image: atmIllustration,
-      title: 'No ATM runs. No borrowing.',
-      backgroundColor: '#CFE7F9', // ATM illustration background
-      bullets: [
-        { text: 'Skip the line and the walk', icon: BoltIcon },
-        { text: 'Discreet, private cash delivery', icon: EyeSlashIcon },
-        { text: 'Get cash exactly when you need it', icon: ClockIcon },
-      ],
+      image: noAtmIllustration,
+      title: 'No ATM runs. Ever.',
+      body: 'Skip the line, skip the hassle—cash delivered privately to your door.',
+      backgroundColor: '#CFE7F9', // NoATM illustration background
     },
     {
-      id: 'background-checked',
-      image: runnersIllustration,
-      title: 'Background-checked runners',
-      backgroundColor: '#C7EDC5', // Runner illustration background
-      bullets: [
-        { text: 'Every runner is vetted and verified', icon: CheckBadgeIcon },
-        { text: 'Identity tracked from pickup to delivery', icon: MapPinIcon },
-        { text: 'Safe, reliable handoff at your door', icon: HomeIcon },
-      ],
+      id: 'trusted-runners',
+      image: trustedRunnerIllustration,
+      title: 'Only trusted runners.',
+      body: 'Every runner is background-checked, verified, and tracked during delivery.',
+      backgroundColor: '#C7EDC5', // TrustedRunner illustration background
     },
   ];
 

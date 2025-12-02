@@ -18,16 +18,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Plus } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import type { CustomerAddress } from "@/types/types";
 import { AddressForm, type AddressFormRef } from "./AddressForm";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { addAddressCopy } from "@/lib/copy/addAddress";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { AddressCarousel } from "@/pages/customer/components/AddressCarousel";
 import { track } from "@/lib/analytics";
 import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
 
+// NOTE: This is the LIVE Add Delivery Address modal that pans up from the bottom
+// If you need to change button styles, edit the canonical Button/IconButton components in src/components/ui/
+// Do NOT add inline borderRadius or rounded-full classes here
 function AddressFormModal({
   editingAddress,
   onSave,
@@ -124,14 +129,16 @@ function AddressFormModal({
                     {editingAddress ? "Update your delivery address" : "You can edit or remove it anytime."}
                   </p>
                 </div>
-                <button
+                {/* X button - using canonical IconButton */}
+                <IconButton
                   type="button"
                   onClick={handleClose}
-                  className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                  variant="default"
+                  size="default"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5 text-slate-900" />
-                </button>
+                </IconButton>
               </motion.div>
               
               {/* Scrollable Content Area - between header and footer */}
@@ -169,41 +176,36 @@ function AddressFormModal({
             >
               <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                 <div className="flex gap-3">
-                  <button
+                  {/* Cancel button - using canonical Button, 48px height */}
+                  <Button
                     type="button"
                     onClick={handleClose}
                     disabled={loading}
+                    variant="outline"
                     className={cn(
-                      "flex-1 rounded-full py-4 px-6",
-                      "border border-gray-300",
-                      "bg-white text-gray-900",
+                      "flex-1 h-12 px-6",
                       "text-base font-semibold",
-                      "flex items-center justify-center",
-                      "transition-all duration-200",
                       "active:scale-[0.97]",
-                      "touch-manipulation",
-                      loading && "opacity-60 cursor-not-allowed"
+                      "touch-manipulation"
                     )}
                   >
                     {addAddressCopy.cancelButton}
-                  </button>
-                  <button
+                  </Button>
+                  {/* Save button - using canonical Button, 48px height */}
+                  <Button
                     type="button"
                     onClick={handleSave}
                     disabled={loading}
                     className={cn(
-                      "flex-[2] rounded-full py-4 px-6",
-                      "bg-black text-white",
+                      "flex-[2] h-12 px-6",
+                      "bg-black text-white hover:bg-black/90",
                       "text-base font-semibold",
-                      "flex items-center justify-center",
-                      "transition-all duration-200",
                       "active:scale-[0.97]",
-                      "touch-manipulation",
-                      loading && "opacity-60 cursor-not-allowed"
+                      "touch-manipulation"
                     )}
                   >
                     {loading ? "Saving..." : addAddressCopy.saveButton}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </motion.div>
@@ -217,6 +219,25 @@ function AddressFormModal({
 
 interface AddressSelectorProps {
   selectedAddressId: string | null;
+  /**
+   * Callback when an address is selected.
+   * 
+   * IMPORTANT: The parent component MUST update its selectedAddressId state
+   * when this callback is called, otherwise the visual selection won't update.
+   * 
+   * Example parent implementation:
+   * ```tsx
+   * const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+   * 
+   * <AddressSelector
+   *   selectedAddressId={selectedAddressId}
+   *   onAddressSelect={(address) => {
+   *     setSelectedAddressId(address.id); // ← This is REQUIRED
+   *     // ... other logic
+   *   }}
+   * />
+   * ```
+   */
   onAddressSelect: (address: CustomerAddress) => void;
   onAddressChange: () => void;
   onEditingChange?: (isEditing: boolean) => void;
@@ -241,47 +262,27 @@ export function AddressSelector({
   onCarouselIndexChange,
 }: AddressSelectorProps) {
   const navigate = useNavigate();
-  const { addresses, isLoading: loading } = useCustomerAddresses();
+  const { addresses, isLoading: loading, refetch: refetchAddresses } = useCustomerAddresses();
   const invalidateAddresses = useInvalidateAddresses();
   const [showForm, setShowForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
-  const prevSelectedAddressIdRef = useRef<string | null>(selectedAddressId);
   const hasAutoSelectedRef = useRef(false);
 
-  // Auto-select address when addresses first load
-  // Only auto-select if no address is currently selected
+  // Auto-select first address ONLY when addresses first load AND no address is selected
+  // This is a one-time initialization - after that, parent controls selection via onAddressSelect
   useEffect(() => {
-    if (loading || addresses.length === 0) return;
+    if (loading || addresses.length === 0 || selectedAddressId || hasAutoSelectedRef.current) return;
     
-    // If selectedAddressId is already provided, don't auto-select
-    // This preserves the user's selection when navigating back
-    if (selectedAddressId) {
-      // Verify the selected address still exists in the list
-      const address = addresses.find(a => a.id === selectedAddressId);
-      if (address) {
-        // Address is already selected, just mark as auto-selected to prevent re-selection
-        if (!hasAutoSelectedRef.current) {
-          hasAutoSelectedRef.current = true;
-        }
-        // Notify parent of addresses count
-        onAddressesCountChange?.(addresses.length);
-        return;
-      }
-    }
-    
-    // Only auto-select once when addresses first become available AND no address is selected
-    if (!hasAutoSelectedRef.current && !selectedAddressId) {
-      // Auto-select first address (default logic hidden for now)
-      const firstAddr = addresses[0];
-      if (firstAddr) {
-        onAddressSelect(firstAddr);
-        track('address_selected', {
-          address_count: addresses.length,
-          is_default: false, // Default logic hidden
-          source: 'auto_select',
-        });
-        hasAutoSelectedRef.current = true;
-      }
+    // One-time auto-select of first address when component first mounts with no selection
+    const firstAddr = addresses[0];
+    if (firstAddr) {
+      onAddressSelect(firstAddr);
+      track('address_selected', {
+        address_count: addresses.length,
+        is_default: false,
+        source: 'auto_select',
+      });
+      hasAutoSelectedRef.current = true;
     }
     
     // Notify parent of addresses count
@@ -289,22 +290,12 @@ export function AddressSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addresses, loading, selectedAddressId]);
   
-  // Handle selectedAddressId changes (e.g., from URL params changing)
+  // Notify parent of addresses count when addresses change
   useEffect(() => {
-    if (loading || addresses.length === 0 || !selectedAddressId) return;
-    
-    const address = addresses.find(a => a.id === selectedAddressId);
-    if (address && prevSelectedAddressIdRef.current !== selectedAddressId) {
-      onAddressSelect(address);
-      prevSelectedAddressIdRef.current = selectedAddressId;
-      track('address_selected', {
-        address_count: addresses.length,
-        is_default: address.is_default || false,
-        source: 'url_param',
-      });
+    if (!loading && addresses.length > 0) {
+      onAddressesCountChange?.(addresses.length);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId]);
+  }, [addresses.length, loading, onAddressesCountChange]);
 
   useEffect(() => {
     // Notify parent when editing state changes
@@ -331,15 +322,21 @@ export function AddressSelector({
   }, [triggerAddAddress, showForm, onAddAddressTriggered]);
 
   const handleAddressCreated = async (newAddress: CustomerAddress) => {
-    // Invalidate query cache - React Query will refetch automatically
-    invalidateAddresses();
+    // Select the new address IMMEDIATELY - parent must update selectedAddressId in onAddressSelect
+    // This ensures "Save & Use Address" actually uses the address right away
+    onAddressSelect(newAddress);
+    track('address_selected', {
+      address_count: (addresses.length + 1), // Approximate count (will be accurate after refetch)
+      is_default: false,
+      source: 'newly_created',
+    });
     
-    // Wait for addresses to refetch, then auto-select the new address
-    // The useEffect above will handle selection when addresses update
-    // For immediate selection, we can select it directly
-    setTimeout(() => {
-      onAddressSelect(newAddress);
-    }, 100);
+    // Invalidate and refetch in the background to update the query cache
+    // This happens asynchronously and doesn't block the selection
+    invalidateAddresses();
+    refetchAddresses().catch((error) => {
+      console.error('[AddressSelector] Error refetching addresses after creation:', error);
+    });
     
     // Notify parent of change
     onAddressChange();

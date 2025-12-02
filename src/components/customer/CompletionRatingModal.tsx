@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Avatar } from '@/components/common/Avatar';
 import { rateRunner } from '@/db/api';
 import { toast } from 'sonner';
@@ -115,13 +116,14 @@ export function CompletionRatingModal({
           >
             {/* Close Button */}
             <div className="absolute top-4 right-4 z-10">
-              <button
+              <IconButton
                 onClick={handleSkip}
-                className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                variant="default"
+                size="lg"
                 aria-label="Close"
               >
                 <X className="h-5 w-5 text-slate-900" />
-              </button>
+              </IconButton>
             </div>
 
             <div className="relative">
@@ -240,9 +242,9 @@ export function CompletionRatingModal({
                   <Button
                     onClick={handleSubmit}
                     disabled={submitting || rating === 0}
-                    className="w-full h-[56px] rounded-full bg-black text-white hover:bg-black/90 text-base font-medium"
+                    className="w-full h-14 text-base font-medium"
                   >
-                    {submitting ? 'Submitting...' : 'Rate your order'}
+                    {submitting ? 'Submitting...' : 'Rate Your Order'}
                   </Button>
                   {order && (
                     <button

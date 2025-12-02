@@ -14,6 +14,8 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, X } from "@/lib/icons";
 import { Landmark, MapPin } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { Button } from "@/components/ui/button";
 import { Pencil, Shield } from "lucide-react";
 import { getIconByName } from "@/components/address/IconPicker";
 import { cn } from "@/lib/utils";
@@ -54,6 +56,8 @@ export default function CashRequest() {
   const [step, setStep] = useState<Step>(initialStep);
   // Ref to track if we're updating step internally (to avoid sync conflicts)
   const isInternalStepUpdate = useRef(false);
+  // Ref to track newly created address ID so we can select it after refetch
+  const newlyCreatedAddressIdRef = useRef<string | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
   const [amount, setAmount] = useState(300);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
@@ -200,9 +204,25 @@ export default function CashRequest() {
   const editAddressFormRef = useRef<AddressFormRef>(null);
   const [editAddressLoading, setEditAddressLoading] = useState(false);
 
+  // Force select newly created address after refetch completes
+  // This is a safety net to ensure the new address is selected even if the immediate selection didn't work
+  useEffect(() => {
+    if (!newlyCreatedAddressIdRef.current || addresses.length === 0) return;
+
+    const newAddress = addresses.find(a => a.id === newlyCreatedAddressIdRef.current);
+    if (newAddress) {
+      // Force select the newly created address
+      setSelectedAddress(newAddress);
+      newlyCreatedAddressIdRef.current = null; // Clear ref after selecting
+    }
+  }, [addresses]);
+
   // Auto-select first address when addresses load or when returning from Manage Addresses
   // Also restore address when returning from Bank Accounts on step 2
   // Use URL param to persist selection across navigation (same mechanism as cash amount -> address select)
+  // 
+  // IMPORTANT: This effect must NOT override a selection that was just made via handleSaveAddress
+  // The selection state (selectedAddress) is the source of truth - this effect only initializes it
   useEffect(() => {
     // No addresses at all → clear selection
     if (addresses.length === 0) {
@@ -227,21 +247,18 @@ export default function CashRequest() {
     }
 
     // Priority 2: If we have a valid selection, don't override it (preserve manual selections)
+    // This includes newly created addresses that were just selected via handleSaveAddress
     if (hasValidSelection) {
       return;
     }
 
     // Priority 3: Only auto-select first address on step 1 (not step 2)
     // Step 2 should only be accessible after selecting an address, so we shouldn't auto-select here
-    if (step === 1) {
-      // No valid selection and no URL param - select first address
-      // This handles initial load when no address is selected yet
-      // Only set if it's different from current selection to avoid infinite loops
-      if (!selectedAddress || !addresses.some(a => a.id === selectedAddress.id)) {
-        const firstAddress = addresses[0];
-        if (firstAddress && (!selectedAddress || selectedAddress.id !== firstAddress.id)) {
-          setSelectedAddress(firstAddress);
-        }
+    // This only runs when there's NO selection at all (initial load)
+    if (step === 1 && !selectedAddress) {
+      const firstAddress = addresses[0];
+      if (firstAddress) {
+        setSelectedAddress(firstAddress);
       }
     }
   }, [
@@ -260,10 +277,14 @@ export default function CashRequest() {
   const handleSaveAddress = useCallback((address: CustomerAddress) => {
     setAddAddressLoading(false);
     setShowAddAddressModal(false);
-    invalidateAddresses();
-    // Select the newly created address
+    // Store the new address ID so we can select it after refetch completes
+    newlyCreatedAddressIdRef.current = address.id;
+    // Select the newly created address IMMEDIATELY - this is the source of truth
+    // Do this BEFORE invalidating so the selection is set before any refetch effects run
     setSelectedAddress(address);
     track('address_created', { source: 'cash_request_step_1' });
+    // Invalidate addresses in the background (non-blocking)
+    invalidateAddresses();
   }, [invalidateAddresses]);
 
   const handleCloseAddAddressModal = useCallback(() => {
@@ -888,19 +909,13 @@ export default function CashRequest() {
                 You can add more later.
               </p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={handleAddAddress}
-              className={cn(
-                "w-full h-[52px] rounded-full bg-black text-white",
-                "hover:bg-black/90 active:scale-[0.98]",
-                "text-base font-semibold",
-                "transition-all duration-150 touch-manipulation",
-                "flex items-center justify-center"
-              )}
+              className="w-full h-14 text-base font-semibold"
             >
               Add Address
-            </button>
+            </Button>
           </div>
         )}
 
@@ -967,7 +982,7 @@ export default function CashRequest() {
                             e.stopPropagation();
                             handleEditAddress(addr);
                           }}
-                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black hover:bg-black/90 active:bg-black/80 transition-colors touch-manipulation"
+                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-md bg-black hover:bg-black/90 active:bg-black/80 transition-colors touch-manipulation"
                           style={{
                             top: '12px',
                             right: '12px',
@@ -1079,14 +1094,15 @@ export default function CashRequest() {
                           You can edit or remove it anytime.
                         </p>
                       </div>
-                      <button
+                      <IconButton
                         type="button"
                         onClick={handleCloseAddAddressModal}
-                        className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                        variant="default"
+                        size="lg"
                         aria-label="Close"
                       >
                         <X className="h-5 w-5 text-slate-900" />
-                      </button>
+                      </IconButton>
                     </motion.div>
                     
                     {/* Scrollable Content Area - between header and footer */}
@@ -1115,41 +1131,35 @@ export default function CashRequest() {
                   >
                     <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                       <div className="flex gap-3">
-                        <button
+                        <Button
                           type="button"
                           onClick={handleCloseAddAddressModal}
                           disabled={addAddressLoading}
+                          variant="outline"
                           className={cn(
-                            "flex-1 rounded-full py-4 px-6",
-                            "border border-gray-300",
-                            "bg-white text-gray-900",
+                            "flex-1 h-12 px-6",
                             "text-base font-semibold",
-                            "flex items-center justify-center",
-                            "transition-all duration-200",
                             "active:scale-[0.97]",
-                            "touch-manipulation",
-                            addAddressLoading && "opacity-60 cursor-not-allowed"
+                            "touch-manipulation"
                           )}
                         >
                           {addAddressCopy.cancelButton}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={handleSaveAddAddress}
                           disabled={addAddressLoading}
                           className={cn(
-                            "flex-[2] rounded-full py-4 px-6",
-                            "bg-black text-white",
+                            "flex-[2] h-12 px-6",
+                            "bg-black text-white hover:bg-black/90",
                             "text-base font-semibold",
-                            "flex items-center justify-center",
-                            "transition-all duration-200",
                             "active:scale-[0.97]",
                             "touch-manipulation",
                             addAddressLoading && "opacity-60 cursor-not-allowed"
                           )}
                         >
                           {addAddressLoading ? "Saving..." : addAddressCopy.saveButton}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
@@ -1210,14 +1220,15 @@ export default function CashRequest() {
                           Update your address details.
                         </p>
                       </div>
-                      <button
+                      <IconButton
                         type="button"
                         onClick={handleCloseEditAddressModal}
-                        className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-full border border-[#F0F0F0] bg-white hover:bg-slate-50 active:bg-slate-100 transition-colors touch-manipulation"
+                        variant="default"
+                        size="lg"
                         aria-label="Close"
                       >
                         <X className="h-5 w-5 text-slate-900" />
-                      </button>
+                      </IconButton>
                     </motion.div>
                     
                     {/* Scrollable Content Area - between header and footer */}
@@ -1246,39 +1257,34 @@ export default function CashRequest() {
                   >
                     <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                       <div className="flex gap-3">
-                        <button
+                        <Button
                           type="button"
                           onClick={handleCloseEditAddressModal}
                           disabled={editAddressLoading}
+                          variant="outline"
                           className={cn(
-                            "flex-1 rounded-full py-4 px-6",
-                            "border border-gray-300",
-                            "bg-white text-gray-900",
+                            "flex-1 h-12 px-6",
                             "text-base font-semibold",
-                            "flex items-center justify-center",
-                            "disabled:opacity-50 disabled:cursor-not-allowed",
-                            "active:scale-[0.98] transition-transform duration-150",
+                            "active:scale-[0.97]",
                             "touch-manipulation"
                           )}
                         >
                           Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={handleSaveEditAddressForm}
                           disabled={editAddressLoading}
                           className={cn(
-                            "flex-[2] rounded-full py-4 px-6",
-                            "bg-black text-white",
+                            "flex-[2] h-12 px-6",
+                            "bg-black text-white hover:bg-black/90",
                             "text-base font-semibold",
-                            "flex items-center justify-center",
-                            "disabled:opacity-50 disabled:cursor-not-allowed",
-                            "active:scale-[0.98] transition-transform duration-150",
+                            "active:scale-[0.97]",
                             "touch-manipulation"
                           )}
                         >
                           {editAddressLoading ? "Saving..." : "Save Address"}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
@@ -1389,41 +1395,34 @@ export default function CashRequest() {
                 >
                   <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                     <div className="flex gap-3">
-                      <button
+                      <Button
                         type="button"
                         onClick={handleCloseAddAddressModal}
                         disabled={addAddressLoading}
+                        variant="outline"
                         className={cn(
-                          "flex-1 rounded-full py-4 px-6",
-                          "border border-gray-300",
-                          "bg-white text-gray-900",
+                          "flex-1 h-12 px-6",
                           "text-base font-semibold",
-                          "flex items-center justify-center",
-                          "transition-all duration-200",
                           "active:scale-[0.97]",
-                          "touch-manipulation",
-                          addAddressLoading && "opacity-60 cursor-not-allowed"
+                          "touch-manipulation"
                         )}
                       >
                         {addAddressCopy.cancelButton}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         onClick={handleSaveAddAddress}
                         disabled={addAddressLoading}
                         className={cn(
-                          "flex-[2] rounded-full py-4 px-6",
-                          "bg-black text-white",
+                          "flex-[2] h-12 px-6",
+                          "bg-black text-white hover:bg-black/90",
                           "text-base font-semibold",
-                          "flex items-center justify-center",
-                          "transition-all duration-200",
                           "active:scale-[0.97]",
-                          "touch-manipulation",
-                          addAddressLoading && "opacity-60 cursor-not-allowed"
+                          "touch-manipulation"
                         )}
                       >
                         {addAddressLoading ? "Saving..." : addAddressCopy.saveButton}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </motion.div>

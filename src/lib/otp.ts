@@ -5,12 +5,12 @@
  */
 
 /**
- * Generate a 6-digit numeric OTP code
+ * Generate a 4-digit numeric OTP code
  * 
- * @returns 6-digit numeric string (e.g., "123456")
+ * @returns 4-digit numeric string (e.g., "1234")
  */
 export function generateOtpCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 /**
@@ -50,11 +50,11 @@ export function getOtpTimeRemaining(expiresAt?: string | null): number | null {
 /**
  * Format OTP code for display (adds spacing for readability)
  * 
- * @param code - 6-digit OTP code
- * @returns Formatted string (e.g., "123 456")
+ * @param code - 4-digit OTP code
+ * @returns Formatted string (e.g., "12 34")
  */
 export function formatOtpCode(code: string): string {
-  if (!code || code.length !== 6) return code;
-  return `${code.slice(0, 3)} ${code.slice(3)}`;
+  if (!code || code.length !== 4) return code;
+  return `${code.slice(0, 2)} ${code.slice(2)}`;
 }
 
