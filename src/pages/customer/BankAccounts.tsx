@@ -18,6 +18,8 @@ import { usePlaidLinkKyc } from "@/hooks/usePlaidLinkKyc";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { BankingHelpStories } from "@/components/customer/BankingHelpStories";
+import { supabase } from "@/db/supabase";
+import { toast } from "sonner";
 
 function getKycStatusBadge(kycStatus: string) {
   const status = kycStatus?.toLowerCase();
@@ -329,13 +331,50 @@ export default function BankAccounts() {
                   )}
                 </div>
 
-                {/* Action button */}
-                <div className="pt-3 border-t border-slate-100">
+                {/* Action buttons */}
+                <div className="pt-3 border-t border-slate-100 space-y-3">
                   <PlaidKycButton
                     label={isVerified ? "Change Bank" : "Finish verification"}
-                    className="w-full rounded-full bg-black text-white hover:bg-black/90 font-semibold h-14 min-h-[56px] px-6 text-[17px]"
+                    className="w-full rounded-xl bg-black text-white hover:bg-black/90 font-semibold h-14 min-h-[56px] px-6 text-[17px]"
                     disabled={isLoading}
                   />
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to disconnect your bank account? You will need to reconnect a bank to place cash orders.')) {
+                        try {
+                          const { data: { user } } = await supabase.auth.getUser();
+                          if (!user) return;
+                          
+                          const { error } = await supabase
+                            .from('profiles')
+                            .update({
+                              plaid_item_id: null,
+                              plaid_access_token: null,
+                              kyc_status: 'unverified',
+                              bank_institution_name: null,
+                              bank_last4: null,
+                              bank_institution_logo_url: null,
+                              updated_at: new Date().toISOString()
+                            })
+                            .eq('id', user.id);
+                          
+                          if (error) throw error;
+                          
+                          // Invalidate profile cache to refetch
+                          await queryClient.invalidateQueries({ queryKey: ['profile'] });
+                          
+                          toast.success('Bank account disconnected');
+                        } catch (error) {
+                          console.error('Error disconnecting bank:', error);
+                          toast.error('Failed to disconnect bank account');
+                        }
+                      }
+                    }}
+                    className="w-full h-14 rounded-xl text-[15px] font-medium"
+                  >
+                    Disconnect Bank
+                  </Button>
                 </div>
               </CustomerCard>
 
