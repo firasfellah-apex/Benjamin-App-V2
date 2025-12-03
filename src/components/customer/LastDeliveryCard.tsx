@@ -57,11 +57,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
             </div>
             
             {/* Status pill */}
-            <div className={`flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium border ${
-              isCancelled
-                ? "bg-red-50 text-red-700 border-red-200"
-                : "bg-emerald-50 text-emerald-700 border-emerald-200"
-            }`}>
+            <div 
+              className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-medium border"
+              style={isCancelled ? {
+                backgroundColor: '#FEE5E7',
+                color: '#E84855',
+                borderColor: '#E84855'
+              } : {
+                backgroundColor: '#E5FBF2',
+                color: '#047857',
+                borderColor: '#13F287'
+              }}
+            >
               {getOrderStatusLabel(order)}
             </div>
           </div>

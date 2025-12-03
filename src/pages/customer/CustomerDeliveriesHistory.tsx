@@ -54,7 +54,14 @@ function DeliveryStatusBadge({ delivery }: { delivery: CustomerDelivery }) {
 
   if (isCancelled) {
     return (
-      <span className="inline-flex items-center rounded-full border border-red-100 bg-red-50 px-3 py-0.5 text-[11px] font-medium text-red-600">
+      <span 
+        className="inline-flex items-center rounded-full border px-3 py-0.5 text-[11px] font-medium"
+        style={{
+          backgroundColor: '#FEE5E7',
+          color: '#E84855',
+          borderColor: '#E84855'
+        }}
+      >
         Cancelled
       </span>
     );
@@ -62,7 +69,14 @@ function DeliveryStatusBadge({ delivery }: { delivery: CustomerDelivery }) {
 
   if (isDelivered) {
     return (
-      <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-0.5 text-[11px] font-medium text-emerald-700">
+      <span 
+        className="inline-flex items-center rounded-full border px-3 py-0.5 text-[11px] font-medium"
+        style={{
+          backgroundColor: '#E5FBF2',
+          color: '#047857',
+          borderColor: '#13F287'
+        }}
+      >
         Delivered
       </span>
     );

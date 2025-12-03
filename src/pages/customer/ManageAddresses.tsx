@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil, Trash2, MapPin } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { deleteAddress, formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
+import { deleteAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
 import type { CustomerAddress } from "@/types/types";
 import { getIconByName } from "@/components/address/IconPicker";
 import { AddressForm, type AddressFormRef } from "@/components/address/AddressForm";
@@ -404,13 +404,14 @@ export default function ManageAddresses() {
                     }}
                     disabled={deletingId === addr.id}
                     className={cn(
-                      "flex-1 rounded-xl bg-red-600 text-white",
+                      "flex-1 rounded-xl text-white",
                       "px-4 py-4 flex items-center justify-center",
-                      "hover:bg-red-700",
+                      "hover:opacity-90",
                       "disabled:opacity-50 disabled:cursor-not-allowed",
                       "active:scale-[0.98] transition-all duration-150",
                       "touch-manipulation"
                     )}
+                    style={{ backgroundColor: '#E84855' }}
                     aria-label="Delete address"
                   >
                     <Trash2 className="h-5 w-5 text-white" />
@@ -542,30 +543,19 @@ export default function ManageAddresses() {
                         onClick={handleCloseAddAddressModal}
                         disabled={addAddressLoading}
                         variant="outline"
-                        className={cn(
-                          "flex-1 h-12 px-6",
-                          "text-base font-semibold",
-                          "active:scale-[0.97]",
-                          "touch-manipulation"
-                        )}
+                        className="flex-1 h-14"
                       >
                         Cancel
                       </Button>
-            <Button
+                      <Button
                         type="button"
                         onClick={handleSaveAddAddressForm}
                         disabled={addAddressLoading}
-                        className={cn(
-                          "flex-[2] h-12 px-6",
-                          "bg-black text-white hover:bg-black/90",
-                          "text-base font-semibold",
-                          "active:scale-[0.97]",
-                          "touch-manipulation"
-                        )}
+                        className="flex-[2] h-14 bg-black text-white hover:bg-black/90"
                       >
                         {addAddressLoading ? "Saving..." : "Save Address"}
-            </Button>
-          </div>
+                      </Button>
+                    </div>
                   </div>
                 </motion.div>
               </motion.div>
@@ -659,12 +649,7 @@ export default function ManageAddresses() {
                         onClick={handleCloseEditAddressModal}
                         disabled={editAddressLoading}
                         variant="outline"
-                        className={cn(
-                          "flex-1 h-12 px-6",
-                          "text-base font-semibold",
-                          "active:scale-[0.97]",
-                          "touch-manipulation"
-                        )}
+                        className="flex-1 h-14"
                       >
                         Cancel
                       </Button>
@@ -672,17 +657,11 @@ export default function ManageAddresses() {
                         type="button"
                         onClick={handleSaveEditAddressForm}
                         disabled={editAddressLoading}
-                        className={cn(
-                          "flex-[2] h-12 px-6",
-                          "bg-black text-white hover:bg-black/90",
-                          "text-base font-semibold",
-                          "active:scale-[0.97]",
-                          "touch-manipulation"
-                        )}
+                        className="flex-[2] h-14 bg-black text-white hover:bg-black/90"
                       >
                         {editAddressLoading ? "Saving..." : "Save Address"}
                       </Button>
-          </div>
+                    </div>
         </div>
                 </motion.div>
               </motion.div>
@@ -726,29 +705,22 @@ export default function ManageAddresses() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
-              <AlertDialogAction
+              <Button
                 onClick={confirmDelete}
-                className={cn(
-                  "w-full h-14 bg-red-600 text-white",
-                  "hover:bg-red-700 active:scale-[0.98]",
-                  "text-base font-semibold",
-                  "transition-all duration-150 touch-manipulation"
-                )}
                 disabled={deletingId === addressToDelete?.id}
+                className="w-full h-14 text-white hover:opacity-90"
+                style={{ backgroundColor: '#E84855' }}
               >
                 {deletingId === addressToDelete?.id ? "Deleting..." : "Delete"}
-              </AlertDialogAction>
-              <AlertDialogCancel
-                className={cn(
-                  "w-full h-14 border border-black bg-white text-black",
-                  "hover:bg-slate-50 active:scale-[0.98]",
-                  "text-base font-semibold",
-                  "transition-all duration-150 touch-manipulation",
-                  "mt-0"
-                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={deletingId === addressToDelete?.id}
+                className="w-full h-14"
               >
                 Cancel
-              </AlertDialogCancel>
+              </Button>
             </AlertDialogFooter>
           </div>
         </AlertDialogContent>

@@ -14,8 +14,6 @@ import {
 } from "@/components/ui/sheet";
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -29,7 +27,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Clock, MapPinPen, LogOut, X, Star } from "@/lib/icons";
 import { Landmark, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import logoutIllustration from "@/assets/illustrations/Logout.png";
 
 export function CustomerHeader({
   title,
@@ -258,13 +255,14 @@ export function CustomerHeader({
         {/* Log Out Button */}
         {user && (
           <div className="px-6 pt-4 pb-6">
-            <button
+            <Button
               onClick={handleLogoutClick}
-              className="w-full flex items-center justify-center gap-2 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-xl border border-red-500 text-red-600 bg-transparent hover:bg-red-50 active:bg-red-100 transition-all"
+              className="w-full h-14 text-white hover:opacity-90"
+              style={{ backgroundColor: '#E84855' }}
             >
-              <LogOut className="h-5 w-5 text-red-600" />
+              <LogOut className="h-5 w-5" />
               <span>Log Out</span>
-            </button>
+            </Button>
           </div>
         )}
       </SheetContent>
@@ -324,59 +322,31 @@ export function CustomerHeader({
       )}
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <AlertDialogContent 
-          className="p-0 gap-0 !top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2 !right-auto !bottom-auto"
-          style={{ 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)',
-            right: 'auto',
-            bottom: 'auto'
-          }}
-        >
-          {/* Illustration */}
-          <div className="h-48 md:h-56 flex items-center justify-center bg-[#E5E7EA] rounded-t-[24px]">
-            <img
-              src={logoutIllustration}
-              alt="Logout confirmation"
-              className="w-3/4 h-3/4 object-contain"
-            />
-          </div>
-
-          <div className="px-6 py-6 space-y-4">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
-                Confirm Logout
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-center text-slate-600">
-                Are you sure you want to log out? You'll need to log in again to access your account.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
-              <AlertDialogAction
-                onClick={confirmLogout}
-                className={cn(
-                  "w-full h-14 rounded-full bg-black text-white",
-                  "hover:bg-black/90 active:scale-[0.98]",
-                  "text-base font-semibold",
-                  "transition-all duration-150 touch-manipulation"
-                )}
-              >
-                Log Out
-              </AlertDialogAction>
-              <AlertDialogCancel
-                className={cn(
-                  "w-full h-14 rounded-full border border-black bg-white text-black",
-                  "hover:bg-slate-50 active:scale-[0.98]",
-                  "text-base font-semibold",
-                  "transition-all duration-150 touch-manipulation",
-                  "mt-0"
-                )}
-              >
-                Cancel
-              </AlertDialogCancel>
-            </AlertDialogFooter>
-          </div>
+        <AlertDialogContent className="max-w-sm mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-semibold text-slate-900">
+              Confirm Logout
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Are you sure you want to log out?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+            <Button
+              onClick={confirmLogout}
+              className="w-full h-14 text-white hover:opacity-90"
+              style={{ backgroundColor: '#E84855' }}
+            >
+              Log Out
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutDialog(false)}
+              className="w-full h-14"
+            >
+              Cancel
+            </Button>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>

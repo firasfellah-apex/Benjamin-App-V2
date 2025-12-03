@@ -176,33 +176,22 @@ function AddressFormModal({
             >
               <div className="w-full max-w-2xl px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
                 <div className="flex gap-3">
-                  {/* Cancel button - using canonical Button, 48px height */}
+                  {/* Cancel button - canonical Button with standard 56px height */}
                   <Button
                     type="button"
                     onClick={handleClose}
                     disabled={loading}
                     variant="outline"
-                    className={cn(
-                      "flex-1 h-12 px-6",
-                      "text-base font-semibold",
-                      "active:scale-[0.97]",
-                      "touch-manipulation"
-                    )}
+                    className="flex-1 h-14"
                   >
                     {addAddressCopy.cancelButton}
                   </Button>
-                  {/* Save button - using canonical Button, 48px height */}
+                  {/* Save button - canonical Button with standard 56px height */}
                   <Button
                     type="button"
                     onClick={handleSave}
                     disabled={loading}
-                    className={cn(
-                      "flex-[2] h-12 px-6",
-                      "bg-black text-white hover:bg-black/90",
-                      "text-base font-semibold",
-                      "active:scale-[0.97]",
-                      "touch-manipulation"
-                    )}
+                    className="flex-[2] h-14 bg-black text-white hover:bg-black/90"
                   >
                     {loading ? "Saving..." : addAddressCopy.saveButton}
                   </Button>

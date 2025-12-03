@@ -236,7 +236,7 @@ export default function CustomerDeliveryDetail() {
               type="button"
               onClick={handleReorder}
               disabled={!order || loadingOrder || isNavigating}
-              className="w-full h-14 text-base font-semibold"
+              className="w-full h-14"
             >
               {loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}
             </Button>

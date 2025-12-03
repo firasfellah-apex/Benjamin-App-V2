@@ -68,7 +68,7 @@ export function KycReminderCard({ onCompleted }: KycReminderCardProps) {
         <PlaidKycButton
           label="Connect bank"
           onCompleted={onCompleted}
-          className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90"
+          className="flex-1 h-14 bg-black text-white hover:bg-black/90"
         />
         <Button
           variant="ghost"

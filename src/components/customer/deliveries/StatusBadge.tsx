@@ -16,23 +16,35 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = {
     delivered: {
       label: "Delivered",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      className: "", // Custom inline styles used instead
+      style: {
+        backgroundColor: '#E5FBF2',
+        color: '#047857',
+        borderColor: '#13F287'
+      },
     },
     cancelled: {
       label: "Cancelled",
-      className: "bg-red-50 text-red-700 border-red-200",
+      className: "", // Custom inline styles used instead
+      style: {
+        backgroundColor: '#FEE5E7',
+        color: '#E84855',
+        borderColor: '#E84855'
+      },
     },
     issue_reported: {
       label: "Issue Reported",
       className: "bg-amber-50 text-amber-700 border-amber-200",
+      style: undefined,
     },
     incomplete: {
       label: "Incomplete",
       className: "bg-slate-50 text-slate-700 border-slate-200",
+      style: undefined,
     },
   };
 
-  const { label, className: statusClassName } = config[status];
+  const { label, className: statusClassName, style } = config[status];
 
   return (
     <span
@@ -41,6 +53,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         statusClassName,
         className
       )}
+      style={style}
     >
       {label}
     </span>

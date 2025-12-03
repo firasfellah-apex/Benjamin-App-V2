@@ -26,6 +26,8 @@ import type { OrderWithDetails, Order } from '@/types/types';
 import protectedIllustration from '@/assets/illustrations/Protected.png';
 import noAtmIllustration from '@/assets/illustrations/NoATM.png';
 import trustedRunnerIllustration from '@/assets/illustrations/TrustedRunner.png';
+import connectBankIllustration from '@/assets/illustrations/ConnectBank.png';
+import { Button } from '@/components/ui/button';
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
@@ -405,30 +407,35 @@ export default function CustomerHome() {
       const topPadding = (needsKycReminder || lastCompletedOrder) ? '24px' : '24px';
       content.push(
         <div key="bank-prompt" style={{ paddingTop: topPadding }}>
-          <div className="rounded-2xl border border-[#F0F0F0] bg-white p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                  <line x1="12" y1="1" x2="12" y2="3"></line>
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                  <line x1="12" y1="21" x2="12" y2="23"></line>
-                </svg>
+          <div className="rounded-[24px] border border-[#F0F0F0] bg-white overflow-hidden">
+            {/* Illustration frame - matches TrustCarousel style */}
+            <div className="px-[6px] pt-[6px]">
+              <div className="w-full h-[260px] rounded-[18px] flex items-center justify-center border border-[#F0F0F0]" style={{ backgroundColor: '#F1F1F1' }}>
+                <img
+                  src={connectBankIllustration}
+                  alt="Connect your bank"
+                  className="w-[193px] h-[193px] object-contain"
+                />
               </div>
-              <div className="flex-1 space-y-2">
-                <h3 className="text-base font-semibold text-slate-900">
+            </div>
+            
+            {/* Text and button */}
+            <div className="px-6 pt-6 pb-6 space-y-4">
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-semibold text-slate-900">
                   Connect your bank to order cash
                 </h3>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 leading-relaxed">
                   Link a bank account to verify your identity and start ordering cash delivered to your door.
                 </p>
               </div>
-            </div>
-            <button
+            <Button
               onClick={() => navigate('/customer/bank-accounts')}
-              className="w-full h-14 rounded-xl bg-black text-white hover:bg-black/90 font-semibold text-[15px] transition-colors"
+              className="w-full h-14 bg-black text-white hover:bg-black/90"
             >
               Connect Bank Account
-            </button>
+            </Button>
+          </div>
           </div>
         </div>
       );

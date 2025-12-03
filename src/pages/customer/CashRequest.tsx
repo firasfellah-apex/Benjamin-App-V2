@@ -912,7 +912,7 @@ export default function CashRequest() {
             <Button
               type="button"
               onClick={handleAddAddress}
-              className="w-full h-14 text-base font-semibold"
+              className="w-full h-14"
             >
               Add Address
             </Button>
@@ -1136,12 +1136,7 @@ export default function CashRequest() {
                           onClick={handleCloseAddAddressModal}
                           disabled={addAddressLoading}
                           variant="outline"
-                          className={cn(
-                            "flex-1 h-12 px-6",
-                            "text-base font-semibold",
-                            "active:scale-[0.97]",
-                            "touch-manipulation"
-                          )}
+                          className="flex-1 h-14"
                         >
                           {addAddressCopy.cancelButton}
                         </Button>
@@ -1149,14 +1144,7 @@ export default function CashRequest() {
                           type="button"
                           onClick={handleSaveAddAddress}
                           disabled={addAddressLoading}
-                          className={cn(
-                            "flex-[2] h-12 px-6",
-                            "bg-black text-white hover:bg-black/90",
-                            "text-base font-semibold",
-                            "active:scale-[0.97]",
-                            "touch-manipulation",
-                            addAddressLoading && "opacity-60 cursor-not-allowed"
-                          )}
+                          className="flex-[2] h-14 bg-black text-white hover:bg-black/90"
                         >
                           {addAddressLoading ? "Saving..." : addAddressCopy.saveButton}
                         </Button>
@@ -1262,12 +1250,7 @@ export default function CashRequest() {
                           onClick={handleCloseEditAddressModal}
                           disabled={editAddressLoading}
                           variant="outline"
-                          className={cn(
-                            "flex-1 h-12 px-6",
-                            "text-base font-semibold",
-                            "active:scale-[0.97]",
-                            "touch-manipulation"
-                          )}
+                          className="flex-1 h-14"
                         >
                           Cancel
                         </Button>
@@ -1275,13 +1258,7 @@ export default function CashRequest() {
                           type="button"
                           onClick={handleSaveEditAddressForm}
                           disabled={editAddressLoading}
-                          className={cn(
-                            "flex-[2] h-12 px-6",
-                            "bg-black text-white hover:bg-black/90",
-                            "text-base font-semibold",
-                            "active:scale-[0.97]",
-                            "touch-manipulation"
-                          )}
+                          className="flex-[2] h-14 bg-black text-white hover:bg-black/90"
                         >
                           {editAddressLoading ? "Saving..." : "Save Address"}
                         </Button>
@@ -1400,12 +1377,7 @@ export default function CashRequest() {
                         onClick={handleCloseAddAddressModal}
                         disabled={addAddressLoading}
                         variant="outline"
-                        className={cn(
-                          "flex-1 h-12 px-6",
-                          "text-base font-semibold",
-                          "active:scale-[0.97]",
-                          "touch-manipulation"
-                        )}
+                        className="flex-1 h-14"
                       >
                         {addAddressCopy.cancelButton}
                       </Button>
@@ -1413,13 +1385,7 @@ export default function CashRequest() {
                         type="button"
                         onClick={handleSaveAddAddress}
                         disabled={addAddressLoading}
-                        className={cn(
-                          "flex-[2] h-12 px-6",
-                          "bg-black text-white hover:bg-black/90",
-                          "text-base font-semibold",
-                          "active:scale-[0.97]",
-                          "touch-manipulation"
-                        )}
+                        className="flex-[2] h-14 bg-black text-white hover:bg-black/90"
                       >
                         {addAddressLoading ? "Saving..." : addAddressCopy.saveButton}
                       </Button>

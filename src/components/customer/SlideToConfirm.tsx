@@ -144,7 +144,7 @@ export function SlideToConfirm({
             className="flex h-full items-center justify-center"
             style={{ paddingLeft: LABEL_PADDING_LEFT - 6 }}
           >
-            <span className="text-[15px] font-medium text-white">
+            <span className="text-base font-semibold text-white">
               {labelText}
             </span>
           </div>
@@ -162,7 +162,7 @@ export function SlideToConfirm({
                 className="flex h-full items-center justify-center"
                 style={{ paddingLeft: LABEL_PADDING_LEFT - 6 }}
               >
-                <span className="text-[15px] font-medium text-black">
+                <span className="text-base font-semibold text-black">
                   {labelText}
                 </span>
               </div>

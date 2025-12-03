@@ -4,7 +4,7 @@
  * User-friendly bank connection management with trust-building elements
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import CustomerCard from "@/pages/customer/components/CustomerCard";
@@ -28,7 +28,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import disconnectBankIllustration from "@/assets/illustrations/Alert.png";
 
 function getKycStatusBadge(kycStatus: string) {
   const status = kycStatus?.toLowerCase();
@@ -69,6 +68,14 @@ export default function BankAccounts() {
   const [showHelpStories, setShowHelpStories] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  // Invalidate profile cache when component mounts to ensure fresh data
+  // This prevents stale bank connection data from being displayed
+  useEffect(() => {
+    if (user?.id) {
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+    }
+  }, [user?.id, queryClient]);
 
   const { isLoading } = usePlaidLinkKyc(async () => {
     // After successful KYC, refetch profile
@@ -208,7 +215,7 @@ export default function BankAccounts() {
                 <div className="pt-2 space-y-2">
                   <PlaidKycButton
                     label="Connect bank with Plaid"
-                    className="w-full h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90"
+                    className="w-full h-14 bg-black text-white hover:bg-black/90"
                     disabled={isLoading}
                   />
                   <p className="text-xs text-slate-500">
@@ -346,13 +353,13 @@ export default function BankAccounts() {
                 <div className="pt-3 border-t border-slate-100 space-y-3">
                   <PlaidKycButton
                     label={isVerified ? "Change Bank" : "Finish verification"}
-                    className="w-full rounded-xl bg-black text-white hover:bg-black/90 font-semibold h-14 min-h-[56px] px-6 text-[17px]"
+                    className="w-full h-14 bg-black text-white hover:bg-black/90"
                     disabled={isLoading}
                   />
                   <Button
                     variant="outline"
                     onClick={() => setShowDisconnectDialog(true)}
-                    className="w-full h-14 rounded-xl text-[15px] font-medium"
+                    className="w-full h-14"
                   >
                     Disconnect Bank
                   </Button>
@@ -403,29 +410,17 @@ export default function BankAccounts() {
       {/* Disconnect Bank Confirmation Dialog */}
       <AlertDialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
         <AlertDialogContent className="max-w-sm mx-auto">
-          <AlertDialogHeader className="flex flex-col items-center text-center space-y-4">
-            {/* Illustration */}
-            <div className="w-full h-48 md:h-56 flex items-center justify-center bg-[#F8D8D2] rounded-2xl">
-              <img
-                src={disconnectBankIllustration}
-                alt="Disconnect bank"
-                className="w-3/4 h-3/4 object-contain"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <AlertDialogTitle className="text-xl font-semibold text-slate-900">
-                Disconnect Bank Account?
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm text-slate-600">
-                You'll need to reconnect a bank account before you can place cash orders. Your order history will remain intact.
-              </AlertDialogDescription>
-            </div>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-semibold text-slate-900">
+              Disconnect Bank Account?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              You'll need to reconnect a bank account before you can place cash orders. Your order history will remain intact.
+            </AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter className="flex flex-col gap-3 sm:flex-col">
             <Button
-              variant="destructive"
               onClick={async () => {
                 setIsDisconnecting(true);
                 try {
@@ -460,7 +455,8 @@ export default function BankAccounts() {
                 }
               }}
               disabled={isDisconnecting}
-              className="w-full h-14 rounded-xl"
+              className="w-full h-14 text-white hover:opacity-90"
+              style={{ backgroundColor: '#E84855' }}
             >
               {isDisconnecting ? 'Disconnecting...' : 'Disconnect Bank'}
             </Button>
@@ -468,7 +464,7 @@ export default function BankAccounts() {
               variant="outline"
               onClick={() => setShowDisconnectDialog(false)}
               disabled={isDisconnecting}
-              className="w-full h-14 rounded-xl"
+              className="w-full h-14"
             >
               Cancel
             </Button>
