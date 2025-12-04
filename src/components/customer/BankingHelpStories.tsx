@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { IconButton } from "@/components/ui/icon-button";
 
 interface StoryPage {
   id: string;
@@ -15,7 +15,7 @@ interface BankingHelpStoriesProps {
   duration?: number; // Duration per page in milliseconds (default 5 seconds)
 }
 
-const DEFAULT_DURATION = 5000; // 5 seconds per page
+const DEFAULT_DURATION = 5000; // 5 seconds per page (Instagram-style)
 
 export function BankingHelpStories({
   isOpen,
@@ -103,12 +103,6 @@ export function BankingHelpStories({
     }
   }, [currentPageIndex]);
 
-  const handlePageClick = (index: number) => {
-    setCurrentPageIndex(index);
-    setProgress(0);
-    startTimeRef.current = Date.now();
-  };
-
   // Pause on touch/click start, resume on end
   const handlePause = () => {
     pausedRef.current = true;
@@ -172,24 +166,17 @@ export function BankingHelpStories({
             onTouchEnd={handleResume}
           >
             <div className="relative w-full h-full max-w-md mx-auto bg-white">
-              {/* Progress Bars */}
-              <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 px-2 pt-2">
+              {/* Progress Bars - Instagram style (edge-to-edge) */}
+              <div className="absolute top-0 left-0 right-0 z-10 flex gap-2 px-3 pt-3">
                 {pages.map((_, index) => (
                   <div
                     key={index}
-                    className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePageClick(index);
-                    }}
+                    className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden"
                   >
-                    <div
-                      className={cn(
-                        "h-full bg-white rounded-full transition-all duration-75",
-                        index < currentPageIndex && "bg-white",
-                        index === currentPageIndex && "bg-white"
-                      )}
-                      style={{
+                    <motion.div
+                      className="h-full bg-slate-900 rounded-full"
+                      initial={{ width: index < currentPageIndex ? "100%" : "0%" }}
+                      animate={{
                         width:
                           index < currentPageIndex
                             ? "100%"
@@ -197,32 +184,34 @@ export function BankingHelpStories({
                             ? `${progress}%`
                             : "0%",
                       }}
+                      transition={{ duration: 0.1, ease: "linear" }}
                     />
                   </div>
                 ))}
               </div>
 
-              {/* Close Button */}
-              <button
+              {/* Close Button - positioned same as help button */}
+              <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose();
                 }}
-                className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-colors"
+                className="absolute top-4 right-4 z-20"
                 aria-label="Close"
+                size="lg"
               >
-                <X className="h-5 w-5 text-white" />
-              </button>
+                <X className="h-5 w-5 text-slate-900" strokeWidth={2} />
+              </IconButton>
 
               {/* Content Area */}
-              <div className="h-full flex items-center justify-center pt-12 pb-8 px-6">
+              <div className="h-full flex items-center justify-center pt-16 pb-12 px-8">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentPage?.id}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.2 }}
                     className="w-full"
                   >
                     {currentPage?.content}
@@ -230,29 +219,9 @@ export function BankingHelpStories({
                 </AnimatePresence>
               </div>
 
-              {/* Navigation Hints */}
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
-                {pages.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePageClick(index);
-                    }}
-                    className={cn(
-                      "w-2 h-2 rounded-full transition-all",
-                      index === currentPageIndex
-                        ? "bg-white w-8"
-                        : "bg-white/50 hover:bg-white/70"
-                    )}
-                    aria-label={`Go to page ${index + 1}`}
-                  />
-                ))}
-              </div>
-
-              {/* Left/Right Click Areas for Navigation */}
+              {/* Left/Right Click Areas for Navigation - 50% width each */}
               <div
-                className="absolute left-0 top-0 bottom-0 w-1/3 cursor-pointer"
+                className="absolute left-0 top-0 bottom-0 w-1/2 cursor-pointer z-[5]"
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrevious();
@@ -260,7 +229,7 @@ export function BankingHelpStories({
                 aria-label="Previous"
               />
               <div
-                className="absolute right-0 top-0 bottom-0 w-1/3 cursor-pointer"
+                className="absolute right-0 top-0 bottom-0 w-1/2 cursor-pointer z-[5]"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleNext();

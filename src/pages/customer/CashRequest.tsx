@@ -807,8 +807,8 @@ export default function CashRequest() {
             const windowHeight = window.innerHeight;
             const viewportBottom = windowHeight - 120; // Account for bottom nav (~120px)
             
-            // Expanded card height estimate: map (200px) + content (~48px) = 248px
-            const expandedCardHeight = 248;
+            // Expanded card height estimate: map (206px with padding) + content (~48px) = 254px
+            const expandedCardHeight = 254;
             
             // Calculate where the bottom of the expanded card would be (using current top position)
             const expandedBottom = rect.top + expandedCardHeight;
@@ -955,16 +955,16 @@ export default function CashRequest() {
                     className={cn(
                       "overflow-hidden relative",
                       isSelected 
-                        ? "max-h-[220px] duration-400" 
+                        ? "max-h-[212px] duration-400" 
                         : "max-h-0 duration-350"
                     )}
                     style={{
                       transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
                   >
-                    {/* Map container with staggered opacity fade-in */}
+                    {/* Map container with inset frame styling - matches trust carousel */}
                     <div
-                      className="w-full h-[200px] bg-slate-50 relative"
+                      className="w-full px-[6px] pt-[6px]"
                       style={{
                         opacity: isSelected ? 1 : 0,
                         transition: isSelected
@@ -972,26 +972,28 @@ export default function CashRequest() {
                           : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
                       }}
                     >
-                      <CustomerMapViewport selectedAddress={addr} />
-                      
-                      {/* Edit button - top right corner of map, only for selected addresses */}
-                      {isSelected && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditAddress(addr);
-                          }}
-                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-md bg-black hover:bg-black/90 active:bg-black/80 transition-colors touch-manipulation"
-                          style={{
-                            top: '12px',
-                            right: '12px',
-                          }}
-                          aria-label="Edit address"
-                        >
-                          <Pencil className="h-4 w-4 text-white" />
-                        </button>
-                      )}
+                      <div className="relative w-full h-[200px] rounded-[18px] border border-[#F0F0F0] overflow-hidden bg-slate-50">
+                        <CustomerMapViewport selectedAddress={addr} />
+                        
+                        {/* Edit button - top right corner of map, only for selected addresses */}
+                        {isSelected && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditAddress(addr);
+                            }}
+                            className="absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-md bg-black hover:bg-black/90 active:bg-black/80 transition-colors touch-manipulation"
+                            style={{
+                              top: '12px',
+                              right: '12px',
+                            }}
+                            aria-label="Edit address"
+                          >
+                            <Pencil className="h-4 w-4 text-white" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

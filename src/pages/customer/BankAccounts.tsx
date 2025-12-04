@@ -11,7 +11,8 @@ import CustomerCard from "@/pages/customer/components/CustomerCard";
 import { PlaidKycButton } from "@/components/customer/plaid/PlaidKycButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Landmark, Shield, CheckCircle2, Zap, Lock, Info, HelpCircle } from "lucide-react";
+import { Landmark, Info, HelpCircle, CheckCircle2 } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlaidLinkKyc } from "@/hooks/usePlaidLinkKyc";
@@ -29,6 +30,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
+import identityConfirmationIllustration from '@/assets/illustrations/IdentityConfirmation.png';
+import easyTransfersIllustration from '@/assets/illustrations/EasyTransfers.png';
+import everyoneSafeIllustration from '@/assets/illustrations/EveryoneSafe.png';
+import bankingRegulationIllustration from '@/assets/illustrations/BankingRegulation.png';
 
 function getKycStatusBadge(kycStatus: string) {
   const status = kycStatus?.toLowerCase();
@@ -69,6 +75,7 @@ export default function BankAccounts() {
   const [showHelpStories, setShowHelpStories] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const { setBottomSlot } = useCustomerBottomSlot();
 
   // Debug: Log when disconnect dialog state changes
   useEffect(() => {
@@ -148,6 +155,40 @@ export default function BankAccounts() {
     await queryClient.invalidateQueries({ queryKey: ['profile'] });
   });
 
+  // Derived state
+  const hasBankConnection = !!profile?.plaid_item_id;
+
+  // Set bottom slot for empty state (Connect bank CTA)
+  useEffect(() => {
+    if (!hasBankConnection && isReady) {
+      setBottomSlot(
+        <nav className="fixed bottom-0 left-0 right-0 z-[70] w-screen max-w-none bg-white border-t border-slate-200/70">
+          <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))] space-y-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowHelpStories(true)}
+              className="w-full h-14"
+            >
+              Learn How Bank Verification Works
+            </Button>
+            <PlaidKycButton
+              label="Connect Bank with Plaid"
+              className="w-full h-14 bg-black text-white hover:bg-black/90"
+              disabled={isLoading}
+            />
+            <p className="text-xs text-slate-500 text-center">
+              Takes about 30 seconds in a secure Plaid window.
+            </p>
+          </div>
+        </nav>
+      );
+    } else {
+      setBottomSlot(null);
+    }
+
+    return () => setBottomSlot(null);
+  }, [hasBankConnection, isReady, isLoading, setBottomSlot]);
+
   // Get return path from location state (if opened from cash request page)
   // Otherwise default to home
   const returnPath = (location.state as { returnPath?: string })?.returnPath;
@@ -174,7 +215,6 @@ export default function BankAccounts() {
     );
   }
 
-  const hasBankConnection = !!profile.plaid_item_id;
   const isVerified = profile.kyc_status === 'verified';
   const dailyLimit = profile.daily_limit || 1000;
   const dailyUsage = profile.daily_usage || 0;
@@ -198,24 +238,24 @@ export default function BankAccounts() {
 
   // Help button for top right (adjacent to X button, like FlowHeader)
   const helpButton = (
-    <button
+    <IconButton
       onClick={() => setShowHelpStories(true)}
-      className="w-12 h-12 p-0 inline-flex items-center justify-center rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60 transition-colors touch-manipulation"
       aria-label="Help"
+      size="lg"
     >
       <HelpCircle className="h-5 w-5 text-slate-900" strokeWidth={2} />
-    </button>
+    </IconButton>
   );
 
-  // Story pages - placeholder content for now
+  // Story pages - help screens (Instagram-style)
   const storyPages = [
     {
       id: "page-1",
       content: (
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Page 1</h2>
-          <p className="text-base text-slate-600">
-            Placeholder content for page 1. Add your imagery and copy here.
+          <h2 className="text-2xl font-semibold text-slate-900">Why link your bank?</h2>
+          <p className="text-base text-slate-600 leading-relaxed">
+            Linking your bank proves it's really you. It stops someone else from ordering cash in your name and keeps both you and your runner protected.
           </p>
         </div>
       ),
@@ -224,9 +264,9 @@ export default function BankAccounts() {
       id: "page-2",
       content: (
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Page 2</h2>
-          <p className="text-base text-slate-600">
-            Placeholder content for page 2. Add your imagery and copy here.
+          <h2 className="text-2xl font-semibold text-slate-900">What Benjamin sees</h2>
+          <p className="text-base text-slate-600 leading-relaxed">
+            Benjamin never sees your bank login. Plaid encrypts your details and only shares a secure token with us — your passwords and credentials never touch Benjamin.
           </p>
         </div>
       ),
@@ -235,9 +275,9 @@ export default function BankAccounts() {
       id: "page-3",
       content: (
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Page 3</h2>
-          <p className="text-base text-slate-600">
-            Placeholder content for page 3. Add your imagery and copy here.
+          <h2 className="text-2xl font-semibold text-slate-900">What happens after you connect</h2>
+          <p className="text-base text-slate-600 leading-relaxed">
+            Once your bank is verified, you can request cash instantly. We use your linked account to confirm identity and keep fraud low, so orders get approved faster.
           </p>
         </div>
       ),
@@ -248,12 +288,13 @@ export default function BankAccounts() {
     <>
       <CustomerScreen
         title="My Bank Accounts"
-        subtitle="Securely link a bank account to verify your identity and enable cash orders."
+        subtitle="Link a bank to verify your identity and order cash."
         showBack
         useXButton
         onBack={handleBack}
         fixedContent={fixedContent}
         headerTopRight={helpButton}
+        customBottomPadding="220px"
       topContent={
         <div style={{ paddingTop: '24px' }} className="space-y-6">
           {!hasBankConnection ? (
@@ -267,87 +308,85 @@ export default function BankAccounts() {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-slate-900">
-                    No bank account connected yet
+                    Link a bank to get started
                   </h3>
-                  <div className="space-y-1 text-sm text-slate-600">
-                    <p>
-                      Benjamin needs at least one verified bank account on file before we can deliver cash.
-                    </p>
-                    <p>
-                      This confirms your identity and helps protect both you and our runners.
-                    </p>
-                  </div>
-                </div>
-                <div className="pt-2 space-y-2">
-                  <PlaidKycButton
-                    label="Connect bank with Plaid"
-                    className="w-full h-14 bg-black text-white hover:bg-black/90"
-                    disabled={isLoading}
-                  />
-                  <p className="text-xs text-slate-500">
-                    Takes about 30 seconds in a secure Plaid window.
+                  <p className="text-sm text-slate-600">
+                    Benjamin needs at least one verified bank on file before you can request cash.
                   </p>
                 </div>
               </CustomerCard>
 
-              {/* Why we need this */}
-              <CustomerCard className="space-y-4">
-                <h4 className="text-base font-semibold text-slate-900">
-                  Why Benjamin asks for your bank
-                </h4>
-                <ul className="space-y-3 text-sm text-slate-700">
-                  <li className="flex items-start gap-3">
-                    <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <span>Verify it's really you before sending cash</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Confirm the bank account belongs to you</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-slate-600 flex-shrink-0 mt-0.5" />
-                    <span>Reduce fraud and keep the service safe for everyone</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Zap className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <span>Make future cash requests faster to approve</span>
-                  </li>
-                </ul>
-              </CustomerCard>
-
-              {/* Reassurance block */}
-              <CustomerCard className="space-y-3 bg-slate-50/50">
-                <div className="flex items-start gap-3">
-                  <Lock className="h-5 w-5 text-slate-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 space-y-2">
-                    <p className="text-sm font-medium text-slate-900">
-                      Your bank login never touches Benjamin
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Benjamin never sees or stores your online banking password. Bank connection happens in a secure Plaid window, used by thousands of banks and financial apps. Plaid encrypts your credentials and only shares a secure token with us so we can verify your account.
-                    </p>
-                    <p className="text-xs text-slate-500 pt-1">
-                      You can browse the app without linking a bank, but you won't be able to request cash until at least one account is connected.
-                    </p>
+              {/* Why we ask for your bank - Card grid with illustrations */}
+              <div className="grid grid-cols-1 gap-3">
+                {/* Card 1: Identity Confirmation */}
+                <CustomerCard className="overflow-hidden px-0 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                      <img
+                        src={identityConfirmationIllustration}
+                        alt="Verify Your Identity"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 pr-6">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">Verify Your Identity</p>
+                      <p className="text-xs text-slate-600 leading-relaxed mt-1">Keeps your account secure before we deliver cash.</p>
+                    </div>
                   </div>
-                </div>
-              </CustomerCard>
+                </CustomerCard>
 
-              {/* Troubleshooting Link */}
-              <div className="text-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    // TODO: Add help/troubleshooting modal or page
-                    console.log("Show bank verification help");
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-700"
-                >
-                  <Info className="h-3.5 w-3.5 mr-1.5" />
-                  Having issues? Learn how bank verification works
-                </Button>
+                {/* Card 2: Instant Transfers */}
+                <CustomerCard className="overflow-hidden px-0 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                      <img
+                        src={easyTransfersIllustration}
+                        alt="Enable Instant Transfers"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 pr-6">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">Enable Instant Transfers</p>
+                      <p className="text-xs text-slate-600 leading-relaxed mt-1">A verified bank lets money move quickly and safely.</p>
+                    </div>
+                  </div>
+                </CustomerCard>
+
+                {/* Card 3: Keep Everyone Safe */}
+                <CustomerCard className="overflow-hidden px-0 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                      <img
+                        src={everyoneSafeIllustration}
+                        alt="Keep Everyone Safe"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 pr-6">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">Keep Everyone Safe</p>
+                      <p className="text-xs text-slate-600 leading-relaxed mt-1">Verified customers and runners meet the same security standard.</p>
+                    </div>
+                  </div>
+                </CustomerCard>
+
+                {/* Card 4: Banking Regulation */}
+                <CustomerCard className="overflow-hidden px-0 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                      <img
+                        src={bankingRegulationIllustration}
+                        alt="Banking Regulation"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 pr-6">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">Banking Regulation</p>
+                      <p className="text-xs text-slate-600 leading-relaxed mt-1">Required by our banking partners for cash-handling compliance.</p>
+                    </div>
+                  </div>
+                </CustomerCard>
               </div>
+
             </>
           ) : (
             <>
@@ -435,20 +474,6 @@ export default function BankAccounts() {
                 </div>
               </CustomerCard>
 
-              {/* Security Card */}
-              <CustomerCard className="space-y-3 bg-slate-50/50">
-                <div className="flex items-start gap-3">
-                  <Lock className="h-5 w-5 text-slate-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium text-slate-900">
-                      Your credentials never touch Benjamin
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Plaid handles all verification securely. Your bank login credentials are never stored on Benjamin’s servers.
-                    </p>
-                  </div>
-                </div>
-              </CustomerCard>
 
               {/* Troubleshooting Link */}
               <div className="text-center">

@@ -13,9 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
 import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar';
-import { TrustCarousel } from '@/components/customer/TrustCarousel';
 import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
-import { KycReminderCard } from '@/components/customer/KycReminderCard';
+import CustomerCard from '@/pages/customer/components/CustomerCard';
 import { CompletionRatingModal } from '@/components/customer/CompletionRatingModal';
 import { getCustomerOrders, hasOrderIssue } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
@@ -298,28 +297,25 @@ export default function CustomerHome() {
     return `Good ${getGreetingTime()}${displayName ? `, ${displayName}` : ""}`;
   }, [isReady, displayName]);
 
-  // Trust carousel data
+  // Trust cards data
   const trustCards = [
     {
       id: 'protected',
       image: protectedIllustration,
       title: 'Protected end-to-end.',
       body: 'Your identity and transaction stay secured with bank-grade encryption.',
-      backgroundColor: '#EFE2D1', // Protected illustration background
     },
     {
       id: 'no-atm-runs',
       image: noAtmIllustration,
       title: 'No ATM runs. Ever.',
       body: 'Skip the line, skip the hassle—cash delivered privately to your door.',
-      backgroundColor: '#CFE7F9', // NoATM illustration background
     },
     {
       id: 'trusted-runners',
       image: trustedRunnerIllustration,
       title: 'Only trusted runners.',
       body: 'Every runner is background-checked, verified, and tracked during delivery.',
-      backgroundColor: '#C7EDC5', // TrustedRunner illustration background
     },
   ];
 
@@ -333,12 +329,11 @@ export default function CustomerHome() {
     );
   }, []);
 
-  // Check if user needs KYC reminder
-  const needsKycReminder = useMemo(() => {
+  // Check if user has bank connected (used for bank connection prompt)
+  const hasBankConnection = useMemo(() => {
     if (!profile || !isReady) return false;
-    const isCustomer = profile.role?.includes('customer') && !profile.role?.includes('admin');
-    return isCustomer && profile.kyc_status !== 'verified';
-  }, [profile, isReady]);
+    return !!profile.plaid_item_id;
+  }, [profile?.plaid_item_id, isReady]);
 
   // Determine what to show in topContent
   // Show skeleton while orders are loading to maintain consistent header height
@@ -372,26 +367,10 @@ export default function CustomerHome() {
       );
     }
     
-    // Show KYC reminder card if needed (before other content)
-    if (needsKycReminder && !ordersLoading) {
-      content.push(
-        <div key="kyc-reminder" style={{ paddingTop: '24px' }}>
-          <KycReminderCard
-            onCompleted={async () => {
-              // Profile will be refetched by the hook
-              await queryClient.invalidateQueries({ queryKey: ['profile'] });
-            }}
-          />
-        </div>
-      );
-    }
-    
-    // Show actual card if we have a last delivery (completed or cancelled)
-    // Show it even if there's an active order
+    // Show last delivery card if available
     if (lastCompletedOrder && !ordersLoading) {
-      const topPadding = needsKycReminder ? '24px' : '24px';
       content.push(
-        <div key="last-delivery" style={{ paddingTop: topPadding }}>
+        <div key="last-delivery" style={{ paddingTop: '24px' }}>
           <LastDeliveryCard
             order={lastCompletedOrder}
             onRateRunner={handleRateRunner}
@@ -401,16 +380,16 @@ export default function CustomerHome() {
       );
     }
     
-    // Show bank connection prompt if no bank is connected (after last delivery card or KYC reminder)
-    const hasBankConnection = !!profile?.plaid_item_id;
+    // Show bank connection prompt if no bank is connected
+    // This is the ONLY prompt for connecting bank - shows after last delivery card or at the top
     if (!hasBankConnection && !ordersLoading && isReady) {
-      const topPadding = (needsKycReminder || lastCompletedOrder) ? '24px' : '24px';
+      const topPadding = lastCompletedOrder ? '24px' : '24px';
       content.push(
         <div key="bank-prompt" style={{ paddingTop: topPadding }}>
           <div className="rounded-[24px] border border-[#F0F0F0] bg-white overflow-hidden">
-            {/* Illustration frame - matches TrustCarousel style */}
+            {/* Illustration frame - no background, no border */}
             <div className="px-[6px] pt-[6px]">
-              <div className="w-full h-[260px] rounded-[18px] flex items-center justify-center border border-[#F0F0F0]" style={{ backgroundColor: '#F1F1F1' }}>
+              <div className="w-full h-[260px] rounded-[18px] flex items-center justify-center">
                 <img
                   src={connectBankIllustration}
                   alt="Connect your bank"
@@ -423,36 +402,54 @@ export default function CustomerHome() {
             <div className="px-6 pt-6 pb-6 space-y-4">
               <div className="space-y-1.5">
                 <h3 className="text-lg font-semibold text-slate-900">
-                  Connect your bank to order cash
+                  Connect Your Bank to Order Cash
                 </h3>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Link a bank account to verify your identity and start ordering cash delivered to your door.
+                  Link your bank securely to verify your identity and enable cash delivery straight to your door.
                 </p>
               </div>
-            <Button
-              onClick={() => navigate('/customer/bank-accounts')}
-              className="w-full h-14 bg-black text-white hover:bg-black/90"
-            >
-              Connect Bank Account
-            </Button>
-          </div>
+              <Button
+                onClick={() => navigate('/customer/banks')}
+                className="w-full h-14 bg-black text-white hover:bg-black/90"
+              >
+                Learn More
+              </Button>
+            </div>
           </div>
         </div>
       );
     }
     
-    // Otherwise, show TrustCarousel when there's no last delivery and orders have finished loading
-    if (!lastCompletedOrder && !ordersLoading) {
-      const topPadding = (needsKycReminder || !hasBankConnection) ? '24px' : '24px';
+    // Show trust cards list when there's no last delivery and user has bank connected
+    // If no bank connection, the prompt above takes priority
+    if (!lastCompletedOrder && !ordersLoading && hasBankConnection) {
       content.push(
-        <div key="trust-carousel" style={{ paddingTop: topPadding }}>
-          <TrustCarousel cards={trustCards} />
+        <div key="trust-cards" style={{ paddingTop: '24px' }}>
+          <div className="grid grid-cols-1 gap-3">
+            {trustCards.map((card) => (
+              <CustomerCard key={card.id} className="overflow-hidden px-0 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                    <img
+                      src={card.image}
+                      alt={card.title}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 pr-6">
+                    <p className="text-sm font-semibold text-slate-900 leading-snug">{card.title}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed mt-1">{card.body}</p>
+                  </div>
+                </div>
+              </CustomerCard>
+            ))}
+          </div>
         </div>
       );
     }
     
     return content.length > 0 ? <>{content}</> : null;
-  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, trustCards, needsKycReminder, queryClient]);
+  }, [ordersLoading, authLoading, isReady, lastCompletedOrder, handleRateRunner, trustCards, hasBankConnection, queryClient, navigate]);
 
   // If no user, redirect to landing
   if (!user) {
@@ -520,10 +517,28 @@ export default function CustomerHome() {
         topContent={topContent}
         customBottomPadding={customBottomPadding}
       >
-        {/* Show TrustCarousel below View All Deliveries, even when there's a last delivery */}
+        {/* Show trust cards list below View All Deliveries, even when there's a last delivery */}
         {lastCompletedOrder && (
           <div className="space-y-6">
-            <TrustCarousel cards={trustCards} />
+            <div className="grid grid-cols-1 gap-3">
+              {trustCards.map((card) => (
+                <CustomerCard key={card.id} className="overflow-hidden px-0 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                      <img
+                        src={card.image}
+                        alt={card.title}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 pr-6">
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">{card.title}</p>
+                      <p className="text-xs text-slate-600 leading-relaxed mt-1">{card.body}</p>
+                    </div>
+                  </div>
+                </CustomerCard>
+              ))}
+            </div>
           </div>
         )}
       </CustomerScreen>
