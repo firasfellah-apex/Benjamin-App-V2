@@ -36,6 +36,16 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
     }
   };
   
+  const handleReorder = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Navigate to cash request page with the same address pre-selected
+    if (order.address_id) {
+      navigate(`/customer/request?address=${order.address_id}`);
+    } else {
+      navigate('/customer/request');
+    }
+  };
+  
   return (
     <>
       {/* Standardized spacing: px-6 (24px) horizontal and vertical */}
@@ -79,42 +89,87 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
           {/* Actions */}
           <div className="flex items-center justify-between gap-4">
             {canRate ? (
-              <Button
-                type="button"
-                onClick={handleRateClick}
-                className="w-full h-14 items-center justify-center gap-2 bg-yellow-400 text-base font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
-                style={{ color: '#D97708' }}
-              >
-                <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
-                <span>Rate Runner</span>
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  onClick={handleRateClick}
+                  className="flex-1 h-14 items-center justify-center gap-2 bg-yellow-400 text-base font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                  style={{ color: '#D97708' }}
+                >
+                  <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
+                  <span>Rate Runner</span>
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleReorder}
+                  className="flex-1 h-14 bg-black text-white hover:bg-black/90"
+                >
+                  Reorder
+                </Button>
+              </>
             ) : hasIssue && !isRated ? (
-              <div className="flex items-center justify-between w-full">
-                <span className="text-xs text-slate-600">This delivery is being investigated.</span>
-              </div>
-            ) : isRated && order.runner_rating ? (
-              <div className="flex items-center justify-between w-full">
-                <span className="text-xs text-slate-600">You rated this runner:</span>
-                <div className="inline-flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <span
-                      key={i}
-                      className="text-base leading-[0]"
-                      style={{ color: i < Math.round(order.runner_rating || 0) ? '#DFB300' : '#E5E7EB' }}
-                    >
-                      ★
-                    </span>
-                  ))}
+              <>
+                <div className="flex items-center justify-between flex-1">
+                  <span className="text-xs text-slate-600">This delivery is being investigated.</span>
                 </div>
-              </div>
+                <Button
+                  type="button"
+                  onClick={handleReorder}
+                  className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90"
+                >
+                  Reorder
+                </Button>
+              </>
+            ) : isRated && order.runner_rating ? (
+              <>
+                <div className="flex items-center justify-between flex-1">
+                  <span className="text-xs text-slate-600">You rated this runner:</span>
+                  <div className="inline-flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className="text-base leading-[0]"
+                        style={{ color: i < Math.round(order.runner_rating || 0) ? '#DFB300' : '#E5E7EB' }}
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleReorder}
+                  className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90"
+                >
+                  Reorder
+                </Button>
+              </>
             ) : isCancelled ? (
-              <div className="text-xs text-slate-400">
-                This order was cancelled.
-              </div>
+              <>
+                <div className="text-xs text-slate-400 flex-1">
+                  This order was cancelled.
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleReorder}
+                  className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90"
+                >
+                  Reorder
+                </Button>
+              </>
             ) : (
-              <div className="text-xs text-slate-400">
-                Thank you for using Benjamin.
-              </div>
+              <>
+                <div className="text-xs text-slate-400 flex-1">
+                  Thank you for using Benjamin.
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleReorder}
+                  className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90"
+                >
+                  Reorder
+                </Button>
+              </>
             )}
           </div>
         </div>

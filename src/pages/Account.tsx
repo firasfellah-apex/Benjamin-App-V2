@@ -447,7 +447,7 @@ export default function Account() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50"
+                    className="flex-1 h-14"
                     onClick={handleReset}
                     disabled={isSaving}
                   >
@@ -455,7 +455,7 @@ export default function Account() {
                   </Button>
                   <Button
                     type="button"
-                    className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90"
+                    className="flex-1 h-14 bg-black text-white hover:bg-black/90"
                     onClick={handleSave}
                     disabled={isSaving}
                   >
