@@ -95,16 +95,14 @@ export default function BankAccounts() {
       console.log('[Disconnect Bank] Cleared localStorage cache');
       
       // Update database to remove bank connection
+      // Only update columns that actually exist in the profiles table
       console.log('[Disconnect Bank] Updating database...');
       const { error } = await supabase
         .from('profiles')
         .update({
           plaid_item_id: null,
-          plaid_access_token: null,
           kyc_status: 'unverified',
-          bank_institution_name: null,
-          bank_last4: null,
-          bank_institution_logo_url: null,
+          kyc_verified_at: null,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
