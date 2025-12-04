@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { BankingHelpStories } from "@/components/customer/BankingHelpStories";
 import { supabase } from "@/db/supabase";
 import { toast } from "sonner";
+import { clearProfileCache } from "@/hooks/useProfile";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -68,6 +69,73 @@ export default function BankAccounts() {
   const [showHelpStories, setShowHelpStories] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  // Debug: Log when disconnect dialog state changes
+  useEffect(() => {
+    console.log('[BankAccounts] showDisconnectDialog:', showDisconnectDialog);
+  }, [showDisconnectDialog]);
+
+  // Handler for disconnecting bank
+  const handleDisconnectBank = async () => {
+    console.log('[Disconnect Bank] Starting disconnect process...');
+    setIsDisconnecting(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('[Disconnect Bank] No user found');
+        toast.error('Not authenticated');
+        return;
+      }
+      
+      console.log('[Disconnect Bank] User ID:', user.id);
+      
+      // Clear localStorage cache immediately to prevent stale data
+      clearProfileCache();
+      console.log('[Disconnect Bank] Cleared localStorage cache');
+      
+      // Update database to remove bank connection
+      console.log('[Disconnect Bank] Updating database...');
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          plaid_item_id: null,
+          plaid_access_token: null,
+          kyc_status: 'unverified',
+          bank_institution_name: null,
+          bank_last4: null,
+          bank_institution_logo_url: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error('[Disconnect Bank] Database update error:', error);
+        throw error;
+      }
+      
+      console.log('[Disconnect Bank] Database updated successfully');
+      
+      // Invalidate all profile queries and force immediate refetch
+      console.log('[Disconnect Bank] Invalidating React Query cache...');
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      
+      console.log('[Disconnect Bank] Forcing refetch...');
+      await queryClient.refetchQueries({ 
+        queryKey: ['profile', user.id],
+        type: 'active'
+      });
+      
+      console.log('[Disconnect Bank] Complete! Profile should now show disconnected state');
+      toast.success('Bank account disconnected');
+      setShowDisconnectDialog(false);
+    } catch (error) {
+      console.error('[Disconnect Bank] Error:', error);
+      toast.error('Failed to disconnect bank account');
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
 
   // Invalidate profile cache when component mounts to ensure fresh data
   // This prevents stale bank connection data from being displayed
@@ -358,7 +426,10 @@ export default function BankAccounts() {
                   />
                   <Button
                     variant="outline"
-                    onClick={() => setShowDisconnectDialog(true)}
+                    onClick={() => {
+                      console.log('[BankAccounts] Disconnect Bank button clicked');
+                      setShowDisconnectDialog(true);
+                    }}
                     className="w-full h-14"
                   >
                     Disconnect Bank
@@ -421,39 +492,8 @@ export default function BankAccounts() {
 
           <AlertDialogFooter className="flex flex-col gap-3 sm:flex-col">
             <Button
-              onClick={async () => {
-                setIsDisconnecting(true);
-                try {
-                  const { data: { user } } = await supabase.auth.getUser();
-                  if (!user) return;
-                  
-                  const { error } = await supabase
-                    .from('profiles')
-                    .update({
-                      plaid_item_id: null,
-                      plaid_access_token: null,
-                      kyc_status: 'unverified',
-                      bank_institution_name: null,
-                      bank_last4: null,
-                      bank_institution_logo_url: null,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', user.id);
-                  
-                  if (error) throw error;
-                  
-                  // Invalidate profile cache to refetch
-                  await queryClient.invalidateQueries({ queryKey: ['profile'] });
-                  
-                  toast.success('Bank account disconnected');
-                  setShowDisconnectDialog(false);
-                } catch (error) {
-                  console.error('Error disconnecting bank:', error);
-                  toast.error('Failed to disconnect bank account');
-                } finally {
-                  setIsDisconnecting(false);
-                }
-              }}
+              type="button"
+              onClick={handleDisconnectBank}
               disabled={isDisconnecting}
               className="w-full h-14 text-white hover:opacity-90"
               style={{ backgroundColor: '#E84855' }}
@@ -461,8 +501,12 @@ export default function BankAccounts() {
               {isDisconnecting ? 'Disconnecting...' : 'Disconnect Bank'}
             </Button>
             <Button
+              type="button"
               variant="outline"
-              onClick={() => setShowDisconnectDialog(false)}
+              onClick={() => {
+                console.log('[BankAccounts] Cancel button clicked');
+                setShowDisconnectDialog(false);
+              }}
               disabled={isDisconnecting}
               className="w-full h-14"
             >
