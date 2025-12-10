@@ -100,8 +100,8 @@ export default function ManageAddresses() {
             const windowHeight = window.innerHeight;
             const viewportBottom = windowHeight - 120; // Account for bottom nav (~120px)
             
-            // Expanded card height estimate: map (200px) + content (~48px) + buttons (~60px with padding) = ~308px
-            const expandedCardHeight = 308;
+            // Expanded card height estimate: map (260px) + content (~48px) + buttons (~60px with padding) = ~368px
+            const expandedCardHeight = 368;
             
             // Calculate where the bottom of the expanded card would be (using current top position)
             const expandedBottom = rect.top + expandedCardHeight;
@@ -342,24 +342,26 @@ export default function ManageAddresses() {
                 className={cn(
                   "overflow-hidden relative",
                   isSelected 
-                    ? "max-h-[220px] duration-400" 
+                    ? "max-h-[272px] duration-400" 
                     : "max-h-0 duration-350"
                 )}
                 style={{
                   transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
               >
-                {/* Map container */}
+                {/* Map container with inset frame styling - matches CashRequest */}
                 <div
-                  className="w-full h-[200px] bg-slate-50 relative"
+                  className="w-full px-[6px] pt-[6px]"
                   style={{
                     opacity: isSelected ? 1 : 0,
                     transition: isSelected
-                      ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s"
-                      : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                      ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                      : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
                   }}
                 >
-                  <CustomerMapViewport selectedAddress={addr} />
+                  <div className="relative w-full h-[260px] rounded-[18px] border border-[#F0F0F0] overflow-hidden bg-slate-50">
+                    <CustomerMapViewport selectedAddress={addr} />
+                  </div>
                 </div>
               </div>
 

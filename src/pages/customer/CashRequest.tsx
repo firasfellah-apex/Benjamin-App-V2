@@ -119,37 +119,49 @@ export default function CashRequest() {
   const selectedAddressIdFromUrl = searchParams.get('address_id');
 
   // Update URL when selectedAddress changes (but don't navigate)
+  // Use ref to prevent infinite loops
+  const lastSyncedAddressIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (step === 1 && selectedAddress) {
-      if (selectedAddressIdFromUrl !== selectedAddress.id) {
+      // Only update URL if address actually changed and we haven't synced this address yet
+      if (selectedAddressIdFromUrl !== selectedAddress.id && lastSyncedAddressIdRef.current !== selectedAddress.id) {
         const newParams = new URLSearchParams(searchParams);
         newParams.set('address_id', selectedAddress.id);
         setSearchParams(newParams, { replace: true });
+        lastSyncedAddressIdRef.current = selectedAddress.id;
       }
+    } else if (!selectedAddress) {
+      // Reset ref when address is cleared
+      lastSyncedAddressIdRef.current = null;
     }
-  }, [selectedAddress?.id, step, selectedAddressIdFromUrl, searchParams, setSearchParams]);
+  }, [selectedAddress?.id, step, selectedAddressIdFromUrl]);
 
   // Handle reorder prefilling from URL params
+  // Use ref to track which params we've already processed to prevent loops
+  const processedReorderParamsRef = useRef<string | null>(null);
   useEffect(() => {
     const amountParam = searchParams.get('amount');
-    if (amountParam) {
+    const addressIdParam = searchParams.get('address_id');
+    const paramsKey = `${amountParam || ''}:${addressIdParam || ''}`;
+    
+    // Only process if params exist and we haven't processed this exact combination
+    if (amountParam && processedReorderParamsRef.current !== paramsKey) {
       const parsedAmount = parseFloat(amountParam);
       if (!isNaN(parsedAmount) && parsedAmount >= MIN_AMOUNT && parsedAmount <= MAX_AMOUNT) {
         // Round to nearest $20 increment
         const rounded = Math.round(parsedAmount / 20) * 20;
         const clamped = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, rounded));
         setAmount(clamped);
-        if (step === 1) {
-          setTimeout(() => {
-            const addressIdParam = searchParams.get('address_id');
-            if (addressIdParam) {
-              setStep(2);
-            }
-          }, 500);
-        }
+        processedReorderParamsRef.current = paramsKey;
       }
     }
-  }, [searchParams, step]);
+    
+    // Reset ref when amount/address_id params are removed (user navigates away)
+    if (!amountParam && !addressIdParam) {
+      processedReorderParamsRef.current = null;
+    }
+  }, [searchParams]);
+
 
   // Calculate pricing (memoized so identity is stable)
   const pricing = useMemo(() => {
@@ -193,6 +205,56 @@ export default function CashRequest() {
   const { setBottomSlot } = useCustomerBottomSlot();
   const invalidateAddresses = useInvalidateAddresses();
 
+  // Auto-advance to step 2 when reordering with address_id
+  // This runs separately and waits for address to be selected
+  const hasAutoAdvancedRef = useRef(false);
+  useEffect(() => {
+    const addressIdParam = searchParams.get('address_id');
+    const amountParam = searchParams.get('amount');
+    
+    // Reset auto-advance flag when params change
+    if (hasAutoAdvancedRef.current && (!addressIdParam || !amountParam)) {
+      hasAutoAdvancedRef.current = false;
+    }
+    
+    // Only auto-advance if:
+    // 1. We're on step 1
+    // 2. We have address_id and amount params (reorder scenario)
+    // 3. The address from URL param is actually selected
+    // 4. Addresses have loaded
+    // 5. We haven't already auto-advanced
+    if (step === 1 && addressIdParam && amountParam && addresses.length > 0 && !hasAutoAdvancedRef.current) {
+      // Check if the address from URL is selected
+      const isAddressSelected = selectedAddress?.id === addressIdParam;
+      
+      if (isAddressSelected) {
+        // Address is selected, advance to step 2
+        hasAutoAdvancedRef.current = true;
+        isInternalStepUpdate.current = true;
+        setStep(2);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('step', '2');
+        setSearchParams(newParams, { replace: true });
+      } else if (selectedAddressIdFromUrl === addressIdParam) {
+        // Address param exists but not selected yet - wait a bit for selection to happen
+        // This handles the case where addresses are still loading
+        const timeoutId = setTimeout(() => {
+          // Check again if address is now selected
+          if (selectedAddress?.id === addressIdParam && step === 1 && !hasAutoAdvancedRef.current) {
+            hasAutoAdvancedRef.current = true;
+            isInternalStepUpdate.current = true;
+            setStep(2);
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set('step', '2');
+            setSearchParams(newParams, { replace: true });
+          }
+        }, 500);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [step, selectedAddress?.id, addresses.length, searchParams, setSearchParams, selectedAddressIdFromUrl]);
+
   // Modal state for adding address
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const addAddressFormRef = useRef<AddressFormRef>(null);
@@ -223,42 +285,68 @@ export default function CashRequest() {
   // 
   // IMPORTANT: This effect must NOT override a selection that was just made via handleSaveAddress
   // The selection state (selectedAddress) is the source of truth - this effect only initializes it
+  // Use ref to track last restored address ID to prevent infinite loops
+  const lastRestoredAddressIdRef = useRef<string | null>(null);
   useEffect(() => {
-    // No addresses at all → clear selection
+    // Priority 1: Restore from URL param if it exists (CRITICAL for reorder flow)
+    // This must happen FIRST, even before checking if addresses are loaded
+    // This handles reorder scenarios where we need to select a specific address
+    if (selectedAddressIdFromUrl) {
+      // Only restore if we haven't already restored this address ID
+      if (lastRestoredAddressIdRef.current !== selectedAddressIdFromUrl) {
+        // Try to find the address in the current addresses list
+        const restored = addresses.find(a => a.id === selectedAddressIdFromUrl);
+        if (restored) {
+          // Address found - select it immediately
+          if (!selectedAddress || selectedAddress.id !== restored.id) {
+            setSelectedAddress(restored);
+            lastRestoredAddressIdRef.current = selectedAddressIdFromUrl;
+            return; // Exit early - don't run other selection logic
+          }
+        } else if (addresses.length > 0) {
+          // Address not found in list - this shouldn't happen in reorder flow
+          // but if it does, we'll fall through to other logic
+          console.warn('[CashRequest] Address from URL param not found in addresses list:', selectedAddressIdFromUrl);
+        }
+        // If addresses haven't loaded yet, we'll wait and try again when they load
+      } else if (selectedAddress?.id === selectedAddressIdFromUrl) {
+        // Already restored and matches - update ref to be safe
+        lastRestoredAddressIdRef.current = selectedAddressIdFromUrl;
+        return;
+      }
+    }
+
+    // No addresses at all → clear selection (unless we're waiting for URL param address)
     if (addresses.length === 0) {
-      if (selectedAddress) setSelectedAddress(null);
+      if (selectedAddress && !selectedAddressIdFromUrl) {
+        setSelectedAddress(null);
+        lastRestoredAddressIdRef.current = null;
+      }
       return;
     }
 
     // Check if current selection is valid (exists in addresses array)
     const hasValidSelection = selectedAddress && addresses.some(a => a.id === selectedAddress.id);
 
-    // Priority 1: Restore from URL param if it exists and we don't have a valid selection
-    // This handles:
-    // 1. Returning from Manage Addresses (component remounts, selectedAddress is null, URL param preserved)
-    // 2. Returning from Cash Amount (step changes, selectedAddress might be stale, URL param preserved)
-    // 3. Returning from Bank Accounts on step 2 (selectedAddress might be lost, URL param preserved)
-    if (selectedAddressIdFromUrl && !hasValidSelection) {
-      const restored = addresses.find(a => a.id === selectedAddressIdFromUrl);
-      if (restored && (!selectedAddress || selectedAddress.id !== restored.id)) {
-        setSelectedAddress(restored);
-        return;
-      }
-    }
-
     // Priority 2: If we have a valid selection, don't override it (preserve manual selections)
     // This includes newly created addresses that were just selected via handleSaveAddress
     if (hasValidSelection) {
+      // Update ref to match current selection
+      if (selectedAddress) {
+        lastRestoredAddressIdRef.current = selectedAddress.id;
+      }
       return;
     }
 
     // Priority 3: Only auto-select first address on step 1 (not step 2)
     // Step 2 should only be accessible after selecting an address, so we shouldn't auto-select here
-    // This only runs when there's NO selection at all (initial load)
-    if (step === 1 && !selectedAddress) {
+    // This only runs when there's NO selection at all (initial load) AND no URL param
+    // IMPORTANT: Don't auto-select if we have a URL param - wait for it to be restored
+    if (step === 1 && !selectedAddress && !selectedAddressIdFromUrl) {
       const firstAddress = addresses[0];
       if (firstAddress) {
         setSelectedAddress(firstAddress);
+        lastRestoredAddressIdRef.current = firstAddress.id;
       }
     }
   }, [
@@ -807,8 +895,8 @@ export default function CashRequest() {
             const windowHeight = window.innerHeight;
             const viewportBottom = windowHeight - 120; // Account for bottom nav (~120px)
             
-            // Expanded card height estimate: map (206px with padding) + content (~48px) = 254px
-            const expandedCardHeight = 254;
+            // Expanded card height estimate: map (272px with padding) + content (~48px) = 320px
+            const expandedCardHeight = 320;
             
             // Calculate where the bottom of the expanded card would be (using current top position)
             const expandedBottom = rect.top + expandedCardHeight;
@@ -939,11 +1027,11 @@ export default function CashRequest() {
                   key={addr.id}
                   ref={setCardRef}
                   className={cn(
-                    "w-full rounded-xl border bg-white overflow-hidden",
+                    "w-full border bg-white overflow-hidden",
                     "transition-all duration-300 ease-in-out",
                     isSelected
-                      ? "border border-black"
-                      : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
+                      ? "border border-black rounded-[24px]"
+                      : "border border-[#F0F0F0] hover:border-[#E0E0E0] rounded-[24px]"
                   )}
                   style={{
                     transform: isSelected ? "scale(1)" : "scale(0.998)",
@@ -955,7 +1043,7 @@ export default function CashRequest() {
                     className={cn(
                       "overflow-hidden relative",
                       isSelected 
-                        ? "max-h-[212px] duration-400" 
+                        ? "max-h-[272px] duration-400" 
                         : "max-h-0 duration-350"
                     )}
                     style={{
@@ -972,7 +1060,7 @@ export default function CashRequest() {
                           : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
                       }}
                     >
-                      <div className="relative w-full h-[200px] rounded-[18px] border border-[#F0F0F0] overflow-hidden bg-slate-50">
+                      <div className="relative w-full h-[260px] rounded-[18px] border border-[#F0F0F0] overflow-hidden bg-slate-50">
                         <CustomerMapViewport selectedAddress={addr} />
                         
                         {/* Edit button - top right corner of map, only for selected addresses */}

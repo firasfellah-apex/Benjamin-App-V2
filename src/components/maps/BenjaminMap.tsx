@@ -183,13 +183,15 @@ export function BenjaminMap({
             draggable: draggable,
             icon: {
               url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M16 0C10.477 0 6 4.477 6 10C6 17.5 16 40 16 40C16 40 26 17.5 26 10C26 4.477 21.523 0 16 0Z" fill="#22C55E"/>
-                  <circle cx="16" cy="10" r="5" fill="white"/>
+                <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Chubbier pin shape (black) -->
+                  <path d="M18 0C12.477 0 8 4.477 8 10C8 18 18 44 18 44C18 44 28 18 28 10C28 4.477 23.523 0 18 0Z" fill="#000000"/>
+                  <!-- Dollar sign (green) -->
+                  <text x="18" y="16" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#13F287" text-anchor="middle" dominant-baseline="central" style="user-select: none;">$</text>
                 </svg>
               `),
-              scaledSize: new g.maps.Size(32, 40),
-              anchor: new g.maps.Point(16, 40),
+              scaledSize: new g.maps.Size(36, 44),
+              anchor: new g.maps.Point(18, 44),
             },
           });
           

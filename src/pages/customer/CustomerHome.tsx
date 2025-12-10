@@ -25,7 +25,6 @@ import type { OrderWithDetails, Order } from '@/types/types';
 import protectedIllustration from '@/assets/illustrations/Protected.png';
 import noAtmIllustration from '@/assets/illustrations/NoATM.png';
 import trustedRunnerIllustration from '@/assets/illustrations/TrustedRunner.png';
-import connectBankIllustration from '@/assets/illustrations/ConnectBank.png';
 import { Button } from '@/components/ui/button';
 
 export default function CustomerHome() {
@@ -387,19 +386,8 @@ export default function CustomerHome() {
       content.push(
         <div key="bank-prompt" style={{ paddingTop: topPadding }}>
           <div className="rounded-[24px] border border-[#F0F0F0] bg-white overflow-hidden">
-            {/* Illustration frame - no background, no border */}
-            <div className="px-[6px] pt-[6px]">
-              <div className="w-full h-[260px] rounded-[18px] flex items-center justify-center">
-                <img
-                  src={connectBankIllustration}
-                  alt="Connect your bank"
-                  className="w-[193px] h-[193px] object-contain"
-                />
-              </div>
-            </div>
-            
-            {/* Text and button */}
-            <div className="px-6 pt-6 pb-6 space-y-4">
+            {/* Text and button - equal padding all around */}
+            <div className="p-6 space-y-4">
               <div className="space-y-1.5">
                 <h3 className="text-lg font-semibold text-slate-900">
                   Connect Your Bank to Order Cash

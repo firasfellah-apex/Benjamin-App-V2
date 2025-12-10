@@ -21,7 +21,7 @@ import {
 } from '@/lib/reveal';
 import { shouldShowCustomerOtpToCustomer } from '@/lib/revealRunnerView';
 import { OtpDisplay } from '@/components/customer/OtpDisplay';
-import { rateRunner } from '@/db/api';
+import { rateRunner, getOrderById } from '@/db/api';
 import { toast } from 'sonner';
 import { supabase } from '@/db/supabase';
 import { resolveDeliveryStyleFromOrder } from '@/lib/deliveryStyle';
@@ -29,6 +29,7 @@ import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
 import { X } from 'lucide-react';
 import { IconButton } from '@/components/ui/icon-button';
 import moneyCountIllustration from '@/assets/illustrations/MoneyCount.png';
+import { useOrderRealtime } from '@/hooks/useOrdersRealtime';
 
 // Loader component for runner assignment state
 import LottieComponent from "lottie-react";
@@ -88,6 +89,64 @@ export function ActiveDeliverySheet({
   const COUNT_GUARDRAIL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
   const makeGuardrailKey = (orderId: string) => `benjamin:count-guardrail:${orderId}`;
   
+  // Local order state to handle realtime updates independently
+  const [localOrder, setLocalOrder] = useState<OrderWithDetails>(order);
+
+  // Sync localOrder when order prop changes (from parent)
+  useEffect(() => {
+    setLocalOrder(order);
+  }, [order]);
+
+  // Subscribe to realtime updates for this order
+  useOrderRealtime(order.id, {
+    onUpdate: async (updatedOrder) => {
+      console.log('[ActiveDeliverySheet] Realtime update received:', {
+        orderId: updatedOrder.id,
+        status: updatedOrder.status,
+        updated_at: updatedOrder.updated_at,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Fetch full order details to get relations (runner, address_snapshot, etc.)
+      try {
+        const fullOrder = await getOrderById(updatedOrder.id);
+        if (fullOrder) {
+          setLocalOrder(fullOrder);
+          // Notify parent component of the update
+          if (onOrderUpdate) {
+            onOrderUpdate(fullOrder);
+          }
+        } else {
+          // Fallback: merge update into existing order
+          setLocalOrder((prev) => ({
+            ...prev,
+            ...updatedOrder,
+          } as OrderWithDetails));
+          if (onOrderUpdate) {
+            onOrderUpdate({
+              ...order,
+              ...updatedOrder,
+            } as OrderWithDetails);
+          }
+        }
+      } catch (error) {
+        console.error('[ActiveDeliverySheet] Error fetching full order after realtime update:', error);
+        // Fallback: merge update into existing order
+        setLocalOrder((prev) => ({
+          ...prev,
+          ...updatedOrder,
+        } as OrderWithDetails));
+        if (onOrderUpdate) {
+          onOrderUpdate({
+            ...order,
+            ...updatedOrder,
+          } as OrderWithDetails);
+        }
+      }
+    },
+    enabled: !!order.id,
+  });
+
   // Debug: Log when order prop changes (for PWA troubleshooting)
   const prevOrderRef = useRef<OrderWithDetails | null>(null);
   useEffect(() => {
@@ -116,27 +175,27 @@ export function ActiveDeliverySheet({
   // Re-check whenever order updates (including when order_events change)
   useEffect(() => {
     const updateCustomerStatus = async () => {
-      if (order.status === 'Pending Handoff') {
-        const status = await getCustomerFacingStatusWithArrival(order.status, order);
+      if (localOrder.status === 'Pending Handoff') {
+        const status = await getCustomerFacingStatusWithArrival(localOrder.status, localOrder);
         setCustomerStatus(status);
-        lastCheckedOrderRef.current = order.id;
+        lastCheckedOrderRef.current = localOrder.id;
       } else {
-        setCustomerStatus(getCustomerFacingStatus(order.status));
-        lastCheckedOrderRef.current = order.id;
+        setCustomerStatus(getCustomerFacingStatus(localOrder.status));
+        lastCheckedOrderRef.current = localOrder.id;
       }
     };
     updateCustomerStatus();
-  }, [order.status, order.id, order.updated_at, order]);
+  }, [localOrder.status, localOrder.id, localOrder.updated_at, localOrder]);
   
   // Poll for arrival status periodically when in Pending Handoff
   // This ensures we catch arrival even if realtime subscription has issues
   // Uses a longer interval to avoid excessive API calls
   useEffect(() => {
-    if (order.status !== 'Pending Handoff' || !order.id) return;
+    if (localOrder.status !== 'Pending Handoff' || !localOrder.id) return;
     
     // Initial check
     const checkArrival = async () => {
-      const status = await getCustomerFacingStatusWithArrival(order.status, order);
+      const status = await getCustomerFacingStatusWithArrival(localOrder.status, localOrder);
       setCustomerStatus((prev) => {
         // Only update if status actually changed to avoid unnecessary re-renders
         if (prev.step !== status.step || prev.label !== status.label) {
@@ -154,13 +213,13 @@ export function ActiveDeliverySheet({
     const interval = setInterval(checkArrival, 3000);
     
     return () => clearInterval(interval);
-  }, [order.status, order.id, order]);
+  }, [localOrder.status, localOrder.id, localOrder]);
 
   // Subscribe to order_events for runner arrival updates
   useEffect(() => {
-    if (order.status !== 'Pending Handoff' || !order.id) return;
+    if (localOrder.status !== 'Pending Handoff' || !localOrder.id) return;
 
-    const orderId = order.id; // Capture orderId in closure
+    const orderId = localOrder.id; // Capture orderId in closure
     const channelName = `order-events:${orderId}:runner-arrived`;
     
     const channel = supabase
@@ -219,15 +278,15 @@ export function ActiveDeliverySheet({
       console.log(`[ActiveDeliverySheet] Unsubscribing from ${channelName}`);
       supabase.removeChannel(channel);
     };
-  }, [order.status, order.id, order, onOrderUpdate]);
+  }, [localOrder.status, localOrder.id, localOrder, onOrderUpdate]);
 
   // Subscribe to OTP verification events to start count window immediately
   // NOTE: This is a backup - the primary trigger is otp_verified_at field check
   useEffect(() => {
-    const deliveryStyle = resolveDeliveryStyleFromOrder(order);
-    if (deliveryStyle !== 'COUNTED' || !order.id) return;
+    const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
+    if (deliveryStyle !== 'COUNTED' || !localOrder.id) return;
 
-    const orderId = order.id;
+    const orderId = localOrder.id;
     const channelName = `order-events:${orderId}:otp-verified`;
     
     const channel = supabase
@@ -285,13 +344,13 @@ export function ActiveDeliverySheet({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [order.id]);
-  const showRunnerIdentity = canRevealRunnerIdentity(order.status);
-  const allowContact = canContactRunner(order.status);
-  const isFinal = isOrderFinal(order.status);
-  const canCancel = order.status === "Pending" || order.status === "Runner Accepted";
-  const isCompleted = order.status === "Completed";
-  const isCancelled = order.status === "Cancelled";
+  }, [localOrder.id]);
+  const showRunnerIdentity = canRevealRunnerIdentity(localOrder.status);
+  const allowContact = canContactRunner(localOrder.status);
+  const isFinal = isOrderFinal(localOrder.status);
+  const canCancel = localOrder.status === "Pending" || localOrder.status === "Runner Accepted";
+  const isCompleted = localOrder.status === "Completed";
+  const isCancelled = localOrder.status === "Cancelled";
 
   // Get status copy for collapsed state - must match the customerStatus label
   const getStatusCopy = (status: OrderStatus): string => {
@@ -308,18 +367,20 @@ export function ActiveDeliverySheet({
   };
 
   const handleRateRunner = async (rating: number) => {
-    if (!order.id || order.runner_rating) return;
+    if (!localOrder.id || localOrder.runner_rating) return;
     
     setSubmittingRating(true);
     try {
-      await rateRunner(order.id, rating);
+      await rateRunner(localOrder.id, rating);
       toast.success('Rating submitted successfully');
       // Update order state with new rating
+      const updatedOrder = {
+        ...localOrder,
+        runner_rating: rating,
+      };
+      setLocalOrder(updatedOrder);
       if (onOrderUpdate) {
-        onOrderUpdate({
-          ...order,
-          runner_rating: rating,
-        });
+        onOrderUpdate(updatedOrder);
       }
     } catch (error: any) {
       console.error('Error rating runner:', error);
@@ -332,14 +393,14 @@ export function ActiveDeliverySheet({
   // Calculate estimated arrival time
   const calculateEstimatedArrival = (): string | null => {
     // Only show ETA when runner is on the way (Cash Withdrawn or Pending Handoff)
-    if (order.status !== 'Cash Withdrawn' && order.status !== 'Pending Handoff') {
+    if (localOrder.status !== 'Cash Withdrawn' && localOrder.status !== 'Pending Handoff') {
       return null;
     }
 
     // If cash was withdrawn, estimate 5-10 minutes from withdrawal time
     // Don't show ETA if runner has already arrived
-    if (order.cash_withdrawn_at && customerStatus.step !== 'ARRIVED') {
-      const withdrawnTime = new Date(order.cash_withdrawn_at);
+    if (localOrder.cash_withdrawn_at && customerStatus.step !== 'ARRIVED') {
+      const withdrawnTime = new Date(localOrder.cash_withdrawn_at);
       const estimatedMinutes = 8; // 8 minutes average
       const arrivalTime = new Date(withdrawnTime.getTime() + estimatedMinutes * 60000);
       
@@ -361,7 +422,7 @@ export function ActiveDeliverySheet({
    * - secondaryLine: City, state (or street address if label exists)
    */
   const formatAddressForCollapsed = (): { primaryLine: string; secondaryLine: string } => {
-    const address = order.address_snapshot;
+    const address = localOrder.address_snapshot;
     
     // Get label if available
     const label = address?.label;
@@ -399,9 +460,9 @@ export function ActiveDeliverySheet({
       if (streetLine.length > 28) {
         streetLine = streetLine.substring(0, 25) + '…';
       }
-    } else if (order.customer_address) {
+    } else if (localOrder.customer_address) {
       // Fallback to customer_address - extract first line
-      const parts = order.customer_address.split(',');
+      const parts = localOrder.customer_address.split(',');
       streetLine = abbreviateStreet(parts[0]?.trim() || '');
       if (streetLine.length > 28) {
         streetLine = streetLine.substring(0, 25) + '…';
@@ -412,9 +473,9 @@ export function ActiveDeliverySheet({
     let cityLine = '';
     if (address?.city && address?.state) {
       cityLine = `${address.city}, ${address.state}`;
-    } else if (order.customer_address) {
+    } else if (localOrder.customer_address) {
       // Try to extract city/state from customer_address
-      const parts = order.customer_address.split(',');
+      const parts = localOrder.customer_address.split(',');
       if (parts.length >= 2) {
         const cityPart = parts[parts.length - 2]?.trim() || '';
         const stateZipPart = parts[parts.length - 1]?.trim() || '';
@@ -441,7 +502,7 @@ export function ActiveDeliverySheet({
     } else {
       // Fallback
       return {
-        primaryLine: order.customer_address || 'Address not available',
+        primaryLine: localOrder.customer_address || 'Address not available',
         secondaryLine: ''
       };
     }
@@ -513,7 +574,7 @@ export function ActiveDeliverySheet({
       resizeObserver.disconnect();
       clearTimeout(timeout);
     };
-  }, [isExpanded, onCollapsedHeightChange, collapsedHeight, order.status, order.otp_code, customerStatus]);
+  }, [isExpanded, onCollapsedHeightChange, collapsedHeight, localOrder.status, localOrder.otp_code, customerStatus]);
 
   // Keep the sheet snapped to its state (expanded vs collapsed)
   useEffect(() => {
@@ -523,14 +584,14 @@ export function ActiveDeliverySheet({
 
   // COUNTED delivery guardrail logic - driven by OTP verification, persists for 3 minutes
   useEffect(() => {
-    const deliveryStyle = resolveDeliveryStyleFromOrder(order);
-    if (deliveryStyle !== 'COUNTED' || order.status === 'Cancelled') {
+    const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
+    if (deliveryStyle !== 'COUNTED' || localOrder.status === 'Cancelled') {
       setShowCountGuardrail(false);
       setHasDismissedGuardrail(false);
       return;
     }
 
-    const key = makeGuardrailKey(order.id);
+    const key = makeGuardrailKey(localOrder.id);
 
     const parseStored = () => {
       try {
@@ -544,7 +605,7 @@ export function ActiveDeliverySheet({
     };
 
     const stored = parseStored();
-    const otpVerifiedAt = (order as any).otp_verified_at;
+    const otpVerifiedAt = (localOrder as any).otp_verified_at;
     
     // CRITICAL: Only show guardrail when OTP is VERIFIED, not when it's generated
     // OTP is verified when:
@@ -554,7 +615,7 @@ export function ActiveDeliverySheet({
     // OTP is generated when:
     // - otp_code exists but otp_verified_at is null
     // - Status is "Pending Handoff" but OTP not verified yet
-    const isOtpVerified = !!otpVerifiedAt && order.status === 'Pending Handoff';
+    const isOtpVerified = !!otpVerifiedAt && localOrder.status === 'Pending Handoff';
     
     let expiresAt: number | null = null;
     let windowStartTime: number | null = null;
@@ -565,9 +626,9 @@ export function ActiveDeliverySheet({
       expiresAt = windowStartTime + COUNT_GUARDRAIL_WINDOW_MS;
       
       console.log('[ActiveDeliverySheet][Guardrail] ✅ OTP verified by runner, starting count window:', {
-        orderId: order.id,
+        orderId: localOrder.id,
         otpVerifiedAt,
-        status: order.status,
+        status: localOrder.status,
         windowStartTime: new Date(windowStartTime).toISOString(),
         expiresAt: new Date(expiresAt).toISOString(),
       });
@@ -583,11 +644,11 @@ export function ActiveDeliverySheet({
     } else if (stored && stored.expiresAt) {
       // Check if stored window is still valid (OTP was verified when it was created)
       // Only use stored window if we're still in Pending Handoff (OTP verified but not completed)
-      if (order.status === 'Pending Handoff' || order.status === 'Completed') {
+      if (localOrder.status === 'Pending Handoff' || localOrder.status === 'Completed') {
         expiresAt = stored.expiresAt;
         console.log('[ActiveDeliverySheet][Guardrail] Using stored window (from previous OTP verification):', {
-          orderId: order.id,
-          status: order.status,
+          orderId: localOrder.id,
+          status: localOrder.status,
           expiresAt: new Date(expiresAt).toISOString(),
         });
       } else {
@@ -659,7 +720,7 @@ export function ActiveDeliverySheet({
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [order.id, order.status, (order as any).otp_verified_at]);
+  }, [localOrder.id, localOrder.status, (localOrder as any).otp_verified_at]);
 
   // Countdown timer - update every second when guardrail is active
   useEffect(() => {
@@ -669,7 +730,7 @@ export function ActiveDeliverySheet({
     }
 
     const interval = setInterval(() => {
-      const key = makeGuardrailKey(order.id);
+      const key = makeGuardrailKey(localOrder.id);
       try {
         const raw = localStorage.getItem(key);
         const parsed = raw ? JSON.parse(raw) : {};
@@ -695,7 +756,7 @@ export function ActiveDeliverySheet({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [showCountGuardrail, countdownSeconds, order.id]);
+  }, [showCountGuardrail, countdownSeconds, localOrder.id]);
 
   // Track if user is at top of scroll (for collapse gesture)
   const [isAtTop, setIsAtTop] = useState(true);
@@ -805,11 +866,11 @@ export function ActiveDeliverySheet({
                 <p className="text-sm text-slate-600 pt-[6px]">
                   {customerStatus.step === 'ON_THE_WAY'
                     ? (() => {
-                        const runnerName = showRunnerIdentity && order.runner 
+                        const runnerName = showRunnerIdentity && localOrder.runner 
                           ? getRunnerDisplayName(
-                              (order.runner as any)?.first_name,
-                              (order.runner as any)?.last_name,
-                              order.status
+                              (localOrder.runner as any)?.first_name,
+                              (localOrder.runner as any)?.last_name,
+                              localOrder.status
                             )
                           : 'Your runner';
                         return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
@@ -830,11 +891,11 @@ export function ActiveDeliverySheet({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash Amount</div>
-                    <div className="text-lg font-semibold text-slate-900">${order.requested_amount.toFixed(2)}</div>
+                    <div className="text-lg font-semibold text-slate-900">${localOrder.requested_amount.toFixed(2)}</div>
                   </div>
                   <div>
                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Total Payment</div>
-                    <div className="text-lg font-semibold text-slate-900">${order.total_payment.toFixed(2)}</div>
+                    <div className="text-lg font-semibold text-slate-900">${localOrder.total_payment.toFixed(2)}</div>
                   </div>
                 </div>
                 
@@ -858,22 +919,22 @@ export function ActiveDeliverySheet({
               </div>
 
               {/* 5. Runner Strip (When Allowed) */}
-              {showRunnerIdentity && order.runner ? (
+              {showRunnerIdentity && localOrder.runner ? (
                 <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
                   <div className="flex items-center gap-3">
                     <Avatar
-                      src={order.runner.avatar_url || undefined}
-                      fallback={order.runner.first_name || 'Runner'}
+                      src={localOrder.runner.avatar_url || undefined}
+                      fallback={localOrder.runner.first_name || 'Runner'}
                       size="md"
                       className={cn(
                         "transition-all duration-300",
-                        shouldBlurRunnerAvatar(order.status) && "blur-sm"
+                        shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
                       )}
                     />
                     <div className="flex-1">
                       <p className="font-medium text-slate-900">
-                        {order.runner.first_name || 'Runner'}
-                        {order.runner.last_name && ` ${order.runner.last_name}`}
+                        {localOrder.runner.first_name || 'Runner'}
+                        {localOrder.runner.last_name && ` ${localOrder.runner.last_name}`}
                       </p>
                       <p className="text-xs text-slate-500">Your Benjamin runner</p>
                     </div>
@@ -881,7 +942,7 @@ export function ActiveDeliverySheet({
                     {/* Message Button - Canonical IconButton */}
                     {allowContact && !isCompleted && !isCancelled && (
                       <IconButton
-                        onClick={() => navigate(`/customer/chat/${order.id}`)}
+                        onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
                         className="relative shrink-0"
                         aria-label="Message runner"
                       >
@@ -896,12 +957,12 @@ export function ActiveDeliverySheet({
                   </div>
                   
                   {/* Runner Fun Fact */}
-                  {order.runner.first_name && (order.runner as any)?.fun_fact && (
+                  {localOrder.runner.first_name && (localOrder.runner as any)?.fun_fact && (
                     <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
                       <p className="text-sm text-blue-900 leading-relaxed">
-                        <span className="font-medium">{order.runner.first_name}</span>
+                        <span className="font-medium">{localOrder.runner.first_name}</span>
                         {' — '}
-                        {(order.runner as any).fun_fact}
+                        {(localOrder.runner as any).fun_fact}
                       </p>
                     </div>
                   )}
@@ -929,8 +990,8 @@ export function ActiveDeliverySheet({
             </div>
 
             {/* OTP Display (when OTP is generated) - Collapsed State */}
-            {shouldShowCustomerOtpToCustomer(order.status, !!order.otp_code) && order.otp_code && (
-              <OtpDisplay otpCode={order.otp_code} customerStatusStep={customerStatus.step} />
+            {shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
+              <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
             )}
 
 
@@ -959,19 +1020,19 @@ export function ActiveDeliverySheet({
               <p className="text-sm text-slate-600 pt-[6px]">
                 {customerStatus.step === 'ON_THE_WAY'
                   ? (() => {
-                      const showRunnerIdentity = canRevealRunnerIdentity(order.status);
-                      const runnerName = showRunnerIdentity && order.runner
+                      const showRunnerIdentity = canRevealRunnerIdentity(localOrder.status);
+                      const runnerName = showRunnerIdentity && localOrder.runner
                         ? getRunnerDisplayName(
-                            (order.runner as any)?.first_name,
-                            (order.runner as any)?.last_name,
-                            order.status
+                            (localOrder.runner as any)?.first_name,
+                            (localOrder.runner as any)?.last_name,
+                            localOrder.status
                           )
                         : 'Your runner';
                       return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
                     })()
                   : customerStatus.step === 'ARRIVED'
                   ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
-                  : getExpandedStatusCopy(order.status)}
+                  : getExpandedStatusCopy(localOrder.status)}
               </p>
             </div>
 
@@ -983,11 +1044,11 @@ export function ActiveDeliverySheet({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash Amount</div>
-                  <div className="text-lg font-semibold text-slate-900">${order.requested_amount.toFixed(2)}</div>
+                  <div className="text-lg font-semibold text-slate-900">${localOrder.requested_amount.toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-slate-500">Total Payment</div>
-                  <div className="text-lg font-semibold text-slate-900">${order.total_payment.toFixed(2)}</div>
+                  <div className="text-lg font-semibold text-slate-900">${localOrder.total_payment.toFixed(2)}</div>
                 </div>
               </div>
               
@@ -1011,22 +1072,22 @@ export function ActiveDeliverySheet({
             </div>
 
             {/* 5. Runner Strip (When Allowed) */}
-            {showRunnerIdentity && order.runner ? (
+            {showRunnerIdentity && localOrder.runner ? (
               <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <Avatar
-                    src={order.runner.avatar_url || undefined}
-                    fallback={order.runner.first_name || 'Runner'}
+                    src={localOrder.runner.avatar_url || undefined}
+                    fallback={localOrder.runner.first_name || 'Runner'}
                     size="md"
                     className={cn(
                       "transition-all duration-300",
-                      shouldBlurRunnerAvatar(order.status) && "blur-sm"
+                      shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
                     )}
                   />
                   <div className="flex-1">
                     <p className="font-medium text-slate-900">
-                      {order.runner.first_name || 'Runner'}
-                      {order.runner.last_name && ` ${order.runner.last_name}`}
+                      {localOrder.runner.first_name || 'Runner'}
+                      {localOrder.runner.last_name && ` ${localOrder.runner.last_name}`}
                     </p>
                     <p className="text-xs text-slate-500">Your Benjamin runner</p>
                   </div>
@@ -1034,7 +1095,7 @@ export function ActiveDeliverySheet({
                   {/* Message Button - Canonical IconButton */}
                   {allowContact && !isCompleted && !isCancelled && (
                     <IconButton
-                      onClick={() => navigate(`/customer/chat/${order.id}`)}
+                      onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
                       className="relative shrink-0"
                       aria-label="Message runner"
                     >
@@ -1049,12 +1110,12 @@ export function ActiveDeliverySheet({
                 </div>
                 
                 {/* Runner Fun Fact */}
-                {order.runner.first_name && (order.runner as any)?.fun_fact && (
+                {localOrder.runner.first_name && (localOrder.runner as any)?.fun_fact && (
                   <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
                     <p className="text-sm text-blue-900 leading-relaxed">
-                      <span className="font-medium">{order.runner.first_name}</span>
+                      <span className="font-medium">{localOrder.runner.first_name}</span>
                       {' — '}
-                      {(order.runner as any).fun_fact}
+                      {(localOrder.runner as any).fun_fact}
                     </p>
                   </div>
                 )}
@@ -1081,19 +1142,19 @@ export function ActiveDeliverySheet({
             ) : null}
 
             {/* OTP Display (when OTP is generated) */}
-            {shouldShowCustomerOtpToCustomer(order.status, !!order.otp_code) && order.otp_code && (
-              <OtpDisplay otpCode={order.otp_code} customerStatusStep={customerStatus.step} />
+            {shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
+              <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
             )}
 
             {/* Delivery Progress Timeline */}
             <div ref={progressTimelineRef} className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">Delivery Progress</h3>
               <OrderProgressTimeline
-                currentStatus={order.status}
+                currentStatus={localOrder.status}
                 variant="customer"
                 tone="customer"
                 currentStep={customerStatus.step}
-                order={order}
+                order={localOrder}
               />
             </div>
 
@@ -1103,9 +1164,9 @@ export function ActiveDeliverySheet({
               <div className="space-y-2">
                 <div className="text-sm font-medium text-slate-900">Rate your runner</div>
                 <RatingStars
-                  value={order.runner_rating ?? 0}
-                  onChange={order.runner_rating ? undefined : handleRateRunner}
-                  readOnly={!!order.runner_rating || submittingRating}
+                  value={localOrder.runner_rating ?? 0}
+                  onChange={localOrder.runner_rating ? undefined : handleRateRunner}
+                  readOnly={!!localOrder.runner_rating || submittingRating}
                 />
               </div>
             )}
@@ -1135,7 +1196,7 @@ export function ActiveDeliverySheet({
             {/* Order ID Footer */}
             <div className="text-center pt-4 border-t border-neutral-100">
               <p className="text-xs text-neutral-400">
-                Order #{order.id.slice(0, 8).toUpperCase()}
+                Order #{localOrder.id.slice(0, 8).toUpperCase()}
               </p>
             </div>
             </div>
@@ -1145,13 +1206,13 @@ export function ActiveDeliverySheet({
       {/* ReportIssueSheet for COUNTED guardrail */}
       <ReportIssueSheet
         open={showCountIssueSheet}
-        order={order}
+        order={localOrder}
         onClose={() => {
           setShowCountIssueSheet(false);
           setShowCountGuardrail(false);
           setHasDismissedGuardrail(true);
           try {
-            const key = makeGuardrailKey(order.id);
+            const key = makeGuardrailKey(localOrder.id);
             const raw = localStorage.getItem(key);
             const parsed = raw ? JSON.parse(raw) : {};
             const expiresAt = parsed?.expiresAt ?? Date.now();
@@ -1181,7 +1242,7 @@ export function ActiveDeliverySheet({
                   setShowCountGuardrail(false);
                   setHasDismissedGuardrail(true);
                   try {
-                    const key = makeGuardrailKey(order.id);
+                    const key = makeGuardrailKey(localOrder.id);
                     const raw = localStorage.getItem(key);
                     const parsed = raw ? JSON.parse(raw) : {};
                     const expiresAt = parsed?.expiresAt ?? Date.now();
@@ -1232,7 +1293,7 @@ export function ActiveDeliverySheet({
                   setShowCountGuardrail(false);
                   setHasDismissedGuardrail(true);
                   try {
-                    const key = makeGuardrailKey(order.id);
+                    const key = makeGuardrailKey(localOrder.id);
                     const raw = localStorage.getItem(key);
                     const parsed = raw ? JSON.parse(raw) : {};
                     const expiresAt = parsed?.expiresAt ?? Date.now();
@@ -1246,7 +1307,7 @@ export function ActiveDeliverySheet({
                   
                   // For COUNTED deliveries, navigate to home page to close the active delivery sheet
                   // This happens after runner marks "All good" and order is completed
-                  const deliveryStyle = resolveDeliveryStyleFromOrder(order);
+                  const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
                   if (deliveryStyle === 'COUNTED') {
                     // Navigate to home page to close the active delivery sheet
                     navigate('/customer/home', { replace: true });
@@ -1264,7 +1325,7 @@ export function ActiveDeliverySheet({
                   setShowCountGuardrail(false);
                   setHasDismissedGuardrail(true);
                   try {
-                    const key = makeGuardrailKey(order.id);
+                    const key = makeGuardrailKey(localOrder.id);
                     const raw = localStorage.getItem(key);
                     const parsed = raw ? JSON.parse(raw) : {};
                     const expiresAt = parsed?.expiresAt ?? Date.now();
