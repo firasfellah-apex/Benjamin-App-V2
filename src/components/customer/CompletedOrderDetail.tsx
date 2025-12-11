@@ -9,6 +9,11 @@ import type { OrderWithDetails } from "@/types/types";
 import { formatDate, getOrderDuration } from "@/lib/utils";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { RequestFlowBottomBar } from "@/components/customer/RequestFlowBottomBar";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
+import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
 
 interface CompletedOrderDetailProps {
   order: OrderWithDetails;
@@ -27,8 +32,13 @@ interface CompletedOrderDetailProps {
  */
 export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
+  const { addresses } = useCustomerAddresses();
   const [submittingRating, setSubmittingRating] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
   const hasRunnerRating = !!order.runner_rating;
 
   // Format address
@@ -53,6 +63,23 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
 
   // Handle reorder
   const handleReorder = () => {
+    // Run reorder eligibility check (only when onReorder is not provided - i.e., default reorder logic)
+    if (!onReorder) {
+      const result = validateReorderEligibility({
+        profile: profile || null,
+        addresses: addresses || [],
+        previousOrder: order,
+      });
+      
+      if (!result.ok) {
+        // Show blocked modal
+        setEligibilityResult(result);
+        setShowBlockedModal(true);
+        return;
+      }
+    }
+    
+    // All checks passed or onReorder provided - proceed with reorder
     if (onReorder) {
       onReorder(order);
     } else {
@@ -66,6 +93,11 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
       }
       navigate(`/customer/request?${params.toString()}`);
     }
+  };
+  
+  const handleStartNewRequest = () => {
+    // Navigate to normal order flow (no reorder params)
+    navigate('/customer/request');
   };
 
   // Handle report issue
@@ -324,6 +356,16 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
           )}
           </div>
         </div>
+        
+        {/* Reorder Blocked Modal */}
+        {eligibilityResult && (
+          <ReorderBlockedModal
+            open={showBlockedModal}
+            onOpenChange={setShowBlockedModal}
+            eligibilityResult={eligibilityResult}
+            onStartNewRequest={handleStartNewRequest}
+          />
+        )}
       </CustomerScreen>
   );
 }

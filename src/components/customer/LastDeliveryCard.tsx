@@ -6,10 +6,16 @@
  * Shows delivery amount, address, time, rating status, and navigation to full history.
  */
 
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { OrderWithDetails } from "@/types/types";
 import { formatOrderTitle, formatOrderListTimestamp, getOrderStatusLabel, hasRunnerRating } from "@/lib/orderDisplay";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
+import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
 
 interface LastDeliveryCardProps {
   order: OrderWithDetails;
@@ -19,6 +25,11 @@ interface LastDeliveryCardProps {
 
 export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: LastDeliveryCardProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
+  const { addresses } = useCustomerAddresses();
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
   
   if (!order) return null;
   
@@ -38,16 +49,51 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
   
   const handleReorder = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Navigate to cash request page with the same address pre-selected
-    if (order.address_id) {
-      navigate(`/customer/request?address=${order.address_id}`);
-    } else {
-      navigate('/customer/request');
+    
+    // Run reorder eligibility check
+    const result = validateReorderEligibility({
+      profile: profile || null,
+      addresses: addresses || [],
+      previousOrder: order,
+    });
+    
+    if (!result.ok) {
+      // Show blocked modal
+      setEligibilityResult(result);
+      setShowBlockedModal(true);
+      return;
     }
+    
+    // All checks passed - proceed with reorder
+    const params = new URLSearchParams();
+    params.set('amount', order.requested_amount.toString());
+    
+    if (order.address_id) {
+      params.set('address_id', order.address_id);
+    } else if (order.address_snapshot) {
+      sessionStorage.setItem('reorder_address_snapshot', JSON.stringify(order.address_snapshot));
+    }
+    
+    navigate(`/customer/request?${params.toString()}`);
+  };
+  
+  const handleStartNewRequest = () => {
+    // Navigate to normal order flow (no reorder params)
+    navigate('/customer/request');
   };
   
   return (
     <>
+      {/* Reorder Blocked Modal */}
+      {eligibilityResult && (
+        <ReorderBlockedModal
+          open={showBlockedModal}
+          onOpenChange={setShowBlockedModal}
+          eligibilityResult={eligibilityResult}
+          onStartNewRequest={handleStartNewRequest}
+        />
+      )}
+      
       {/* Standardized spacing: px-6 (24px) horizontal and vertical */}
       {/* Internal spacing: space-y-6 (24px) for grouped UI blocks */}
       <div className="rounded-2xl border border-[#F0F0F0]/70 bg-slate-50/40 px-6 py-6">

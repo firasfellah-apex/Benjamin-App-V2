@@ -13,6 +13,7 @@ import {
   CustomerBottomSlotProvider,
   useCustomerBottomSlot,
 } from "@/contexts/CustomerBottomSlotContext";
+import { GlobalCountGuardrail } from "@/components/customer/GlobalCountGuardrail";
 
 function CustomerLayoutContent({ children }: { children: ReactNode }) {
   const { bottomSlot } = useCustomerBottomSlot();
@@ -42,6 +43,7 @@ export function CustomerLayout({ children }: CustomerLayoutProps) {
   return (
     <CustomerBottomSlotProvider>
       <CustomerLayoutContent>{children}</CustomerLayoutContent>
+      <GlobalCountGuardrail />
     </CustomerBottomSlotProvider>
   );
 }

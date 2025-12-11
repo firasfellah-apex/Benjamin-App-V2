@@ -37,6 +37,8 @@ import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 import { DeliveryModeSelector, type DeliveryMode } from "@/components/customer/DeliveryModeSelector";
 import { AddressForm, type AddressFormRef } from "@/components/address/AddressForm";
 import { addAddressCopy } from "@/lib/copy/addAddress";
+import { VerifyBankModal } from "@/components/customer/VerifyBankModal";
+import { useOrderDraftStore } from "@/stores/useOrderDraftStore";
 
 type Step = 1 | 2;
 
@@ -63,9 +65,18 @@ export default function CashRequest() {
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
   const [loading, setLoading] = useState(false);
   const [showFeeDetails, setShowFeeDetails] = useState(false); // Collapsed by default
+  const [showVerifyBankModal, setShowVerifyBankModal] = useState(false);
+  
+  // Order draft store for persisting order state during bank verification
+  const { draft, returnTo, setDraft, clearDraft } = useOrderDraftStore();
+  const hasRestoredFromDraftRef = useRef(false);
+
 
   // Initialize amount and delivery mode from profile personalization (only once on mount)
+  // Only run if we haven't restored from draft
   useEffect(() => {
+    if (hasRestoredFromDraftRef.current) return; // Skip if we restored from draft
+    
     if (profile) {
       // Set amount from usual_withdrawal_amount if available
       if (profile.usual_withdrawal_amount !== null && 
@@ -204,6 +215,48 @@ export default function CashRequest() {
   const hasAnyAddresses = addresses.length > 0;
   const { setBottomSlot } = useCustomerBottomSlot();
   const invalidateAddresses = useInvalidateAddresses();
+
+  // Restore from draft if returning from bank verification
+  // This must run after addresses are loaded
+  useEffect(() => {
+    if (draft && returnTo === 'order-review' && !hasRestoredFromDraftRef.current && addresses.length > 0) {
+      hasRestoredFromDraftRef.current = true;
+      
+      // Restore amount
+      if (draft.amount >= MIN_AMOUNT && draft.amount <= MAX_AMOUNT) {
+        setAmount(draft.amount);
+      }
+      
+      // Restore delivery mode
+      if (draft.deliveryMode) {
+        setDeliveryMode(draft.deliveryMode);
+      }
+      
+      // Restore address - find it in the addresses list
+      if (draft.addressId) {
+        const addressToRestore = addresses.find(addr => addr.id === draft.addressId);
+        if (addressToRestore) {
+          setSelectedAddress(addressToRestore);
+          // Ensure we're on step 2 (review screen)
+          if (step === 1) {
+            isInternalStepUpdate.current = true;
+            setStep(2);
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set('step', '2');
+            if (draft.addressId) {
+              newParams.set('address_id', draft.addressId);
+            }
+            setSearchParams(newParams, { replace: true });
+          }
+        }
+      }
+      
+      // Show success toast
+      toast.success("Bank verified! Your order details have been restored.", {
+        duration: 3000,
+      });
+    }
+  }, [draft, returnTo, addresses, step, searchParams, setSearchParams]);
 
   // Auto-advance to step 2 when reordering with address_id
   // This runs separately and waits for address to be selected
@@ -484,6 +537,26 @@ export default function CashRequest() {
       return;
     }
 
+    // Bank connection guardrail: prevent order creation if no bank is linked
+    const hasLinkedBank = !!profile?.plaid_item_id;
+    if (!hasLinkedBank) {
+      // Save draft before showing modal
+      const draftOrder = {
+        amount,
+        deliveryMode,
+        addressId: selectedAddress.id,
+        feeBreakdown: pricing ? {
+          platformFee: pricing.platformFee,
+          complianceFee: pricing.complianceFee,
+          deliveryFee: pricing.deliveryFee,
+          total: pricing.total,
+        } : undefined,
+      };
+      setDraft(draftOrder, 'order-review');
+      setShowVerifyBankModal(true);
+      return; // Do not proceed to create the order
+    }
+
     if (profile && profile.daily_usage + pricing.total > profile.daily_limit) {
       toast.error(`${strings.customer.dailyLimitExceeded} $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
       return;
@@ -522,6 +595,9 @@ export default function CashRequest() {
         deliveryStyle
       );
       if (order) {
+        // Clear draft after successful order creation
+        clearDraft();
+        hasRestoredFromDraftRef.current = false;
         toast.success(strings.toasts.orderPlaced);
         navigate(`/customer/deliveries/${order.id}`);
       }
@@ -1488,6 +1564,12 @@ export default function CashRequest() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Verify Bank Modal - shown when user tries to confirm order without linked bank */}
+      <VerifyBankModal
+        open={showVerifyBankModal}
+        onOpenChange={setShowVerifyBankModal}
+      />
     </>
   );
 }

@@ -28,7 +28,7 @@ import { resolveDeliveryStyleFromOrder } from '@/lib/deliveryStyle';
 import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
 import { X } from 'lucide-react';
 import { IconButton } from '@/components/ui/icon-button';
-import moneyCountIllustration from '@/assets/illustrations/MoneyCount.png';
+import countConfirmationIllustration from '@/assets/illustrations/CountConfirmation.png';
 import { useOrderRealtime } from '@/hooks/useOrdersRealtime';
 
 // Loader component for runner assignment state
@@ -758,6 +758,55 @@ export function ActiveDeliverySheet({
     return () => clearInterval(interval);
   }, [showCountGuardrail, countdownSeconds, localOrder.id]);
 
+  // Auto-close sheet and navigate to home when COUNTED order is completed and 3-minute window has expired
+  useEffect(() => {
+    const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
+    if (deliveryStyle !== 'COUNTED' || localOrder.status !== 'Completed') {
+      return;
+    }
+
+    const key = makeGuardrailKey(localOrder.id);
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const expiresAt = parsed?.expiresAt;
+      
+      if (!expiresAt) {
+        // No window stored, order might have been completed before OTP was verified
+        // Navigate to home after a short delay
+        const timeout = setTimeout(() => {
+          navigate('/customer/home', { replace: true });
+        }, 1000);
+        return () => clearTimeout(timeout);
+      }
+
+      const now = Date.now();
+      const remainingMs = expiresAt - now;
+
+      if (remainingMs <= 0) {
+        // Window has expired and order is completed - navigate to home
+        console.log('[ActiveDeliverySheet] COUNTED order completed and 3-minute window expired, navigating to home');
+        navigate('/customer/home', { replace: true });
+        return;
+      }
+
+      // Window hasn't expired yet - set timeout to navigate when it does
+      const timeout = setTimeout(() => {
+        console.log('[ActiveDeliverySheet] COUNTED order completed and 3-minute window expired, navigating to home');
+        navigate('/customer/home', { replace: true });
+      }, remainingMs);
+
+      return () => clearTimeout(timeout);
+    } catch (error) {
+      console.error('[ActiveDeliverySheet] Error checking count window expiration:', error);
+      // On error, navigate to home after a short delay
+      const timeout = setTimeout(() => {
+        navigate('/customer/home', { replace: true });
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [localOrder.id, localOrder.status, navigate]);
+
   // Track if user is at top of scroll (for collapse gesture)
   const [isAtTop, setIsAtTop] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
@@ -1231,9 +1280,9 @@ export function ActiveDeliverySheet({
       {/* COUNTED guardrail modal overlay */}
       {showCountGuardrail && !isCancelled && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white shadow-xl p-6 space-y-4 relative">
+          <div className="w-full max-w-sm rounded-[24px] bg-white shadow-xl relative overflow-hidden">
             {/* Close button */}
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-4 right-4 z-10">
               <IconButton
                 type="button"
                 variant="default"
@@ -1260,93 +1309,98 @@ export function ActiveDeliverySheet({
               </IconButton>
             </div>
 
-            {/* Illustration */}
-            <div className="flex justify-center -mt-2">
-              <img
-                src={moneyCountIllustration}
-                alt="Money count"
-                className="w-32 h-32 object-contain"
-              />
+            {/* Illustration frame - 6px from top and sides */}
+            <div className="w-full px-[6px] pt-[6px]">
+              <div
+                className="w-full h-[260px] flex items-center justify-center rounded-[18px]"
+              >
+                <div className="w-[193px] h-[193px] flex items-center justify-center overflow-hidden rounded-[18px]">
+                  <img
+                    src={countConfirmationIllustration}
+                    alt="Count confirmation"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Content */}
-            <div className="space-y-2 text-center">
-              <h3 className="text-lg font-semibold text-slate-900">
-                How did the count go?
-              </h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Take a moment to count your cash with the runner present.
-              </p>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Report any mismatch and we&apos;ll take care of it.
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1.5">
-                You&apos;ll have about 3 minutes to flag any issue for this delivery.
-              </p>
-            </div>
+            {/* Content - with 24px padding on sides and bottom */}
+            <div className="px-6 pb-6 space-y-4">
+              <div className="space-y-2 text-center">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  How did the count go?
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Count your cash with the runner. If anything&apos;s off, we&apos;ll handle it.
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  You&apos;ll have about 3 minutes to flag any issue for this delivery.
+                </p>
+              </div>
 
-            {/* Actions */}
-            <div className="space-y-3 pt-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  setShowCountGuardrail(false);
-                  setHasDismissedGuardrail(true);
-                  try {
-                    const key = makeGuardrailKey(localOrder.id);
-                    const raw = localStorage.getItem(key);
-                    const parsed = raw ? JSON.parse(raw) : {};
-                    const expiresAt = parsed?.expiresAt ?? Date.now();
-                    localStorage.setItem(
-                      key,
-                      JSON.stringify({ ...parsed, dismissed: true, expiresAt })
-                    );
-                  } catch (e) {
-                    console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
-                  }
-                  
-                  // For COUNTED deliveries, navigate to home page to close the active delivery sheet
-                  // This happens after runner marks "All good" and order is completed
-                  const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
-                  if (deliveryStyle === 'COUNTED') {
-                    // Navigate to home page to close the active delivery sheet
-                    navigate('/customer/home', { replace: true });
-                  }
-                }}
-                className="w-full h-14 text-base font-medium"
-              >
-                Looks Correct
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  // Close guardrail modal and dismiss it
-                  setShowCountGuardrail(false);
-                  setHasDismissedGuardrail(true);
-                  try {
-                    const key = makeGuardrailKey(localOrder.id);
-                    const raw = localStorage.getItem(key);
-                    const parsed = raw ? JSON.parse(raw) : {};
-                    const expiresAt = parsed?.expiresAt ?? Date.now();
-                    localStorage.setItem(
-                      key,
-                      JSON.stringify({ ...parsed, dismissed: true, expiresAt })
-                    );
-                  } catch (e) {
-                    console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
-                  }
-                  // Open the issue report sheet
-                  setShowCountIssueSheet(true);
-                }}
-                className="w-full h-14 border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600 text-base font-medium"
-              >
-                Incorrect Amount
-              </Button>
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    // Close guardrail modal and dismiss it
+                    setShowCountGuardrail(false);
+                    setHasDismissedGuardrail(true);
+                    try {
+                      const key = makeGuardrailKey(localOrder.id);
+                      const raw = localStorage.getItem(key);
+                      const parsed = raw ? JSON.parse(raw) : {};
+                      const expiresAt = parsed?.expiresAt ?? Date.now();
+                      localStorage.setItem(
+                        key,
+                        JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                      );
+                    } catch (e) {
+                      console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                    }
+                    // Open the issue report sheet
+                    setShowCountIssueSheet(true);
+                  }}
+                  className="flex-1 h-14 text-base font-semibold text-white"
+                  style={{ backgroundColor: '#E84855' }}
+                >
+                  Incorrect Amount
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setShowCountGuardrail(false);
+                    setHasDismissedGuardrail(true);
+                    try {
+                      const key = makeGuardrailKey(localOrder.id);
+                      const raw = localStorage.getItem(key);
+                      const parsed = raw ? JSON.parse(raw) : {};
+                      const expiresAt = parsed?.expiresAt ?? Date.now();
+                      localStorage.setItem(
+                        key,
+                        JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                      );
+                    } catch (e) {
+                      console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                    }
+                    
+                    // For COUNTED deliveries, navigate to home page to close the active delivery sheet
+                    // This happens after runner marks "All good" and order is completed
+                    const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
+                    if (deliveryStyle === 'COUNTED') {
+                      // Navigate to home page to close the active delivery sheet
+                      navigate('/customer/home', { replace: true });
+                    }
+                  }}
+                  className="flex-1 h-14 text-base font-semibold bg-black text-white hover:bg-black/90"
+                >
+                  Looks Correct
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      )}
+        )}
     </motion.div>
   );
 }

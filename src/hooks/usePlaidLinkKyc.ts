@@ -8,6 +8,8 @@ import { usePlaidLink } from "react-plaid-link";
 import { toast } from "sonner";
 import { createLinkToken, exchangePublicToken } from "@/lib/plaid";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { useOrderDraftStore } from "@/stores/useOrderDraftStore";
 
 export interface UsePlaidLinkKycResult {
   openPlaid: () => void;
@@ -26,6 +28,8 @@ export function usePlaidLinkKyc(onCompleted?: () => void): UsePlaidLinkKycResult
   const [lastResult, setLastResult] = useState<UsePlaidLinkKycResult["lastResult"]>(null);
   const [pendingOpen, setPendingOpen] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { draft, returnTo } = useOrderDraftStore();
 
   const onSuccess = useCallback(
     async (publicToken: string, metadata: any) => {
@@ -53,6 +57,12 @@ export function usePlaidLinkKyc(onCompleted?: () => void): UsePlaidLinkKycResult
           description: "Your bank is connected and you're ready to request cash.",
         });
         
+        // Check if we need to navigate back to order review
+        if (returnTo === 'order-review' && draft) {
+          // Navigate back to order review screen with step 2
+          navigate('/customer/request?step=2&address_id=' + draft.addressId);
+        }
+        
         // Call completion callback if provided
         onCompleted?.();
       } catch (err: any) {
@@ -64,7 +74,7 @@ export function usePlaidLinkKyc(onCompleted?: () => void): UsePlaidLinkKycResult
         setLoading(false);
       }
     },
-    [onCompleted, queryClient]
+    [onCompleted, queryClient, navigate, draft, returnTo]
   );
 
   const { open, ready } = usePlaidLink({

@@ -21,6 +21,11 @@ import { Skeleton } from "@/components/common/Skeleton";
 import { Button } from "@/components/ui/button";
 import type { CustomerDelivery } from "@/types/delivery";
 import type { OrderWithDetails } from "@/types/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
+import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
 
 /**
  * Build timeline events from delivery data
@@ -98,6 +103,9 @@ export default function CustomerDeliveryDetail() {
   const location = useLocation();
   const { deliveries, isLoading } = useCustomerDeliveries();
   const { setBottomSlot } = useCustomerBottomSlot();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
+  const { addresses } = useCustomerAddresses();
   
   // Try to get delivery from location state first (for instant render)
   const [delivery, setDelivery] = useState<CustomerDelivery | null>(
@@ -108,6 +116,8 @@ export default function CustomerDeliveryDetail() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [showReportIssueSheet, setShowReportIssueSheet] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
 
   // If not in state, find from deliveries list
   useEffect(() => {
@@ -198,6 +208,21 @@ export default function CustomerDeliveryDetail() {
       return;
     }
 
+    // Run reorder eligibility check
+    const result = validateReorderEligibility({
+      profile: profile || null,
+      addresses: addresses || [],
+      previousOrder: order,
+    });
+    
+    if (!result.ok) {
+      // Show blocked modal
+      setEligibilityResult(result);
+      setShowBlockedModal(true);
+      return;
+    }
+
+    // All checks passed - proceed with reorder
     setIsNavigating(true);
     
     const params = new URLSearchParams();
@@ -213,7 +238,13 @@ export default function CustomerDeliveryDetail() {
     setBottomSlot(null);
     
     navigate(`/customer/request?${params.toString()}`);
-  }, [order, navigate, isNavigating, setBottomSlot]);
+  }, [order, navigate, isNavigating, setBottomSlot, profile, addresses]);
+  
+  const handleStartNewRequest = useCallback(() => {
+    // Navigate to normal order flow (no reorder params)
+    setBottomSlot(null);
+    navigate('/customer/request');
+  }, [navigate, setBottomSlot]);
 
   const handleReportProblem = useCallback(() => {
     if (!order) {
@@ -441,6 +472,16 @@ export default function CustomerDeliveryDetail() {
           open={showReportIssueSheet}
           order={order}
           onClose={() => setShowReportIssueSheet(false)}
+        />
+      )}
+
+      {/* Reorder Blocked Modal */}
+      {eligibilityResult && (
+        <ReorderBlockedModal
+          open={showBlockedModal}
+          onOpenChange={setShowBlockedModal}
+          eligibilityResult={eligibilityResult}
+          onStartNewRequest={handleStartNewRequest}
         />
       )}
     </CustomerScreen>
