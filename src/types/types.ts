@@ -111,6 +111,8 @@ export interface CustomerAddress {
   postal_code: string;
   latitude: number | null;
   longitude: number | null;
+  custom_pin_lat: number | null; // Custom pin latitude set by customer (for meeting location)
+  custom_pin_lng: number | null; // Custom pin longitude set by customer (for meeting location)
   is_default: boolean;
   delivery_notes: string | null;
   created_at: string;
@@ -126,6 +128,8 @@ export interface AddressSnapshot {
   postal_code: string;
   latitude: number | null;
   longitude: number | null;
+  custom_pin_lat: number | null; // Custom pin latitude (for runner meeting location)
+  custom_pin_lng: number | null; // Custom pin longitude (for runner meeting location)
 }
 
 export interface Order {

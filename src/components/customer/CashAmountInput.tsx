@@ -260,7 +260,7 @@ export default function CashAmountInput({
               "flex-1 h-11 rounded-full text-sm font-medium text-slate-900 flex items-center justify-center transition-colors touch-manipulation",
               value === amt
                 ? "border border-black bg-white"
-                : "border border-slate-200 bg-white"
+                : "border-0 bg-[#F7F7F7]"
             )}
           >
             ${amt.toLocaleString()}

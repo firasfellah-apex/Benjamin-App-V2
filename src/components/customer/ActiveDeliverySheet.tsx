@@ -758,6 +758,16 @@ export function ActiveDeliverySheet({
     return () => clearInterval(interval);
   }, [showCountGuardrail, countdownSeconds, localOrder.id]);
 
+  // Auto-close sheet and navigate to home when SPEED order is completed (immediately after OTP verification)
+  useEffect(() => {
+    const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
+    if (deliveryStyle === 'SPEED' && localOrder.status === 'Completed') {
+      console.log('[ActiveDeliverySheet] SPEED order completed, navigating to home immediately');
+      // Navigate to home immediately for speed deliveries
+      navigate('/customer/home', { replace: true });
+    }
+  }, [localOrder.id, localOrder.status, navigate]);
+
   // Auto-close sheet and navigate to home when COUNTED order is completed and 3-minute window has expired
   useEffect(() => {
     const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);

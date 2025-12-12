@@ -4,68 +4,32 @@
  * User-friendly bank connection management with trust-building elements
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import CustomerCard from "@/pages/customer/components/CustomerCard";
 import { PlaidKycButton } from "@/components/customer/plaid/PlaidKycButton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Landmark, HelpCircle, CheckCircle2 } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Landmark, HelpCircle, MoreVertical, X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlaidLinkKyc } from "@/hooks/usePlaidLinkKyc";
 import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { BankingHelpStories } from "@/components/customer/BankingHelpStories";
 import { supabase } from "@/db/supabase";
 import { toast } from "sonner";
 import { clearProfileCache } from "@/hooks/useProfile";
 import { useBankAccounts, useInvalidateBankAccounts, disconnectBankAccount } from "@/hooks/useBankAccounts";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
+import { useOrderDraftStore } from "@/stores/useOrderDraftStore";
 import identityConfirmationIllustration from '@/assets/illustrations/IdentityConfirmation.png';
 import easyTransfersIllustration from '@/assets/illustrations/EasyTransfers.png';
 import everyoneSafeIllustration from '@/assets/illustrations/EveryoneSafe.png';
 import bankingRegulationIllustration from '@/assets/illustrations/BankingRegulation.png';
 
-function getKycStatusBadge(kycStatus: string) {
-  const status = kycStatus?.toLowerCase();
-  if (status === 'verified') {
-    return (
-      <Badge className="bg-green-500/10 text-green-700 border-green-500/20 flex items-center gap-1.5">
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        Verified
-      </Badge>
-    );
-  } else if (status === 'pending') {
-    return (
-      <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-500/20">
-        Pending
-      </Badge>
-    );
-  } else if (status === 'failed') {
-    return (
-      <Badge variant="destructive">
-        Failed
-      </Badge>
-    );
-  } else {
-    return (
-      <Badge variant="outline" className="text-slate-500">
-        Unverified
-      </Badge>
-    );
-  }
-}
 
 export default function BankAccounts() {
   const navigate = useNavigate();
@@ -76,10 +40,15 @@ export default function BankAccounts() {
   const invalidateBankAccounts = useInvalidateBankAccounts();
   const queryClient = useQueryClient();
   const [showHelpStories, setShowHelpStories] = useState(false);
-  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
-  const [bankToDisconnect, setBankToDisconnect] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [expandedBankId, setExpandedBankId] = useState<string | null>(null);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [bankAccountToDisconnect, setBankAccountToDisconnect] = useState<{ id: string; institutionName: string; last4: string; logoUrl: string | null } | null>(null);
   const { setBottomSlot } = useCustomerBottomSlot();
+  
+  // Ref to track help button position - MUST be before any conditional returns
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const [helpButtonPosition, setHelpButtonPosition] = useState<{ top: number; right: number } | null>(null);
 
   // Debug: Log bank accounts state
   useEffect(() => {
@@ -96,10 +65,6 @@ export default function BankAccounts() {
     });
   }, [bankAccounts, hasAnyBank, isLoadingBanks, profile?.plaid_item_id]);
 
-  // Debug: Log when disconnect dialog state changes
-  useEffect(() => {
-    console.log('[BankAccounts] showDisconnectDialog:', showDisconnectDialog);
-  }, [showDisconnectDialog]);
 
   // Auto-refresh profile if bank is connected but institution data is missing
   useEffect(() => {
@@ -114,15 +79,31 @@ export default function BankAccounts() {
     }
   }, [profile, isReady, queryClient]);
 
-  // Handler for disconnecting a specific bank account
-  const handleDisconnectBank = async () => {
-    if (!bankToDisconnect) return;
+  // Handler for showing disconnect confirmation dialog
+  const handleDisconnectBank = (bankAccountId: string) => {
+    const bankAccount = bankAccounts.find(ba => ba.id === bankAccountId);
+    if (bankAccount) {
+      const last4 = bankAccount.bank_last4 || (bankAccount.plaid_item_id ? bankAccount.plaid_item_id.slice(-4) : "****");
+      setBankAccountToDisconnect({
+        id: bankAccount.id,
+        institutionName: bankAccount.bank_institution_name || 'Bank Account',
+        last4: last4,
+        logoUrl: bankAccount.bank_institution_logo_url
+      });
+      setShowDisconnectDialog(true);
+      setExpandedBankId(null); // Close the menu
+    }
+  };
+
+  // Handler for confirming bank account disconnection
+  const confirmDisconnect = async () => {
+    if (!bankAccountToDisconnect) return;
     
-    console.log('[Disconnect Bank] Starting disconnect process for:', bankToDisconnect);
+    console.log('[Disconnect Bank] Starting disconnect process for:', bankAccountToDisconnect.id);
     setIsDisconnecting(true);
     
     try {
-      const success = await disconnectBankAccount(bankToDisconnect);
+      const success = await disconnectBankAccount(bankAccountToDisconnect.id);
       
       if (success) {
         // Invalidate bank accounts cache
@@ -148,7 +129,7 @@ export default function BankAccounts() {
         
         toast.success('Bank account disconnected');
         setShowDisconnectDialog(false);
-        setBankToDisconnect(null);
+        setBankAccountToDisconnect(null);
       } else {
         throw new Error('Failed to disconnect bank account');
       }
@@ -160,6 +141,11 @@ export default function BankAccounts() {
     }
   };
 
+  // Toggle bank account menu
+  const toggleBankMenu = (bankAccountId: string) => {
+    setExpandedBankId(expandedBankId === bankAccountId ? null : bankAccountId);
+  };
+
   // Invalidate profile cache when component mounts to ensure fresh data
   // This prevents stale bank connection data from being displayed
   useEffect(() => {
@@ -168,6 +154,26 @@ export default function BankAccounts() {
     }
   }, [user?.id, queryClient]);
 
+  // Derived state - use bank accounts instead of profile
+  const hasBankConnection = hasAnyBank;
+
+  // Get return path from location state (if opened from cash request page)
+  // Otherwise default to home
+  const returnPath = (location.state as { returnPath?: string })?.returnPath;
+  
+  // Check if we came from an order flow (via returnPath or order draft store)
+  const { returnTo, clearDraft } = useOrderDraftStore();
+  const cameFromOrderFlow = !!returnPath || returnTo === 'order-review';
+  
+  // Clear order draft store if we didn't come from an order flow
+  // This prevents navigation after bank connection when user accessed page voluntarily
+  useEffect(() => {
+    if (!cameFromOrderFlow && returnTo === 'order-review') {
+      console.log('[BankAccounts] Clearing order draft store - user accessed page voluntarily');
+      clearDraft();
+    }
+  }, [cameFromOrderFlow, returnTo, clearDraft]);
+  
   const { isLoading } = usePlaidLinkKyc(async () => {
     // After successful KYC, refetch profile and bank accounts
     console.log('[BankAccounts] Plaid success - invalidating caches...');
@@ -190,14 +196,10 @@ export default function BankAccounts() {
     await queryClient.refetchQueries({ queryKey: ["bank-accounts", user?.id] });
     
     console.log('[BankAccounts] Caches invalidated and refetched');
+    
+    // Navigation is handled by usePlaidLinkKyc hook based on returnTo
+    // If we cleared the draft, it won't navigate
   });
-
-  // Derived state - use bank accounts instead of profile
-  const hasBankConnection = hasAnyBank;
-
-  // Get return path from location state (if opened from cash request page)
-  // Otherwise default to home
-  const returnPath = (location.state as { returnPath?: string })?.returnPath;
   const handleBack = () => {
     if (returnPath) {
       navigate(returnPath);
@@ -287,6 +289,13 @@ export default function BankAccounts() {
   const dailyLimit = profile.daily_limit || 1000;
   const dailyUsage = profile.daily_usage || 0;
   const availableToday = dailyLimit - dailyUsage;
+  const progressPercentage = (availableToday / dailyLimit) * 100;
+  
+  // Calculate stroke-dashoffset for circular progress
+  // Larger radius to prevent text from overlaying progress bar
+  const radius = 75;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progressPercentage / 100) * circumference;
 
   // These variables are only used in the empty state section now
   // The bank accounts list uses data from bankAccounts array
@@ -299,7 +308,18 @@ export default function BankAccounts() {
   // Help button for top right (adjacent to X button, like FlowHeader)
   const helpButton = (
     <IconButton
-      onClick={() => setShowHelpStories(true)}
+      ref={helpButtonRef}
+      onClick={() => {
+        // Get button position before opening modal
+        if (helpButtonRef.current) {
+          const rect = helpButtonRef.current.getBoundingClientRect();
+          setHelpButtonPosition({
+            top: rect.top,
+            right: window.innerWidth - rect.right,
+          });
+        }
+        setShowHelpStories(true);
+      }}
       aria-label="Help"
       size="lg"
     >
@@ -357,25 +377,57 @@ export default function BankAccounts() {
         customBottomPadding="220px"
       topContent={
         <div style={{ paddingTop: '24px' }} className="space-y-6">
-          {!hasBankConnection ? (
-            <>
-              {/* Empty state */}
-              <CustomerCard className="space-y-4 text-center">
-                <div className="flex justify-center">
-                  <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
-                    <Landmark className="h-8 w-8 text-slate-400" />
+          {/* Circular Progress Indicator - Always show when banks are connected */}
+          {hasBankConnection && (
+            <div className="flex flex-col items-center justify-center">
+              {/* Circular Progress - Larger diameter with thicker stroke */}
+              <div className="relative w-64 h-64">
+                <svg className="w-64 h-64 transform -rotate-90" viewBox="0 0 200 200">
+                  {/* Background circle */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r={radius}
+                    stroke="#E5E7EB"
+                    strokeWidth="16"
+                    fill="none"
+                  />
+                  {/* Progress circle - Brand green #13F287 with thicker stroke */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r={radius}
+                    stroke="#13F287"
+                    strokeWidth="16"
+                    fill="none"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    className="transition-all duration-500"
+                  />
+                </svg>
+                {/* Center content - All text inside circle with more breathing space */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-10">
+                  <div className="text-xl font-bold text-slate-900 leading-tight text-center">
+                    ${availableToday.toLocaleString()}/${dailyLimit.toLocaleString()}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className="text-sm text-slate-600">Available Today</span>
+                    <InfoTooltip
+                      label="Available Today"
+                      side="top"
+                      align="center"
+                    >
+                      Available Today is your remaining daily limit. We cap daily cash deliveries to keep the service safe and reliable for everyone.
+                    </InfoTooltip>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    Link a bank to get started
-                  </h3>
-                  <p className="text-sm text-slate-600">
-                    Benjamin needs at least one verified bank on file before you can request cash.
-                  </p>
-                </div>
-              </CustomerCard>
-
+              </div>
+            </div>
+          )}
+          
+          {!hasBankConnection ? (
+            <>
               {/* Why we ask for your bank - Card grid with illustrations */}
               <div className="grid grid-cols-1 gap-3">
                 {/* Card 1: Identity Confirmation */}
@@ -450,95 +502,85 @@ export default function BankAccounts() {
             </>
           ) : (
             <>
-              {/* Display all bank accounts */}
+              {/* Display all bank accounts - Each as individual component */}
               {bankAccounts.length > 0 ? (
-                bankAccounts.map((bankAccount) => {
-                  const institutionName = bankAccount.bank_institution_name || "Primary bank";
-                const last4 = bankAccount.bank_last4 || (bankAccount.plaid_item_id ? bankAccount.plaid_item_id.slice(-4) : "••••");
-                const institutionLogo = bankAccount.bank_institution_logo_url;
-                const lastSynced = bankAccount.kyc_verified_at 
-                  ? format(new Date(bankAccount.kyc_verified_at), 'h:mm a')
-                  : null;
-                const isVerified = bankAccount.kyc_status === 'verified';
+                <div className="space-y-3">
+                  {bankAccounts.map((bankAccount) => {
+                    const institutionName = bankAccount.bank_institution_name || "Primary bank";
+                    const last4 = bankAccount.bank_last4 || (bankAccount.plaid_item_id ? bankAccount.plaid_item_id.slice(-4) : "3459");
+                    const institutionLogo = bankAccount.bank_institution_logo_url;
+                    const isExpanded = expandedBankId === bankAccount.id;
 
-                return (
-                  <CustomerCard key={bankAccount.id} className="space-y-4 px-0">
-                    {/* Header: Bank logo, name, account, purpose */}
-                    <div className="flex items-start gap-3">
-                      {institutionLogo ? (
-                        <div className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0">
-                          <img
-                            src={institutionLogo}
-                            alt={institutionName}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                          <Landmark className="h-6 w-6 text-green-600" />
-                        </div>
-                      )}
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {institutionName}
-                            </h3>
-                            <p className="text-sm text-slate-600">
-                              Bank account •••• {last4}
-                            </p>
+                    return (
+                      <div key={bankAccount.id} className="rounded-2xl border border-slate-200/70 bg-slate-50/40 overflow-hidden">
+                        {/* Bank Account Card - 12px padding all around */}
+                        <div className="p-3">
+                          <div className="flex items-center gap-3">
+                            {/* Bank Logo - 48x48px with 12px roundness (square, not circular) */}
+                            {institutionLogo ? (
+                              <div
+                                className="h-12 w-12 flex-shrink-0 bg-white rounded-[12px] overflow-hidden flex items-center justify-center"
+                              >
+                                <img
+                                  src={institutionLogo}
+                                  alt={institutionName}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <Landmark className="h-6 w-6 text-slate-400" />
+                              </div>
+                            )}
+                            
+                            {/* Bank Name and Account Number */}
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-base font-semibold text-slate-900 truncate">
+                                {institutionName}
+                              </h3>
+                              <p className="text-sm text-slate-600">
+                                **** {last4}
+                              </p>
+                            </div>
+                            
+                            {/* Menu button - 48x48px with 12px roundness */}
+                            <button
+                              onClick={() => toggleBankMenu(bankAccount.id)}
+                              aria-label={isExpanded ? "Close menu" : "More options"}
+                              className="w-12 h-12 rounded-xl bg-[#F7F7F7] flex items-center justify-center hover:bg-[#EDEDED] active:bg-[#E0E0E0] transition-colors"
+                            >
+                              {isExpanded ? (
+                                <X className="h-5 w-5 text-slate-900" />
+                              ) : (
+                                <MoreVertical className="h-5 w-5 text-slate-900" />
+                              )}
+                            </button>
                           </div>
-                          {getKycStatusBadge(bankAccount.kyc_status)}
+                        </div>
+                        
+                        {/* Disconnect Button - Shows when expanded with smooth animation */}
+                        <div
+                          className="overflow-hidden transition-all duration-300 ease-in-out"
+                          style={{
+                            maxHeight: isExpanded ? '100px' : '0',
+                            opacity: isExpanded ? 1 : 0,
+                          }}
+                        >
+                          <div className="px-3 pt-2 pb-3">
+                            <Button
+                              onClick={() => handleDisconnectBank(bankAccount.id)}
+                              disabled={isDisconnecting}
+                              className="w-full h-14 text-white hover:opacity-90 transition-opacity"
+                              style={{ backgroundColor: '#E84855' }}
+                            >
+                              {isDisconnecting ? 'Disconnecting...' : 'Disconnect Bank Account'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Key info: Daily limit, Available today, Last verified */}
-                    <div className="space-y-3 pt-3 border-t border-slate-100">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600">Daily limit</span>
-                        <span className="text-sm font-semibold text-slate-900">
-                          ${dailyLimit.toLocaleString()}/day
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600">Available today</span>
-                        <span className="text-base font-semibold text-green-600">
-                          ${availableToday.toLocaleString()}
-                        </span>
-                      </div>
-                      {lastSynced && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">Last verified</span>
-                          <span className="text-sm text-slate-500">
-                            Today, {lastSynced}
-                          </span>
-                        </div>
-                      )}
-                      {!isVerified && (
-                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2">
-                          We still need a quick refresh of your bank connection to complete verification.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Disconnect button */}
-                    <div className="pt-3 border-t border-slate-100">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          console.log('[BankAccounts] Disconnect Bank button clicked for:', bankAccount.id);
-                          setBankToDisconnect(bankAccount.id);
-                          setShowDisconnectDialog(true);
-                        }}
-                        className="w-full h-14"
-                      >
-                        Disconnect Bank
-                      </Button>
-                    </div>
-                  </CustomerCard>
-                );
-                })
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="text-center py-8 text-slate-500">
                   No bank accounts found. Please connect a bank account.
@@ -553,48 +595,82 @@ export default function BankAccounts() {
         isOpen={showHelpStories}
         onClose={() => setShowHelpStories(false)}
         pages={storyPages}
+        closeButtonPosition={helpButtonPosition}
       />
 
-      {/* Disconnect Bank Confirmation Dialog */}
+      {/* Disconnect Confirmation Dialog */}
       <AlertDialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
-        <AlertDialogContent className="max-w-sm mx-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-semibold text-slate-900">
-              Disconnect Bank Account?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600">
-              {bankAccounts.length === 1 
-                ? "You'll need to reconnect a bank account before you can place cash orders. Your order history will remain intact."
-                : "This bank account will be removed. You can add it again later if needed."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter className="flex flex-col gap-3 sm:flex-col">
-            <Button
-              type="button"
-              onClick={handleDisconnectBank}
-              disabled={isDisconnecting}
-              className="w-full h-14 text-white hover:opacity-90"
-              style={{ backgroundColor: '#E84855' }}
-            >
-              {isDisconnecting ? 'Disconnecting...' : 'Disconnect Bank'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                console.log('[BankAccounts] Cancel button clicked');
-                setShowDisconnectDialog(false);
-                setBankToDisconnect(null);
-              }}
-              disabled={isDisconnecting}
-              className="w-full h-14"
-            >
-              Cancel
-            </Button>
-          </AlertDialogFooter>
+        <AlertDialogContent 
+          className="p-0 gap-0 !top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2 !right-auto !bottom-auto"
+          style={{ 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            right: 'auto',
+            bottom: 'auto'
+          }}
+        >
+          <div className="px-6 py-6 space-y-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
+                Disconnect Bank Account?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-slate-600">
+                Are you sure you want to disconnect this bank account? This action cannot be undone.
+                {bankAccountToDisconnect && (
+                  <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="flex items-center gap-3 justify-center">
+                      {bankAccountToDisconnect.logoUrl ? (
+                        <div className="h-12 w-12 flex-shrink-0 bg-white rounded-[12px] overflow-hidden flex items-center justify-center">
+                          <img
+                            src={bankAccountToDisconnect.logoUrl}
+                            alt={bankAccountToDisconnect.institutionName}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                          <Landmark className="h-6 w-6 text-slate-400" />
+                        </div>
+                      )}
+                      <div className="text-left">
+                        <h3 className="text-base font-semibold text-slate-900 truncate">
+                          {bankAccountToDisconnect.institutionName}
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          **** {bankAccountToDisconnect.last4}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+              <Button
+                onClick={confirmDisconnect}
+                disabled={isDisconnecting}
+                className="w-full h-14 text-white hover:opacity-90"
+                style={{ backgroundColor: '#E84855' }}
+              >
+                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDisconnectDialog(false);
+                  setBankAccountToDisconnect(null);
+                }}
+                disabled={isDisconnecting}
+                className="w-full h-14"
+              >
+                Cancel
+              </Button>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
+
     </>
   );
 }

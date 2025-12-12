@@ -13,15 +13,17 @@ interface BankingHelpStoriesProps {
   onClose: () => void;
   pages: StoryPage[];
   duration?: number; // Duration per page in milliseconds (default 5 seconds)
+  closeButtonPosition?: { top: number; right: number } | null; // Position to match the help button
 }
 
-const DEFAULT_DURATION = 5000; // 5 seconds per page (Instagram-style)
+const DEFAULT_DURATION = 10000; // 10 seconds per page (Instagram-style)
 
 export function BankingHelpStories({
   isOpen,
   onClose,
   pages,
   duration = DEFAULT_DURATION,
+  closeButtonPosition,
 }: BankingHelpStoriesProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -196,7 +198,18 @@ export function BankingHelpStories({
                   e.stopPropagation();
                   onClose();
                 }}
-                className="absolute top-4 right-4 z-20"
+                className="absolute z-20"
+                style={
+                  closeButtonPosition
+                    ? {
+                        top: `${closeButtonPosition.top}px`,
+                        right: `${closeButtonPosition.right}px`,
+                      }
+                    : {
+                        top: '1rem',
+                        right: '1rem',
+                      }
+                }
                 aria-label="Close"
                 size="lg"
               >

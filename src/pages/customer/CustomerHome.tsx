@@ -26,10 +26,12 @@ import protectedIllustration from '@/assets/illustrations/Protected.png';
 import noAtmIllustration from '@/assets/illustrations/NoATM.png';
 import trustedRunnerIllustration from '@/assets/illustrations/TrustedRunner.png';
 import { Button } from '@/components/ui/button';
+import { useBankAccounts } from '@/hooks/useBankAccounts';
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
   const { profile, isReady } = useProfile(user?.id);
+  const { hasAnyBank } = useBankAccounts();
   const navigate = useNavigate();
   const location = useLocation(); // react-router location
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
@@ -329,10 +331,8 @@ export default function CustomerHome() {
   }, []);
 
   // Check if user has bank connected (used for bank connection prompt)
-  const hasBankConnection = useMemo(() => {
-    if (!profile || !isReady) return false;
-    return !!profile.plaid_item_id;
-  }, [profile?.plaid_item_id, isReady]);
+  // Use bank_accounts table instead of profile.plaid_item_id
+  const hasBankConnection = hasAnyBank;
 
   // Determine what to show in topContent
   // Show skeleton while orders are loading to maintain consistent header height

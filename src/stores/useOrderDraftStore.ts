@@ -4,20 +4,25 @@ import type { DeliveryMode } from "@/components/customer/DeliveryModeSelector";
 /**
  * Order Draft Store
  * 
- * Persists in-progress order data when user is forced to verify bank
- * during the order confirmation flow.
+ * Persists in-progress order data across navigation during the 3-step order flow.
+ * Used to maintain state when user navigates between steps or to bank accounts page.
  */
 
+export type DeliveryStyle = "counted" | "speed";
+
 export interface DraftOrder {
+  addressId?: string;
+  bankAccountId?: string;
   amount: number;
-  deliveryMode: DeliveryMode;
-  addressId: string;
+  deliveryStyle?: DeliveryStyle;
   feeBreakdown?: {
     platformFee: number;
     complianceFee: number;
     deliveryFee: number;
     total: number;
   };
+  // Legacy fields for backward compatibility
+  deliveryMode?: DeliveryMode; // Maps to deliveryStyle
 }
 
 interface OrderDraftState {

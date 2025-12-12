@@ -12,17 +12,18 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, X } from "@/lib/icons";
-import { Landmark, MapPin } from "lucide-react";
+import { X } from "@/lib/icons";
+import { Landmark, MapPin, Pencil, Shield, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
-import { Pencil, Shield } from "lucide-react";
 import { getIconByName } from "@/components/address/IconPicker";
 import { cn } from "@/lib/utils";
 import { FlowHeader } from "@/components/customer/FlowHeader";
 import { toast } from "sonner";
 import { createOrder, formatAddress, getAddressPrimaryLine, getAddressSecondaryLine } from "@/db/api";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearProfileCache } from "@/hooks/useProfile";
 import { strings } from "@/lib/strings";
 import type { CustomerAddress } from "@/types/types";
 import { calculatePricing } from "@/lib/pricing";
@@ -30,6 +31,7 @@ import CashAmountInput from "@/components/customer/CashAmountInput";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { CustomerMapViewport } from "@/components/customer/layout/CustomerMapViewport";
 import { CustomerOrderFlowFooter } from "@/components/customer/layout/CustomerOrderFlowFooter";
+import { RequestFlowBottomBar } from "@/components/customer/RequestFlowBottomBar";
 import { track } from "@/lib/analytics";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useCustomerAddresses, useInvalidateAddresses } from "@/features/address/hooks/useCustomerAddresses";
@@ -37,14 +39,16 @@ import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 import { DeliveryModeSelector, type DeliveryMode } from "@/components/customer/DeliveryModeSelector";
 import { AddressForm, type AddressFormRef } from "@/components/address/AddressForm";
 import { addAddressCopy } from "@/lib/copy/addAddress";
-import { VerifyBankModal } from "@/components/customer/VerifyBankModal";
 import { useOrderDraftStore } from "@/stores/useOrderDraftStore";
+import { useBankAccounts } from "@/hooks/useBankAccounts";
+import { SlideToConfirm } from "@/components/customer/SlideToConfirm";
 
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 
 export default function CashRequest() {
   const navigate = useNavigate();
   const { profile } = useProfile();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Constants
@@ -54,7 +58,7 @@ export default function CashRequest() {
   // Wizard state
   // Initialize step from URL param if present (for navigation back from ManageAddresses)
   const stepParam = searchParams.get('step');
-  const initialStep = stepParam === '2' ? 2 : 1;
+  const initialStep = stepParam === '3' ? 3 : stepParam === '2' ? 2 : 1;
   const [step, setStep] = useState<Step>(initialStep);
   // Ref to track if we're updating step internally (to avoid sync conflicts)
   const isInternalStepUpdate = useRef(false);
@@ -65,9 +69,13 @@ export default function CashRequest() {
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("count_confirm");
   const [loading, setLoading] = useState(false);
   const [showFeeDetails, setShowFeeDetails] = useState(false); // Collapsed by default
-  const [showVerifyBankModal, setShowVerifyBankModal] = useState(false);
   
-  // Order draft store for persisting order state during bank verification
+  // Bank account selection
+  const { bankAccounts, hasAnyBank } = useBankAccounts();
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
+  
+  // Order draft store for persisting order state during navigation
   const { draft, returnTo, setDraft, clearDraft } = useOrderDraftStore();
   const hasRestoredFromDraftRef = useRef(false);
 
@@ -110,8 +118,8 @@ export default function CashRequest() {
     }
     
     const stepParam = searchParams.get('step');
-    if (stepParam === '1' || stepParam === '2') {
-      const urlStep = stepParam === '2' ? 2 : 1;
+    if (stepParam === '1' || stepParam === '2' || stepParam === '3') {
+      const urlStep = stepParam === '3' ? 3 : stepParam === '2' ? 2 : 1;
       // Only update if URL step differs from current step
       // This handles returning from other pages where URL has step param
       if (urlStep !== step) {
@@ -125,6 +133,13 @@ export default function CashRequest() {
       }
     }
   }, [searchParams, step]);
+
+  // Auto-select first bank account when banks load
+  useEffect(() => {
+    if (hasAnyBank && bankAccounts.length > 0 && !selectedBankAccountId) {
+      setSelectedBankAccountId(bankAccounts[0].id);
+    }
+  }, [hasAnyBank, bankAccounts, selectedBankAccountId]);
 
   // Sync selectedAddressId with URL param to persist across navigation
   const selectedAddressIdFromUrl = searchParams.get('address_id');
@@ -216,10 +231,10 @@ export default function CashRequest() {
   const { setBottomSlot } = useCustomerBottomSlot();
   const invalidateAddresses = useInvalidateAddresses();
 
-  // Restore from draft if returning from bank verification
-  // This must run after addresses are loaded
+  // Restore from draft if returning from bank verification or navigation
+  // This must run after addresses and bank accounts are loaded
   useEffect(() => {
-    if (draft && returnTo === 'order-review' && !hasRestoredFromDraftRef.current && addresses.length > 0) {
+    if (draft && !hasRestoredFromDraftRef.current && addresses.length > 0) {
       hasRestoredFromDraftRef.current = true;
       
       // Restore amount
@@ -227,9 +242,19 @@ export default function CashRequest() {
         setAmount(draft.amount);
       }
       
-      // Restore delivery mode
-      if (draft.deliveryMode) {
+      // Restore delivery mode/style
+      if (draft.deliveryStyle) {
+        setDeliveryMode(draft.deliveryStyle === 'counted' ? 'count_confirm' : 'quick_handoff');
+      } else if (draft.deliveryMode) {
         setDeliveryMode(draft.deliveryMode);
+      }
+      
+      // Restore bank account
+      if (draft.bankAccountId && bankAccounts.length > 0) {
+        const bankExists = bankAccounts.some(b => b.id === draft.bankAccountId);
+        if (bankExists) {
+          setSelectedBankAccountId(draft.bankAccountId);
+        }
       }
       
       // Restore address - find it in the addresses list
@@ -237,26 +262,56 @@ export default function CashRequest() {
         const addressToRestore = addresses.find(addr => addr.id === draft.addressId);
         if (addressToRestore) {
           setSelectedAddress(addressToRestore);
-          // Ensure we're on step 2 (review screen)
-          if (step === 1) {
-            isInternalStepUpdate.current = true;
-            setStep(2);
-            const newParams = new URLSearchParams(searchParams);
-            newParams.set('step', '2');
-            if (draft.addressId) {
-              newParams.set('address_id', draft.addressId);
+          // Determine which step to restore to
+          // BUT: respect the step in URL params if present (e.g., when returning from BankAccounts)
+          const urlStepParam = searchParams.get('step');
+          const urlStep = urlStepParam === '3' ? 3 : urlStepParam === '2' ? 2 : urlStepParam === '1' ? 1 : null;
+          
+          // Only auto-restore step if URL doesn't specify a step
+          if (!urlStep) {
+            if (draft.deliveryStyle || draft.deliveryMode) {
+              // Has delivery style - restore to step 3
+              if (step !== 3) {
+                isInternalStepUpdate.current = true;
+                setStep(3);
+                const newParams = new URLSearchParams(searchParams);
+                newParams.set('step', '3');
+                if (draft.addressId) {
+                  newParams.set('address_id', draft.addressId);
+                }
+                setSearchParams(newParams, { replace: true });
+              }
+            } else if (draft.bankAccountId) {
+              // Has bank account - restore to step 2
+              if (step === 1) {
+                isInternalStepUpdate.current = true;
+                setStep(2);
+                const newParams = new URLSearchParams(searchParams);
+                newParams.set('step', '2');
+                if (draft.addressId) {
+                  newParams.set('address_id', draft.addressId);
+                }
+                setSearchParams(newParams, { replace: true });
+              }
             }
-            setSearchParams(newParams, { replace: true });
+          } else {
+            // URL specifies a step - respect it (e.g., returning from BankAccounts with step=2)
+            if (step !== urlStep) {
+              isInternalStepUpdate.current = true;
+              setStep(urlStep);
+            }
           }
         }
       }
       
-      // Show success toast
-      toast.success("Bank verified! Your order details have been restored.", {
-        duration: 3000,
-      });
+      // Show success toast if returning from bank verification
+      if (returnTo === 'order-review') {
+        toast.success("Bank verified! Your order details have been restored.", {
+          duration: 3000,
+        });
+      }
     }
-  }, [draft, returnTo, addresses, step, searchParams, setSearchParams]);
+  }, [draft, returnTo, addresses, bankAccounts, step, searchParams, setSearchParams]);
 
   // Auto-advance to step 2 when reordering with address_id
   // This runs separately and waits for address to be selected
@@ -488,6 +543,12 @@ export default function CashRequest() {
       toast.error(strings.customer.addressRequiredError);
       return;
     }
+    // Save draft before moving to step 2
+    setDraft({
+      addressId: selectedAddress.id,
+      amount,
+      bankAccountId: selectedBankAccountId || undefined,
+    });
     // Save the current carousel index before moving to next step
     // This will be restored when returning to address selection
     // Note: The index is saved via onCarouselIndexChange callback
@@ -500,7 +561,34 @@ export default function CashRequest() {
       newParams.set('address_id', selectedAddress.id);
     }
     setSearchParams(newParams, { replace: true });
-  }, [selectedAddress, searchParams, setSearchParams]);
+  }, [selectedAddress, amount, selectedBankAccountId, setDraft, searchParams, setSearchParams]);
+  
+  const handleNextToDeliveryStyle = useCallback(() => {
+    if (!selectedAddress) {
+      toast.error(strings.customer.addressRequiredError);
+      return;
+    }
+    if (!hasAnyBank || !selectedBankAccountId) {
+      toast.error("Please connect a bank account to continue");
+      return;
+    }
+    // Save draft before moving to step 3
+    setDraft({
+      addressId: selectedAddress.id,
+      amount,
+      bankAccountId: selectedBankAccountId,
+      deliveryStyle: deliveryMode === 'count_confirm' ? 'counted' : 'speed',
+    });
+    isInternalStepUpdate.current = true;
+    setStep(3);
+    // Update URL to reflect step 3
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('step', '3');
+    if (selectedAddress.id) {
+      newParams.set('address_id', selectedAddress.id);
+    }
+    setSearchParams(newParams, { replace: true });
+  }, [selectedAddress, amount, selectedBankAccountId, deliveryMode, hasAnyBank, setDraft, searchParams, setSearchParams]);
   
   const handleBackToAddress = useCallback(() => {
     // Update both state and URL when going back to address selection
@@ -508,6 +596,19 @@ export default function CashRequest() {
     setStep(1);
     const newParams = new URLSearchParams(searchParams);
     newParams.set('step', '1');
+    // Preserve address_id if we have a selected address
+    if (selectedAddress?.id) {
+      newParams.set('address_id', selectedAddress.id);
+    }
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams, selectedAddress?.id]);
+
+  const handleBackToAmount = useCallback(() => {
+    // Update both state and URL when going back to amount/bank selection
+    isInternalStepUpdate.current = true;
+    setStep(2);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('step', '2');
     // Preserve address_id if we have a selected address
     if (selectedAddress?.id) {
       newParams.set('address_id', selectedAddress.id);
@@ -539,24 +640,15 @@ export default function CashRequest() {
       return;
     }
 
-    // Bank connection guardrail: prevent order creation if no bank is linked
-    const hasLinkedBank = !!profile?.plaid_item_id;
-    if (!hasLinkedBank) {
-      // Save draft before showing modal
-      const draftOrder = {
-        amount,
-        deliveryMode,
-        addressId: selectedAddress.id,
-        feeBreakdown: pricing ? {
-          platformFee: pricing.platformFee,
-          complianceFee: pricing.complianceFee,
-          deliveryFee: pricing.deliveryFee,
-          total: pricing.total,
-        } : undefined,
-      };
-      setDraft(draftOrder, 'order-review');
-      setShowVerifyBankModal(true);
-      return; // Do not proceed to create the order
+    if (!selectedBankAccountId) {
+      toast.error("Please select a bank account");
+      return;
+    }
+
+    // Validate draft has all required fields
+    if (!draft?.addressId || !draft?.bankAccountId || !draft?.amount || !draft?.deliveryStyle) {
+      toast.error("Missing order information. Please go back and complete all steps.");
+      return;
     }
 
     if (profile && profile.daily_usage + pricing.total > profile.daily_limit) {
@@ -579,27 +671,34 @@ export default function CashRequest() {
     try {
       const deliveryNotes = selectedAddress.delivery_notes || "";
       
-      // Map deliveryMode to delivery_style
-      const deliveryStyle = deliveryMode === 'count_confirm' ? 'COUNTED' as const : 'SPEED' as const;
+      // Use deliveryStyle from draft (already mapped from deliveryMode)
+      const deliveryStyle = draft.deliveryStyle === 'counted' ? 'COUNTED' as const : 'SPEED' as const;
       
       // Debug logging for delivery style mapping
       console.log('[CashRequest] Creating order with delivery style:', {
-        deliveryMode,
-        deliveryStyle,
-        mapping: deliveryMode === 'count_confirm' ? 'count_confirm → COUNTED' : 'quick_handoff → SPEED',
+        deliveryStyle: draft.deliveryStyle,
+        mappedStyle: deliveryStyle,
       });
       
       const order = await createOrder(
-        amount,
+        draft.amount,
         formatAddress(selectedAddress),
         deliveryNotes,
-        selectedAddress.id,
+        draft.addressId,
         deliveryStyle
       );
       if (order) {
         // Clear draft after successful order creation
         clearDraft();
         hasRestoredFromDraftRef.current = false;
+        
+        // Invalidate profile cache to update daily_usage immediately
+        clearProfileCache();
+        if (profile?.id) {
+          await queryClient.invalidateQueries({ queryKey: ['profile', profile.id] });
+          await queryClient.refetchQueries({ queryKey: ['profile', profile.id] });
+        }
+        
         toast.success(strings.toasts.orderPlaced);
         navigate(`/customer/deliveries/${order.id}`);
       }
@@ -610,7 +709,7 @@ export default function CashRequest() {
     } finally {
       setLoading(false);
     }
-  }, [selectedAddress, pricing, profile, amount, deliveryMode, navigate]);
+  }, [selectedAddress, pricing, profile, draft, navigate, clearDraft, queryClient]);
 
   // Memoize the summary section (everything including breakdown) - stable reference
   // MUST be before any conditional returns to follow Rules of Hooks
@@ -748,38 +847,54 @@ export default function CashRequest() {
     navigate('/customer/banks', { state: { returnPath } });
   }, [navigate, searchParams]);
 
-  // Memoize flow header for both steps
+  // Memoize flow header for all steps
   const flowHeader = useMemo(() => {
     if (step === 1) {
       return (
         <FlowHeader
           step={1}
-          totalSteps={2}
+          totalSteps={3}
           mode="cancel"
           onPrimaryNavClick={handleBackToHome}
           title="Where should we deliver?"
-          subtitle="Select a location. You can save more than one."
+          subtitle="Choose where you'd like your cash delivered."
           onSecondaryAction={handleManageAddressesFromSelect}
           showSecondaryAction={true}
         />
       );
-    } else {
+    } else if (step === 2) {
       return (
         <FlowHeader
           step={2}
-          totalSteps={2}
+          totalSteps={3}
           mode="back"
           onPrimaryNavClick={handleBackToAddress}
           title="How much cash do you need?"
-          subtitle="Choose an amount and delivery style."
+          subtitle="Choose a bank account and cash amount."
           onSecondaryAction={handleBankAccounts}
           showSecondaryAction={true}
           secondaryActionIcon={Landmark}
           secondaryActionLabel="My Bank Accounts"
         />
       );
+    } else {
+      return (
+        <FlowHeader
+          step={3}
+          totalSteps={3}
+          mode="back"
+          onPrimaryNavClick={handleBackToAmount}
+          title="How would you like it delivered?"
+          subtitle="Choose a delivery style and confirm your request."
+          showHelp={true}
+          onHelpClick={() => {
+            // Placeholder for help functionality - will be implemented later
+            console.log('Help clicked on delivery style step');
+          }}
+        />
+      );
     }
-  }, [step, handleBackToHome, handleBackToAddress, handleManageAddressesFromSelect, handleBankAccounts]);
+  }, [step, handleBackToHome, handleBackToAddress, handleBackToAmount, handleManageAddressesFromSelect, handleBankAccounts]);
 
   // Fixed content for step 2 (cash amount) - divider under title
   const cashAmountFixedContent = step === 2 ? (
@@ -789,17 +904,198 @@ export default function CashRequest() {
     </>
   ) : null;
 
+  // Get selected bank account
+  const selectedBankAccount = useMemo(() => {
+    if (!selectedBankAccountId) return null;
+    return bankAccounts.find(b => b.id === selectedBankAccountId) || null;
+  }, [bankAccounts, selectedBankAccountId]);
+
   // Memoize the entire topContent to prevent remounting
   // MUST be before any conditional returns to follow Rules of Hooks
   // Premium spacing: 24px padding overall, clear vertical sections
   const topContent = useMemo(() => {
     if (step === 2) {
-      // Cash amount page - divider is now in fixedContent, so content starts here
+      // Cash amount + bank selection page
       return (
         <div className="space-y-0" style={{ minHeight: "180px" }}>
-          {/* 24px spacing from fixed divider to cash input */}
+          {/* Bank Account Selection Section */}
+          <div className="pt-3">
+          {!hasAnyBank ? (
+              // No bank connected - show connect prompt
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-4 py-4 mb-6">
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900 mb-1">
+                      Add a bank to continue
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      Connect a bank to verify your identity and place cash requests.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleBankAccounts}
+                    className="w-full h-14 bg-black text-white hover:bg-black/90"
+                  >
+                    Add Bank Account
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Bank accounts exist - show selection
+              <div className="mb-6">
+                {bankAccounts.length === 1 ? (
+                  // Single bank - show without dropdown
+                  <div className="w-full py-3 flex items-center gap-3">
+                    {selectedBankAccount?.bank_institution_logo_url ? (
+                      <div className="h-12 w-12 rounded-[12px] overflow-hidden flex-shrink-0 bg-white flex items-center justify-center">
+                        <img
+                          src={selectedBankAccount.bank_institution_logo_url}
+                          alt={selectedBankAccount.bank_institution_name || 'Bank'}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                        <Landmark className="h-6 w-6 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-semibold text-slate-900 truncate">
+                        {selectedBankAccount?.bank_institution_name || 'Bank Account'}
+                      </h3>
+                      <p className="text-sm text-slate-600">
+                        **** {selectedBankAccount?.bank_last4 || ''}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  // Multiple banks - show dropdown
+                  <div className="w-full">
+                    <button
+                      type="button"
+                      onClick={() => setShowBankDropdown(!showBankDropdown)}
+                      className="w-full py-3 flex items-center gap-3"
+                    >
+                      {selectedBankAccount?.bank_institution_logo_url ? (
+                        <div className="h-12 w-12 rounded-[12px] overflow-hidden flex-shrink-0 bg-white flex items-center justify-center">
+                          <img
+                            src={selectedBankAccount.bank_institution_logo_url}
+                            alt={selectedBankAccount.bank_institution_name || 'Bank'}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                          <Landmark className="h-6 w-6 text-slate-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0 text-left">
+                        <h3 className="text-base font-semibold text-slate-900 truncate">
+                          {selectedBankAccount?.bank_institution_name || 'Bank Account'}
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          **** {selectedBankAccount?.bank_last4 || ''}
+                        </p>
+                      </div>
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        className="w-12 h-12 rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "h-5 w-5 text-slate-600 transition-transform duration-300 ease-in-out",
+                            showBankDropdown && "rotate-180"
+                          )}
+                        />
+                      </IconButton>
+                    </button>
+                    {/* Expandable dropdown container with smooth animation */}
+                    <div
+                      className={cn(
+                        "overflow-hidden relative",
+                        showBankDropdown 
+                          ? "max-h-[500px] opacity-100" 
+                          : "max-h-0 opacity-0"
+                      )}
+                      style={{
+                        transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      }}
+                    >
+                      <div 
+                        className="mt-2 space-y-2"
+                        style={{
+                          opacity: showBankDropdown ? 1 : 0,
+                          transition: showBankDropdown
+                            ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                            : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+                        }}
+                      >
+                        {bankAccounts.map((bank) => (
+                          <button
+                            key={bank.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBankAccountId(bank.id);
+                              setShowBankDropdown(false);
+                            }}
+                            className={cn(
+                              "w-full py-3 flex items-center gap-3",
+                              selectedBankAccountId === bank.id
+                                ? "bg-white"
+                                : ""
+                            )}
+                          >
+                            {bank.bank_institution_logo_url ? (
+                              <div className="h-12 w-12 rounded-[12px] overflow-hidden flex-shrink-0 bg-white flex items-center justify-center">
+                                <img
+                                  src={bank.bank_institution_logo_url}
+                                  alt={bank.bank_institution_name || 'Bank'}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <Landmark className="h-6 w-6 text-slate-400" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 text-left">
+                              <h3 className="text-base font-semibold text-slate-900 truncate">
+                                {bank.bank_institution_name || 'Bank Account'}
+                              </h3>
+                              <p className="text-sm text-slate-600">
+                                **** {bank.bank_last4}
+                              </p>
+                            </div>
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="w-12 h-12 rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60"
+                            >
+                              {selectedBankAccountId === bank.id && (
+                                <div className="h-5 w-5 rounded-full bg-black flex items-center justify-center">
+                                  <div className="h-2 w-2 rounded-full bg-white" />
+                                </div>
+                              )}
+                            </IconButton>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Divider between bank selection and cash amount */}
+          <div>
+            <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+          </div>
+
+          {/* Cash Amount Section */}
           <div style={{ paddingTop: '24px' }}>
-            {/* Cash Amount Section - No wrapper container */}
             <CashAmountInput
               value={amount}
               onChange={handleAmountChange}
@@ -810,55 +1106,68 @@ export default function CashRequest() {
             />
           </div>
 
-      {/* Summary Section - No wrapper container */}
-      <div style={{ paddingTop: '24px' }}>
-        {summarySection}
-      </div>
+          {/* Summary Section */}
+          <div style={{ paddingTop: '24px' }}>
+            {summarySection}
+          </div>
+        </div>
+      );
+    } else if (step === 3) {
+      // Delivery style + OTP education page
+      return (
+        <div className="space-y-0" style={{ minHeight: "180px" }}>
+          {/* 24px spacing from fixed divider to delivery style */}
+          <div style={{ paddingTop: '24px' }}>
+            <DeliveryModeSelector
+              value={deliveryMode}
+              onChange={(mode) => setDeliveryMode(mode)}
+            />
+          </div>
 
-      {/* Second divider - Only under the chevron (after summary section) */}
-      <div style={{ paddingTop: '24px' }}>
-        <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
-      </div>
+          {/* Divider */}
+          <div style={{ paddingTop: '24px' }}>
+            <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+          </div>
 
-      {/* Delivery Style Selector - No wrapper container */}
-      <div style={{ paddingTop: '24px' }}>
-        <DeliveryModeSelector
-          value={deliveryMode}
-          onChange={(mode) => setDeliveryMode(mode)}
-        />
-      </div>
-
-      {/* Third divider - Under the style toggle */}
-      <div style={{ paddingTop: '24px' }}>
-        <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
-      </div>
-
-      {/* Security Tip - Standalone, always fully open */}
-      <div style={{ paddingTop: '24px' }}>
-        <div className="w-full rounded-xl bg-[#FEF9C3]" style={{ padding: '18px' }}>
-          <div className="flex flex-col items-center text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Shield className="h-5 w-5 text-orange-500 flex-shrink-0" />
-              <p className="text-sm font-semibold text-slate-900">
-                Never Share Your Code Early
-              </p>
-            </div>
-            <div className="h-[1px] bg-orange-500 mb-3 w-full" />
-            <div className="space-y-1.5 text-sm text-slate-600">
-              <p>Anyone with the code can receive your envelope.</p>
-              <p>Only share it when your runner is with you.</p>
-              <p>Benjamin will never ask for it by phone or text.</p>
+          {/* Security Tip - OTP Education */}
+          <div style={{ paddingTop: '24px' }}>
+            <div className="w-full rounded-xl bg-[#FEF9C3]" style={{ padding: '18px' }}>
+              <div className="flex flex-col items-center text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Shield className="h-5 w-5 text-orange-500 flex-shrink-0" />
+                  <p className="text-sm font-semibold text-slate-900">
+                    Never Share Your Code Early
+                  </p>
+                </div>
+                <div className="h-[1px] bg-orange-500 mb-3 w-full" />
+                <div className="space-y-1.5 text-sm text-slate-600">
+                  <p>Anyone with the code can receive your envelope.</p>
+                  <p>Only share it when your runner is with you.</p>
+                  <p>Benjamin will never ask for it by phone or text.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
       );
     }
     
     // Step 1 (address selection) - no topContent here, handled separately
     return null;
-  }, [step, amount, handleAmountChange, summarySection, pricing, deliveryMode]);
+  }, [
+    step,
+    amount,
+    handleAmountChange,
+    summarySection,
+    pricing,
+    deliveryMode,
+    hasAnyBank,
+    bankAccounts,
+    selectedBankAccountId,
+    selectedBankAccount,
+    showBankDropdown,
+    handleBankAccounts,
+  ]);
 
   // Memoize terms content for footer
   const termsContent = useMemo(() => {
@@ -890,22 +1199,45 @@ export default function CashRequest() {
       );
     }
     if (step === 2) {
+      // Step 2: Disable CTA if no bank connected
+      const isStep2Disabled = loading || !selectedAddress || !pricing || !hasAnyBank || !selectedBankAccountId;
       return (
-        <CustomerOrderFlowFooter
+        <RequestFlowBottomBar
           mode="amount"
-          onPrimary={handleSubmit}
-          onSecondary={handleBackToAddress}
+          onPrimary={handleNextToDeliveryStyle}
           isLoading={loading}
-          primaryDisabled={loading || !selectedAddress || !pricing || !deliveryMode}
-          termsContent={termsContent}
-          useSliderButton={true}
+          primaryDisabled={isStep2Disabled}
+          primaryLabel="Continue to Delivery Style"
+          termsContent={
+            !hasAnyBank ? (
+              <div className="text-xs text-slate-500 text-center">
+                Add a bank account to continue.
+              </div>
+            ) : undefined
+          }
         />
+      );
+    }
+    if (step === 3) {
+      // Step 3: Slide to Confirm
+      return (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-6 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
+          <div className="max-w-2xl mx-auto space-y-3">
+            {termsContent}
+            <SlideToConfirm
+              onConfirm={handleSubmit}
+              disabled={loading || !selectedAddress || !pricing || !selectedBankAccountId || !deliveryMode}
+              label="Slide to Confirm Request"
+            />
+          </div>
+        </div>
       );
     }
     return null;
   }, [
     step,
     handleNextStep,
+    handleNextToDeliveryStyle,
     handleBackToAddress,
     handleSubmit,
     handleAddAddress,
@@ -916,6 +1248,8 @@ export default function CashRequest() {
     deliveryMode,
     termsContent,
     addresses.length,
+    hasAnyBank,
+    selectedBankAccountId,
   ]);
 
   // Set bottom slot - only depends on memoized footer and stable setBottomSlot
@@ -1443,16 +1777,18 @@ export default function CashRequest() {
     );
   }
 
-  // Step 2: Cash Amount + Delivery Style
+  // Step 2: Cash Amount + Bank Selection
+  // Step 3: Delivery Style + OTP Education + Slide to Confirm
 
-  return (
-    <>
-      <CustomerScreen
-        flowHeader={flowHeader}
-        fixedContent={cashAmountFixedContent}
-        topContent={topContent}
-        customBottomPadding="calc(24px + max(24px, env(safe-area-inset-bottom)) + 120px)"
-      />
+  if (step === 2 || step === 3) {
+    return (
+      <>
+        <CustomerScreen
+          flowHeader={flowHeader}
+          fixedContent={step === 2 ? cashAmountFixedContent : null}
+          topContent={topContent}
+          customBottomPadding={step === 3 ? "calc(24px + max(24px, env(safe-area-inset-bottom)) + 200px)" : "calc(24px + max(24px, env(safe-area-inset-bottom)) + 120px)"}
+        />
 
       {/* Add Address Modal - Portal to document.body */}
       {typeof document !== 'undefined' && createPortal(
@@ -1567,13 +1903,12 @@ export default function CashRequest() {
         document.body
       )}
 
-      {/* Verify Bank Modal - shown when user tries to confirm order without linked bank */}
-      <VerifyBankModal
-        open={showVerifyBankModal}
-        onOpenChange={setShowVerifyBankModal}
-      />
-    </>
-  );
+      </>
+    );
+  }
+
+  // Step 1 is handled above, Steps 2 and 3 are handled above
+  return null;
 }
 
 

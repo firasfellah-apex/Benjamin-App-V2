@@ -378,33 +378,53 @@ export async function createAddress(address: {
   postal_code: string;
   latitude?: number;
   longitude?: number;
+  custom_pin_lat?: number;
+  custom_pin_lng?: number;
   delivery_notes?: string | null;
   is_default?: boolean;
 }): Promise<CustomerAddress | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // Build insert object, conditionally including custom_pin fields
+  // This helps if migration hasn't been run yet (though migration should be run)
+  const insertData: any = {
+    customer_id: user.id,
+    label: address.label,
+    icon: address.icon || 'Home',
+    line1: address.line1,
+    line2: address.line2 || null,
+    city: address.city,
+    state: address.state,
+    postal_code: address.postal_code,
+    latitude: address.latitude || null,
+    longitude: address.longitude || null,
+    delivery_notes: address.delivery_notes || null,
+    is_default: address.is_default || false
+  };
+
+  // Only include custom_pin fields if they have values
+  // Note: Migration 20250130_add_custom_pin_coordinates.sql must be run for these to work
+  if (address.custom_pin_lat !== undefined && address.custom_pin_lat !== null) {
+    insertData.custom_pin_lat = address.custom_pin_lat;
+  }
+  if (address.custom_pin_lng !== undefined && address.custom_pin_lng !== null) {
+    insertData.custom_pin_lng = address.custom_pin_lng;
+  }
+
   const { data, error } = await supabase
     .from("customer_addresses")
-    .insert({
-      customer_id: user.id,
-      label: address.label,
-      icon: address.icon || 'Home',
-      line1: address.line1,
-      line2: address.line2 || null,
-      city: address.city,
-      state: address.state,
-      postal_code: address.postal_code,
-      latitude: address.latitude || null,
-      longitude: address.longitude || null,
-      delivery_notes: address.delivery_notes || null,
-      is_default: address.is_default || false
-    })
+    .insert(insertData)
     .select()
     .maybeSingle();
 
   if (error) {
     console.error("Error creating address:", error);
+    // Provide helpful error message if custom_pin columns are missing
+    if (error.message?.includes("custom_pin_lat") || error.message?.includes("custom_pin_lng")) {
+      console.error("❌ ACTION REQUIRED: Run migration 20250130_add_custom_pin_coordinates.sql");
+      console.error("See RUN_CUSTOM_PIN_MIGRATION.md for instructions");
+    }
     return null;
   }
 
@@ -423,17 +443,36 @@ export async function updateAddress(
     postal_code?: string;
     latitude?: number | null;
     longitude?: number | null;
+    custom_pin_lat?: number | null;
+    custom_pin_lng?: number | null;
     delivery_notes?: string | null;
     is_default?: boolean;
   }
 ): Promise<boolean> {
+  // Build update object, conditionally including custom_pin fields only if they have values
+  // Note: Migration 20250130_add_custom_pin_coordinates.sql must be run for these to work
+  const updateData: any = { ...updates };
+  
+  // Only include custom_pin fields if they have non-null values
+  if (updates.custom_pin_lat === null || updates.custom_pin_lat === undefined) {
+    delete updateData.custom_pin_lat;
+  }
+  if (updates.custom_pin_lng === null || updates.custom_pin_lng === undefined) {
+    delete updateData.custom_pin_lng;
+  }
+
   const { error } = await supabase
     .from("customer_addresses")
-    .update(updates)
+    .update(updateData)
     .eq("id", addressId);
 
   if (error) {
     console.error("Error updating address:", error);
+    // Provide helpful error message if custom_pin columns are missing
+    if (error.message?.includes("custom_pin_lat") || error.message?.includes("custom_pin_lng")) {
+      console.error("❌ ACTION REQUIRED: Run migration 20250130_add_custom_pin_coordinates.sql");
+      console.error("See RUN_CUSTOM_PIN_MIGRATION.md for instructions");
+    }
     return false;
   }
 
@@ -485,7 +524,9 @@ export function createAddressSnapshot(address: CustomerAddress): AddressSnapshot
     state: address.state,
     postal_code: address.postal_code,
     latitude: address.latitude,
-    longitude: address.longitude
+    longitude: address.longitude,
+    custom_pin_lat: address.custom_pin_lat,
+    custom_pin_lng: address.custom_pin_lng
   };
 }
 
@@ -539,10 +580,10 @@ export async function createOrder(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Fetch customer profile to get their name
+  // Fetch customer profile to get their name and daily usage
   const { data: profile } = await supabase
     .from("profiles")
-    .select("first_name, last_name")
+    .select("first_name, last_name, daily_usage, daily_limit")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -715,6 +756,32 @@ export async function createOrder(
         provided: deliveryStyle,
         saved: data.delivery_style,
       });
+    }
+
+    // Update daily_usage by adding the requested amount
+    if (profile) {
+      const currentDailyUsage = Number(profile.daily_usage) || 0;
+      const newDailyUsage = currentDailyUsage + requestedAmount;
+      
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          daily_usage: newDailyUsage,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id);
+
+      if (updateError) {
+        console.error("[Order Creation] ❌ Error updating daily_usage:", updateError);
+        // Don't throw - order was created successfully, this is just a tracking update
+      } else {
+        console.log("[Order Creation] ✅ Updated daily_usage:", {
+          previous: currentDailyUsage,
+          added: requestedAmount,
+          new: newDailyUsage,
+          dailyLimit: profile.daily_limit || 1000,
+        });
+      }
     }
   }
 

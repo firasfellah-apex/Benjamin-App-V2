@@ -497,8 +497,18 @@ export default function RunnerOrderDetail() {
     }
     
     // Get dropoff location (customer delivery address) from order
+    // Use custom pin coordinates if available (for exact meeting location), otherwise use original coordinates
+    const addressSnapshot = order.address_snapshot as any;
     const dropoffLocation: Location | null = 
-      order.address_snapshot?.latitude && order.address_snapshot?.longitude
+      (addressSnapshot?.custom_pin_lat && addressSnapshot?.custom_pin_lng)
+        ? {
+            lat: addressSnapshot.custom_pin_lat,
+            lng: addressSnapshot.custom_pin_lng,
+            address: order.address_snapshot?.line1 
+              ? `${order.address_snapshot.line1}${order.address_snapshot.line2 ? `, ${order.address_snapshot.line2}` : ''}, ${order.address_snapshot.city}, ${order.address_snapshot.state}`
+              : order.customer_address || 'Customer Address',
+          }
+        : (order.address_snapshot?.latitude && order.address_snapshot?.longitude)
         ? {
             lat: order.address_snapshot.latitude,
             lng: order.address_snapshot.longitude,

@@ -61,7 +61,15 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
     // If editing an existing address, show fields immediately
     const [hasSelectedAddress, setHasSelectedAddress] = useState(!!address?.line1);
     // Track if user has manually moved the pin - if so, don't overwrite with geocoded coords
-    const [pinManuallyMoved, setPinManuallyMoved] = useState(false);
+    const [pinManuallyMoved, setPinManuallyMoved] = useState(!!(address?.custom_pin_lat && address?.custom_pin_lng));
+    // Track if address was set from autocomplete (to prevent geocoding from overwriting accurate coordinates)
+    const addressFromAutocompleteRef = useRef(false);
+    // Store original coordinates (for ATM selection) - these don't change after initial geocoding
+    // When editing, preserve existing original coordinates
+    const [originalCoordinates, setOriginalCoordinates] = useState<{ lat: number | null; lng: number | null }>({
+      lat: address?.latitude || null,
+      lng: address?.longitude || null,
+    });
     const [formData, setFormData] = useState({
       icon: address?.icon || 'Home',
       label: address?.label || "",
@@ -72,8 +80,10 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
       postal_code: address?.postal_code || "",
       delivery_notes: address?.delivery_notes || "",
       is_default: false, // Default logic hidden for now
-      latitude: address?.latitude || null,
-      longitude: address?.longitude || null,
+      latitude: address?.latitude || null, // Original coordinates (for ATM selection)
+      longitude: address?.longitude || null, // Original coordinates (for ATM selection)
+      custom_pin_lat: address?.custom_pin_lat || null, // Custom pin coordinates (for meeting location)
+      custom_pin_lng: address?.custom_pin_lng || null, // Custom pin coordinates (for meeting location)
     });
 
     const { location: liveLocation } = useLocation();
@@ -93,6 +103,12 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
       // Only geocode if we have enough address info and Maps is available
       if (!isReady || !googleMaps || !geocoderRef.current) return;
       
+      // Skip geocoding if address was just set from autocomplete (autocomplete has more accurate coordinates)
+      if (addressFromAutocompleteRef.current) {
+        addressFromAutocompleteRef.current = false; // Reset flag after skipping
+        return;
+      }
+      
       const hasLine1 = formData.line1.trim().length > 0;
       const hasCity = formData.city.trim().length > 0;
       const hasState = formData.state.trim().length > 0;
@@ -101,6 +117,12 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
       // Need at least line1 to attempt geocoding
       // More fields = better accuracy, but we'll try with just line1 if it looks complete
       if (!hasLine1) {
+        return;
+      }
+      
+      // Only geocode if we have city AND state (or postal code) for better accuracy
+      // This prevents geocoding with incomplete data that might return wrong results
+      if (!hasCity || (!hasState && !hasPostal)) {
         return;
       }
 
@@ -134,25 +156,27 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           const latitude = location.lat();
           const longitude = location.lng();
           
-          // Only update coordinates if user hasn't manually moved the pin
-          // If pin was moved, pin coordinates take precedence over geocoded coordinates
-          if (!pinManuallyMoved) {
-            console.log('[ADDRESS_FORM] Using geocoded coordinates', {
+          // Only update original coordinates if they haven't been set yet
+          // Once set, original coordinates are preserved for ATM selection
+          // Custom pin coordinates are separate and can be updated independently
+          if (!originalCoordinates.lat || !originalCoordinates.lng) {
+            console.log('[ADDRESS_FORM] Setting original coordinates from geocoding', {
               latitude,
               longitude,
               address: addressString,
             });
+            setOriginalCoordinates({ lat: latitude, lng: longitude });
             setFormData(prev => ({
               ...prev,
-              latitude,
-              longitude,
+              latitude, // Original coordinates for ATM selection
+              longitude, // Original coordinates for ATM selection
             }));
           } else {
-            console.log('[ADDRESS_FORM] Skipping geocoded coordinates - pin was manually moved', {
+            console.log('[ADDRESS_FORM] Original coordinates already set, keeping them for ATM selection', {
+              originalLat: originalCoordinates.lat,
+              originalLng: originalCoordinates.lng,
               geocodedLat: latitude,
               geocodedLng: longitude,
-              pinLat: formData.latitude,
-              pinLng: formData.longitude,
             });
           }
         }
@@ -260,8 +284,10 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           city: formData.city,
           state: formData.state,
           postal_code: formData.postal_code,
-          latitude: formData.latitude || null,
-          longitude: formData.longitude || null,
+          latitude: formData.latitude || null, // Original coordinates (for ATM selection)
+          longitude: formData.longitude || null, // Original coordinates (for ATM selection)
+          custom_pin_lat: formData.custom_pin_lat || null, // Custom pin coordinates (for meeting location)
+          custom_pin_lng: formData.custom_pin_lng || null, // Custom pin coordinates (for meeting location)
         };
         
         // Update address fields (default logic hidden for now)
@@ -289,8 +315,10 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           state: formData.state,
           postal_code: formData.postal_code,
           delivery_notes: formData.delivery_notes?.trim() || null,
-          latitude: formData.latitude ?? undefined,
-          longitude: formData.longitude ?? undefined,
+          latitude: formData.latitude ?? undefined, // Original coordinates (for ATM selection)
+          longitude: formData.longitude ?? undefined, // Original coordinates (for ATM selection)
+          custom_pin_lat: formData.custom_pin_lat ?? undefined, // Custom pin coordinates (for meeting location)
+          custom_pin_lng: formData.custom_pin_lng ?? undefined, // Custom pin coordinates (for meeting location)
           is_default: false // Default logic hidden for now
         };
         
@@ -409,18 +437,37 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               }}
               onAddressSelected={(normalized: NormalizedAddress) => {
                 // When place is selected from autocomplete, set all fields and coordinates
-                // Only update coordinates if pin hasn't been manually moved
-                const shouldUpdateCoords = !pinManuallyMoved && normalized.location;
-                setFormData({
-                  ...formData,
-                  line1: normalized.streetLine1,
-                  line2: normalized.streetLine2 || formData.line2,
-                  city: normalized.city || formData.city,
-                  state: normalized.state || formData.state,
-                  postal_code: normalized.postalCode || formData.postal_code,
-                  latitude: shouldUpdateCoords ? normalized.location.lat : formData.latitude,
-                  longitude: shouldUpdateCoords ? normalized.location.lng : formData.longitude,
-                });
+                // Mark that address came from autocomplete to prevent geocoding from overwriting
+                addressFromAutocompleteRef.current = true;
+                
+                // Set original coordinates (for ATM selection) if not already set
+                const newLat = normalized.location?.lat;
+                const newLng = normalized.location?.lng;
+                if (newLat && newLng) {
+                  // Always update coordinates when autocomplete provides them (they're more accurate)
+                  setOriginalCoordinates({ lat: newLat, lng: newLng });
+                  setFormData({
+                    ...formData,
+                    line1: normalized.streetLine1,
+                    line2: normalized.streetLine2 || formData.line2,
+                    city: normalized.city || formData.city,
+                    state: normalized.state || formData.state,
+                    postal_code: normalized.postalCode || formData.postal_code,
+                    // Always use autocomplete coordinates (they're from Places API, more accurate)
+                    latitude: newLat,
+                    longitude: newLng,
+                  });
+                } else {
+                  // No coordinates from autocomplete, set fields but keep existing coordinates
+                  setFormData({
+                    ...formData,
+                    line1: normalized.streetLine1,
+                    line2: normalized.streetLine2 || formData.line2,
+                    city: normalized.city || formData.city,
+                    state: normalized.state || formData.state,
+                    postal_code: normalized.postalCode || formData.postal_code,
+                  });
+                }
                 // Show additional fields after address is selected
                 setHasSelectedAddress(true);
                 // Clear errors for auto-filled fields
@@ -434,17 +481,33 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               }}
               onPlaceSelect={(place) => {
                 // Legacy callback for backwards compatibility
-                // Only update coordinates if pin hasn't been manually moved
-                const shouldUpdateCoords = !pinManuallyMoved && place.latitude && place.longitude;
-                setFormData({
-                  ...formData,
-                  line1: place.line1,
-                  city: place.city,
-                  state: place.state,
-                  postal_code: place.postal_code,
-                  latitude: shouldUpdateCoords ? place.latitude : formData.latitude,
-                  longitude: shouldUpdateCoords ? place.longitude : formData.longitude,
-                });
+                // Mark that address came from autocomplete to prevent geocoding from overwriting
+                addressFromAutocompleteRef.current = true;
+                
+                // Set original coordinates (for ATM selection)
+                if (place.latitude && place.longitude) {
+                  // Always update coordinates when autocomplete provides them (they're more accurate)
+                  setOriginalCoordinates({ lat: place.latitude, lng: place.longitude });
+                  setFormData({
+                    ...formData,
+                    line1: place.line1,
+                    city: place.city,
+                    state: place.state,
+                    postal_code: place.postal_code,
+                    // Always use autocomplete coordinates (they're from Places API, more accurate)
+                    latitude: place.latitude,
+                    longitude: place.longitude,
+                  });
+                } else {
+                  // No coordinates, just set fields
+                  setFormData({
+                    ...formData,
+                    line1: place.line1,
+                    city: place.city,
+                    state: place.state,
+                    postal_code: place.postal_code,
+                  });
+                }
                 // Show additional fields after address is selected
                 setHasSelectedAddress(true);
                 setErrors({
@@ -576,14 +639,20 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
           <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: "200px" }}>
             <BenjaminMap
               center={
-                formData.latitude && formData.longitude
+                // Use custom pin if available, otherwise original coordinates
+                (formData.custom_pin_lat && formData.custom_pin_lng)
+                  ? { lat: formData.custom_pin_lat, lng: formData.custom_pin_lng }
+                  : (formData.latitude && formData.longitude)
                   ? { lat: formData.latitude, lng: formData.longitude }
                   : liveLocation || { lat: 25.7617, lng: -80.1918 }
               }
               zoom={20}
               className="h-full"
               marker={
-                formData.latitude && formData.longitude
+                // Show custom pin if available, otherwise show original coordinates
+                (formData.custom_pin_lat && formData.custom_pin_lng)
+                  ? { lat: formData.custom_pin_lat, lng: formData.custom_pin_lng }
+                  : (formData.latitude && formData.longitude)
                   ? { lat: formData.latitude, lng: formData.longitude }
                   : null
               }
@@ -591,14 +660,18 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               draggable={true}
               onMarkerDrag={(position) => {
                 console.log('[ADDRESS_FORM] Pin manually moved', {
-                  latitude: position.lat,
-                  longitude: position.lng,
+                  customPinLat: position.lat,
+                  customPinLng: position.lng,
+                  originalLat: formData.latitude,
+                  originalLng: formData.longitude,
                 });
                 setPinManuallyMoved(true);
+                // Save custom pin coordinates (for meeting location)
+                // Original coordinates remain unchanged (for ATM selection)
                 setFormData(prev => ({
                   ...prev,
-                  latitude: position.lat,
-                  longitude: position.lng,
+                  custom_pin_lat: position.lat,
+                  custom_pin_lng: position.lng,
                 }));
               }}
             />
