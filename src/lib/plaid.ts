@@ -49,7 +49,10 @@ export async function createLinkToken(): Promise<string> {
  * @param publicToken Public token from Plaid Link onSuccess callback
  * @returns KYC verification result
  */
-export async function exchangePublicToken(publicToken: string): Promise<{
+export async function exchangePublicToken(
+  publicToken: string,
+  metadata?: { institution?: { institution_id?: string } }
+): Promise<{
   ok: boolean;
   kyc_status: string;
   plaid_item_id: string;
@@ -71,7 +74,11 @@ export async function exchangePublicToken(publicToken: string): Promise<{
       "Content-Type": "application/json",
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ public_token: publicToken }),
+    body: JSON.stringify({ 
+      public_token: publicToken,
+      // Pass institution_id from metadata as fallback if available
+      institution_id: metadata?.institution?.institution_id || undefined,
+    }),
   });
 
   if (!response.ok) {

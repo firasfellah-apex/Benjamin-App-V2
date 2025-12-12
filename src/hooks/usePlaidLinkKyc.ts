@@ -41,7 +41,8 @@ export function usePlaidLinkKyc(onCompleted?: () => void): UsePlaidLinkKycResult
         console.log("[Plaid] Public token received:", publicToken);
         console.log("[Plaid] Metadata:", metadata);
 
-        const result = await exchangePublicToken(publicToken);
+        // Pass metadata to Edge Function so it can use institution_id as fallback
+        const result = await exchangePublicToken(publicToken, metadata);
         
         console.log("[Plaid] Exchange result:", result);
         
@@ -52,6 +53,25 @@ export function usePlaidLinkKyc(onCompleted?: () => void): UsePlaidLinkKycResult
         
         // Invalidate profile query to refetch
         await queryClient.invalidateQueries({ queryKey: ['profile'] });
+        
+        // Force immediate refetch to get institution data
+        await queryClient.refetchQueries({ 
+          queryKey: ['profile'],
+          type: 'active'
+        });
+        
+        // CRITICAL: Also invalidate bank-accounts cache to show all banks
+        // Wait a bit for Edge Function to finish updating the database
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Invalidate and refetch bank accounts
+        await queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+        await queryClient.refetchQueries({ 
+          queryKey: ['bank-accounts'],
+          type: 'active'
+        });
+        
+        console.log('[Plaid] ✅ Invalidated both profile and bank-accounts caches');
         
         toast.success("You're verified 🎉", {
           description: "Your bank is connected and you're ready to request cash.",

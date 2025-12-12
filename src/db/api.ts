@@ -2933,3 +2933,184 @@ export async function logRunnerOfferEvent(data: {
   }
 }
 
+// Bank Account APIs
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  plaid_item_id: string;
+  bank_institution_name: string | null;
+  bank_institution_logo_url: string | null;
+  bank_last4: string | null;
+  is_primary: boolean;
+  kyc_status: string;
+  kyc_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getBankAccounts(): Promise<BankAccount[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.log("[getBankAccounts] No user found");
+    return [];
+  }
+
+  console.log("[getBankAccounts] Fetching bank accounts for user:", user.id);
+  const { data, error } = await supabase
+    .from("bank_accounts")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("is_primary", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    // If table doesn't exist, fall back to profile data
+    if (error.code === 'PGRST205' || error.message?.includes('does not exist') || error.message?.includes('relation "bank_accounts"') || error.message?.includes('schema cache')) {
+      console.log("[getBankAccounts] bank_accounts table not found, checking profile for legacy bank data");
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("plaid_item_id, bank_institution_name, bank_institution_logo_url, kyc_status, kyc_verified_at")
+        .eq("id", user.id)
+        .single();
+      
+      if (profileError) {
+        console.error("[getBankAccounts] Error fetching profile:", profileError);
+        return [];
+      }
+      
+      if (profile && profile.plaid_item_id) {
+        // Return legacy format
+        console.log("[getBankAccounts] Found legacy bank account in profile:", {
+          plaid_item_id: profile.plaid_item_id,
+          institution_name: profile.bank_institution_name,
+          has_logo: !!profile.bank_institution_logo_url,
+        });
+        return [{
+          id: 'legacy',
+          user_id: user.id,
+          plaid_item_id: profile.plaid_item_id,
+          bank_institution_name: profile.bank_institution_name,
+          bank_institution_logo_url: profile.bank_institution_logo_url,
+          bank_last4: null,
+          is_primary: true,
+          kyc_status: profile.kyc_status || 'verified',
+          kyc_verified_at: profile.kyc_verified_at,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }];
+      }
+      console.log("[getBankAccounts] No bank account found in profile");
+      return [];
+    }
+    console.error("Error fetching bank accounts:", error);
+    return [];
+  }
+
+  const result = Array.isArray(data) ? data : [];
+  console.log("[getBankAccounts] Query result from bank_accounts table:", result.length);
+  
+  // If table exists but is empty, check profile for legacy bank data
+  if (result.length === 0) {
+    console.log("[getBankAccounts] Table is empty, checking profile for legacy bank data");
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("plaid_item_id, bank_institution_name, bank_institution_logo_url, kyc_status, kyc_verified_at")
+      .eq("id", user.id)
+      .single();
+    
+    if (profileError) {
+      console.error("[getBankAccounts] Error fetching profile:", profileError);
+      return [];
+    }
+    
+    if (profile && profile.plaid_item_id) {
+      // Return legacy format
+      console.log("[getBankAccounts] Found legacy bank account in profile:", {
+        plaid_item_id: profile.plaid_item_id,
+        institution_name: profile.bank_institution_name,
+        has_logo: !!profile.bank_institution_logo_url,
+      });
+      return [{
+        id: 'legacy',
+        user_id: user.id,
+        plaid_item_id: profile.plaid_item_id,
+        bank_institution_name: profile.bank_institution_name,
+        bank_institution_logo_url: profile.bank_institution_logo_url,
+        bank_last4: null,
+        is_primary: true,
+        kyc_status: profile.kyc_status || 'verified',
+        kyc_verified_at: profile.kyc_verified_at,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }];
+    }
+    console.log("[getBankAccounts] No bank account found in profile either");
+    return [];
+  }
+  
+  console.log("[getBankAccounts] Returning bank accounts from table:", result.length);
+  return result;
+}
+
+export async function deleteBankAccount(bankAccountId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  // Handle legacy bank account (stored in profiles table)
+  if (bankAccountId === 'legacy') {
+    console.log("[deleteBankAccount] Deleting legacy bank account from profiles table");
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        plaid_item_id: null,
+        kyc_status: 'unverified',
+        kyc_verified_at: null,
+        bank_institution_name: null,
+        bank_institution_logo_url: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", user.id);
+    
+    if (error) {
+      console.error("Error deleting legacy bank account:", error);
+      return false;
+    }
+    return true;
+  }
+
+  // Try to delete from bank_accounts table
+  const { error } = await supabase
+    .from("bank_accounts")
+    .delete()
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id); // Ensure user can only delete their own accounts
+
+  if (error) {
+    // If table doesn't exist, fall back to profiles table
+    if (error.code === 'PGRST205' || error.message?.includes('does not exist') || error.message?.includes('relation "bank_accounts"')) {
+      console.log("[deleteBankAccount] bank_accounts table not found, deleting from profiles table");
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          plaid_item_id: null,
+          kyc_status: 'unverified',
+          kyc_verified_at: null,
+          bank_institution_name: null,
+          bank_institution_logo_url: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id);
+      
+      if (profileError) {
+        console.error("Error deleting bank account from profiles:", profileError);
+        return false;
+      }
+      return true;
+    }
+    console.error("Error deleting bank account:", error);
+    return false;
+  }
+
+  return true;
+}
+

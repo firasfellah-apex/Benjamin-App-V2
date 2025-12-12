@@ -23,7 +23,18 @@ export function useProfile(userId?: string) {
       try {
         const cached = localStorage.getItem(LS_KEY);
         if (cached) {
-          return JSON.parse(cached);
+          const parsed = JSON.parse(cached);
+          // If cached data is missing new fields, don't use it (force fresh fetch)
+          // This ensures we get bank_institution_name and bank_institution_logo_url
+          if (parsed && typeof parsed === 'object') {
+            // Check if this looks like old cached data without institution fields
+            // If plaid_item_id exists but bank_institution_name is missing, it's stale
+            if (parsed.plaid_item_id && parsed.bank_institution_name === undefined) {
+              console.log('[useProfile] Cached data missing institution fields, forcing fresh fetch');
+              return undefined; // Force fresh fetch
+            }
+          }
+          return parsed;
         }
       } catch {
         // Ignore parse errors

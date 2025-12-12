@@ -516,10 +516,12 @@ export default function CashRequest() {
   }, [searchParams, setSearchParams, selectedAddress?.id]);
   
   const handleBackToHome = useCallback(() => {
+    // Clear order draft when user explicitly cancels/closes the cash request flow
+    clearDraft();
     // Reset selected address when going back to home (starting a new request)
     setSelectedAddress(null);
     navigate('/customer/home');
-  }, [navigate]);
+  }, [navigate, clearDraft]);
 
   const handleSubmit = useCallback(async () => {
     if (!selectedAddress) {

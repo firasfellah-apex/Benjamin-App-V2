@@ -65,6 +65,8 @@ export interface Profile {
   kyc_status: KYCStatus;
   kyc_verified_at: string | null;
   plaid_item_id: string | null;
+  bank_institution_name: string | null;
+  bank_institution_logo_url: string | null;
   invited_by: string | null;
   invitation_accepted_at: string | null;
   daily_limit: number;
