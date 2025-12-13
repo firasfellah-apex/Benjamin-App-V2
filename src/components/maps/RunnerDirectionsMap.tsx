@@ -207,11 +207,12 @@ export function RunnerDirectionsMap({
       
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
-        style: getBenjaminMapStyle(), // Light theme with Benjamin brand colors
+        style: getBenjaminMapStyle(), // Navigation-optimized dark theme
         center: [centerLng, centerLat],
         zoom: 13,
         antialias: true,
-        pitch: 0,
+        // Enable 3D view for better navigation - slight pitch for runner, flat for customer
+        pitch: interactive ? 45 : 0, // 45 degree pitch for runner (co-pilot view), flat for customer
         bearing: 0,
       });
 
@@ -265,8 +266,8 @@ export function RunnerDirectionsMap({
         console.log('[RunnerDirectionsMap] Map "load" event fired');
         clearTimeout(loadTimeout);
         markMapLoaded();
-        // Apply Benjamin theme after map loads
-        applyBenjaminTheme(map);
+        // Apply Benjamin theme after map loads - enable 3D buildings and pass runner flag
+        applyBenjaminTheme(map, { enable3DBuildings: true, isRunner: interactive });
       });
 
       // Alternative: 'idle' event fires when map is fully rendered
@@ -279,8 +280,8 @@ export function RunnerDirectionsMap({
       // Style loaded event - handle separately from load event
       const handleStyleLoad = () => {
         console.log('[RunnerDirectionsMap] Map style loaded successfully');
-        // Apply Benjamin theme when style loads
-        applyBenjaminTheme(map);
+        // Apply Benjamin theme when style loads - enable 3D buildings and pass runner flag
+        applyBenjaminTheme(map, { enable3DBuildings: true, isRunner: interactive });
         // Ensure map is marked as loaded
         if (!mapLoaded) {
           setMapLoaded(true);
@@ -304,8 +305,8 @@ export function RunnerDirectionsMap({
       // Style loaded successfully
       map.on('style.load', () => {
         console.log('[RunnerDirectionsMap] Map style loaded successfully');
-        // Apply Benjamin theme when style loads
-        applyBenjaminTheme(map);
+        // Apply Benjamin theme when style loads - enable 3D buildings and pass runner flag
+        applyBenjaminTheme(map, { enable3DBuildings: true, isRunner: interactive });
         // Ensure map is marked as loaded
         if (!mapLoaded) {
           setMapLoaded(true);

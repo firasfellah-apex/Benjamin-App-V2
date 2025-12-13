@@ -319,6 +319,7 @@ export default function CashRequest() {
   useEffect(() => {
     const addressIdParam = searchParams.get('address_id');
     const amountParam = searchParams.get('amount');
+    const stepParam = searchParams.get('step');
     
     // Reset auto-advance flag when params change
     if (hasAutoAdvancedRef.current && (!addressIdParam || !amountParam)) {
@@ -328,10 +329,11 @@ export default function CashRequest() {
     // Only auto-advance if:
     // 1. We're on step 1
     // 2. We have address_id and amount params (reorder scenario)
-    // 3. The address from URL param is actually selected
-    // 4. Addresses have loaded
-    // 5. We haven't already auto-advanced
-    if (step === 1 && addressIdParam && amountParam && addresses.length > 0 && !hasAutoAdvancedRef.current) {
+    // 3. URL does NOT explicitly specify step=1 (which means stay on step 1)
+    // 4. The address from URL param is actually selected
+    // 5. Addresses have loaded
+    // 6. We haven't already auto-advanced
+    if (step === 1 && addressIdParam && amountParam && stepParam !== '1' && addresses.length > 0 && !hasAutoAdvancedRef.current) {
       // Check if the address from URL is selected
       const isAddressSelected = selectedAddress?.id === addressIdParam;
       
@@ -343,12 +345,14 @@ export default function CashRequest() {
         const newParams = new URLSearchParams(searchParams);
         newParams.set('step', '2');
         setSearchParams(newParams, { replace: true });
-      } else if (selectedAddressIdFromUrl === addressIdParam) {
+      } else if (selectedAddressIdFromUrl === addressIdParam && stepParam !== '1') {
         // Address param exists but not selected yet - wait a bit for selection to happen
         // This handles the case where addresses are still loading
+        // Only do this if step=1 is NOT explicitly in URL (which means stay on step 1)
         const timeoutId = setTimeout(() => {
-          // Check again if address is now selected
-          if (selectedAddress?.id === addressIdParam && step === 1 && !hasAutoAdvancedRef.current) {
+          // Check again if address is now selected and step=1 is not in URL
+          const currentStepParam = searchParams.get('step');
+          if (selectedAddress?.id === addressIdParam && step === 1 && currentStepParam !== '1' && !hasAutoAdvancedRef.current) {
             hasAutoAdvancedRef.current = true;
             isInternalStepUpdate.current = true;
             setStep(2);
@@ -824,15 +828,15 @@ export default function CashRequest() {
     );
   }, [pricing, amount, showFeeDetails]);
 
-  // Handle navigate to manage addresses - pass return path with address_id preserved
-  // Don't include step=1 since it's the default - just include address_id (matches home -> select address flow)
+  // Handle navigate to manage addresses - pass return path with address_id and step=1 preserved
+  // Explicitly include step=1 to prevent draft restoration from advancing to step 2
   const handleManageAddressesFromSelect = useCallback(() => {
-    // Build return path with address_id only (step defaults to 1)
+    // Build return path with step=1 and address_id if available
     if (selectedAddress?.id) {
-      const returnPath = encodeURIComponent(`/customer/request?address_id=${selectedAddress.id}`);
+      const returnPath = encodeURIComponent(`/customer/request?step=1&address_id=${selectedAddress.id}`);
       navigate(`/customer/addresses?return=${returnPath}`);
     } else {
-      const returnPath = encodeURIComponent('/customer/request');
+      const returnPath = encodeURIComponent('/customer/request?step=1');
       navigate(`/customer/addresses?return=${returnPath}`);
     }
   }, [navigate, selectedAddress?.id]);

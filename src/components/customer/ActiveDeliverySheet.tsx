@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useAnimationControls } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { MessageCircle, Phone, MapPin, HelpCircle, Clock, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MessageCircle, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails, OrderStatus } from '@/types/types';
-import { getCustomerFacingStatus, getCustomerFacingStatusWithArrival, CUSTOMER_TIMELINE_STEPS } from '@/lib/customerStatus';
+import { getCustomerFacingStatus, getCustomerFacingStatusWithArrival } from '@/lib/customerStatus';
 import { OrderProgressTimeline } from '@/components/order/OrderProgressTimeline';
 import { RatingStars } from '@/components/common/RatingStars';
 import { Avatar } from '@/components/common/Avatar';
@@ -37,14 +36,14 @@ import runnerLoadingAnimationData from "@/assets/animations/runner-loader-green.
 
 interface ActiveDeliverySheetProps {
   order: OrderWithDetails;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  isExpanded: boolean; // Kept for backward compatibility but not used
+  onToggleExpand: () => void; // Kept for backward compatibility but not used
   onCancel?: () => void;
   onReorder?: () => void;
   onMessage?: () => void;
   onCallSupport?: () => void;
   onOrderUpdate?: (order: OrderWithDetails) => void;
-  // Tell parent how tall the collapsed sheet is (for map padding)
+  // No longer needed - map has fixed viewport
   onCollapsedHeightChange?: (height: number) => void;
 }
 
@@ -60,30 +59,15 @@ export function ActiveDeliverySheet({
   onCollapsedHeightChange,
 }: ActiveDeliverySheetProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [submittingRating, setSubmittingRating] = useState(false);
   const [customerStatus, setCustomerStatus] = useState(getCustomerFacingStatus(order.status));
   const lastCheckedOrderRef = useRef<string | null>(null);
   const unreadCount = useUnreadMessages(order.id);
-  const sheetRef = useRef<HTMLDivElement | null>(null);
-  const progressTimelineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [collapsedHeight, setCollapsedHeight] = useState<number>(260); // sensible default
   const [showCountGuardrail, setShowCountGuardrail] = useState(false);
   const [showCountIssueSheet, setShowCountIssueSheet] = useState(false);
   const [hasDismissedGuardrail, setHasDismissedGuardrail] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
-  
-  // Motion for bottom sheet pan
-  const y = useMotionValue(0);
-  const controls = useAnimationControls();
-
-  const SPRING = {
-    type: 'spring' as const,
-    stiffness: 400,
-    damping: 40,
-    mass: 0.8,
-  };
 
   // COUNTED guardrail constants
   const COUNT_GUARDRAIL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
@@ -510,77 +494,6 @@ export function ActiveDeliverySheet({
 
   const estimatedArrival = calculateEstimatedArrival();
 
-  // Auto-scroll to Delivery Progress when expanding
-  useEffect(() => {
-    if (!isExpanded) return;
-    
-    // Small delay to ensure content is rendered and refs are set
-    const timeoutId = setTimeout(() => {
-      if (progressTimelineRef.current && scrollContainerRef.current) {
-        try {
-          progressTimelineRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start',
-            inline: 'nearest'
-          });
-        } catch (error) {
-          console.warn('[ActiveDeliverySheet] Auto-scroll failed:', error);
-        }
-      }
-    }, 150);
-
-    return () => clearTimeout(timeoutId);
-  }, [isExpanded]);
-
-  // Measure collapsed height and notify parent for map padding
-  useEffect(() => {
-    if (!sheetRef.current || isExpanded) {
-      // Only measure when collapsed
-      if (onCollapsedHeightChange && !isExpanded) {
-        // Use default when expanded
-        onCollapsedHeightChange(260);
-      }
-      return;
-    }
-
-    const measureHeight = () => {
-      if (!sheetRef.current) return;
-      
-      const rect = sheetRef.current.getBoundingClientRect();
-      const totalHeight = rect.height;
-      
-      if (totalHeight > 0 && totalHeight !== collapsedHeight) {
-        setCollapsedHeight(totalHeight);
-        if (onCollapsedHeightChange) {
-          onCollapsedHeightChange(totalHeight);
-        }
-      }
-    };
-
-    // Initial measurement
-    measureHeight();
-
-    // Use ResizeObserver to watch for size changes
-    const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(measureHeight);
-    });
-
-    resizeObserver.observe(sheetRef.current);
-
-    // Also measure after a short delay to catch dynamic content
-    const timeout = setTimeout(measureHeight, 100);
-
-    return () => {
-      resizeObserver.disconnect();
-      clearTimeout(timeout);
-    };
-  }, [isExpanded, onCollapsedHeightChange, collapsedHeight, localOrder.status, localOrder.otp_code, customerStatus]);
-
-  // Keep the sheet snapped to its state (expanded vs collapsed)
-  useEffect(() => {
-    // Always snap y back to 0; we use height + scroll, not permanent offset
-    controls.start({ y: 0, transition: SPRING });
-  }, [isExpanded, controls]);
 
   // COUNTED delivery guardrail logic - driven by OTP verification, persists for 3 minutes
   useEffect(() => {
@@ -817,449 +730,210 @@ export function ActiveDeliverySheet({
     }
   }, [localOrder.id, localOrder.status, navigate]);
 
-  // Track if user is at top of scroll (for collapse gesture)
-  const [isAtTop, setIsAtTop] = useState(true);
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Handle scroll to check if we're at top (for collapse gesture)
-  const handleScroll = () => {
-    if (!scrollContainerRef.current || isDragging) return;
-    const scrollTop = scrollContainerRef.current.scrollTop ?? 0;
-    setIsAtTop(scrollTop === 0);
-  };
-
-  // Handle drag start
-  const handleDragStart = () => {
-    setIsDragging(true);
-  };
-
-  // Handle drag gestures for swipe to expand/collapse with snap-based logic
-  const handleDragEnd = (_event: any, info: { offset: { y: number }; velocity: { y: number } }) => {
-    setIsDragging(false);
-
-    const dragY = info.offset.y;
-    const velocityY = info.velocity.y;
-
-    const DRAG_THRESHOLD = 60;     // pixels
-    const VELOCITY_THRESHOLD = 400; // px/s
-
-    const draggingUp = dragY < -DRAG_THRESHOLD || velocityY < -VELOCITY_THRESHOLD;
-    const draggingDown = dragY > DRAG_THRESHOLD || velocityY > VELOCITY_THRESHOLD;
-
-    if (!isExpanded && draggingUp) {
-      // expand
-      onToggleExpand();
-    } else if (isExpanded && draggingDown && isAtTop) {
-      // collapse only if content scrolled to top
-      onToggleExpand();
-    } else {
-      // stay where you are - snap back to 0
-      controls.start({ y: 0, transition: SPRING });
-    }
-  };
-
-  // When collapsed we still want to be able to drag up anywhere.
-  // When expanded, only allow drag if scroll is at top.
-  const shouldEnableDrag = !isExpanded || isAtTop;
 
   return (
-    <motion.div
-      ref={sheetRef}
-      style={{ y, touchAction: shouldEnableDrag ? 'pan-y' : 'auto' }}
-      animate={controls}
-      drag={shouldEnableDrag ? 'y' : false}
-      dragElastic={0.12}
-      dragMomentum={false}
-      dragConstraints={{ top: -120, bottom: 120 }} // small range just for the gesture
-      dragDirectionLock={true}
-      onDragStart={shouldEnableDrag ? handleDragStart : undefined}
-      onDragEnd={shouldEnableDrag ? handleDragEnd : undefined}
+    <div
       className={cn(
-        'absolute inset-x-0 bottom-0 z-20 bg-white rounded-t-[24px] shadow-2xl',
+        'absolute inset-x-0 top-[50vh] bottom-0 z-20 bg-white rounded-t-[24px] shadow-2xl',
         'pointer-events-auto flex flex-col',
-        isExpanded ? 'h-[85vh] overflow-hidden' : 'h-auto overflow-visible',
-        shouldEnableDrag && 'cursor-grab active:cursor-grabbing'
+        'overflow-hidden' // Container doesn't scroll, only inner content
       )}
-      transition={SPRING}
     >
-      {/* Grab Handle - Fixed at top */}
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onToggleExpand();
-        }}
-        className={cn(
-          "w-full py-3 flex justify-center items-center cursor-pointer bg-white rounded-t-[24px] transition-colors active:bg-neutral-50 flex-shrink-0 relative z-10",
-          shouldEnableDrag && "cursor-grab active:cursor-grabbing"
-        )}
-        aria-label={isExpanded ? "Collapse details" : "Expand details"}
-        type="button"
-        style={{
-          touchAction: 'none', // Prevent default touch behavior - let parent handle drag
-        }}
-      >
-        <div className="w-12 h-1.5 bg-neutral-300 rounded-full" />
-      </button>
-
-      {/* Sheet Content - Scrollable when expanded */}
+      {/* Sheet Content - Always scrollable */}
       <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className={cn(
-          'px-6 w-full',
-          isExpanded ? 'overflow-y-auto overflow-x-hidden flex-1 pb-6' : 'pb-8'
-        )}
-        style={{
-          touchAction: isDragging ? 'none' : isExpanded ? 'pan-y' : 'auto',
-        }}
+        className="px-6 pt-6 w-full overflow-y-auto overflow-x-hidden flex-1 pb-6"
       >
-        {!isExpanded ? (
-            /* COLLAPSED STATE */
-            <div className="space-y-4">
-            {/* Collapsed Summary - Reordered */}
-            <div className="space-y-4">
-              {/* 1. Title and Sub Label - Grouped together */}
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">{customerStatus.label}...</h2>
-                <p className="text-sm text-slate-600 pt-[6px]">
-                  {customerStatus.step === 'ON_THE_WAY'
-                    ? (() => {
-                        const runnerName = showRunnerIdentity && localOrder.runner 
-                          ? getRunnerDisplayName(
-                              (localOrder.runner as any)?.first_name,
-                              (localOrder.runner as any)?.last_name,
-                              localOrder.status
-                            )
-                          : 'Your runner';
-                        return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
-                      })()
-                    : customerStatus.step === 'ARRIVED'
-                    ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
-                    : customerStatus.description}
-                </p>
-              </div>
+        <div className="space-y-6">
+          {/* 1. Title and Sub Label - Grouped together */}
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">{customerStatus.label}...</h2>
+            <p className="text-sm text-slate-600 pt-[6px]">
+              {customerStatus.step === 'ON_THE_WAY'
+                ? (() => {
+                    const runnerName = showRunnerIdentity && localOrder.runner 
+                      ? getRunnerDisplayName(
+                          (localOrder.runner as any)?.first_name,
+                          (localOrder.runner as any)?.last_name,
+                          localOrder.status
+                        )
+                      : 'Your runner';
+                    return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
+                  })()
+                : customerStatus.step === 'ARRIVED'
+                ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+                : getExpandedStatusCopy(localOrder.status)}
+            </p>
+          </div>
 
-              {/* 3. Progress Bar */}
-              <div className="py-3">
-                <DeliveryProgressBar currentStep={customerStatus.step} />
-              </div>
+          {/* 2. Progress Bar */}
+          <DeliveryProgressBar currentStep={customerStatus.step} />
 
-              {/* 4. Order Snapshot: Cash Amount, Total Payment, Delivery Address - Full Width */}
-              <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash Amount</div>
-                    <div className="text-lg font-semibold text-slate-900">${localOrder.requested_amount.toFixed(2)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Total Payment</div>
-                    <div className="text-lg font-semibold text-slate-900">${localOrder.total_payment.toFixed(2)}</div>
-                  </div>
+          {/* 2.5. OTP Display (when runner is on the way) - Higher priority, shown before order snapshot */}
+          {customerStatus.step === 'ON_THE_WAY' && shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
+            <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
+          )}
+
+          {/* 2.75. Runner Strip (When Allowed) - Shown right after OTP, before order snapshot */}
+          {showRunnerIdentity && localOrder.runner ? (
+            <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  src={localOrder.runner.avatar_url || undefined}
+                  fallback={localOrder.runner.first_name || 'Runner'}
+                  size="md"
+                  className={cn(
+                    "transition-all duration-300",
+                    shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
+                  )}
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-slate-900">
+                    {localOrder.runner.first_name || 'Runner'}
+                    {localOrder.runner.last_name && ` ${localOrder.runner.last_name}`}
+                  </p>
+                  <p className="text-xs text-slate-500">Your Benjamin runner</p>
                 </div>
                 
-                {/* Delivery Address - Collapsed View (Concise Format) */}
-                <div className="pt-2 border-t border-neutral-100">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Delivery Address</div>
-                    {(() => {
-                      const { primaryLine, secondaryLine } = formatAddressForCollapsed();
-                      return (
-                        <div className="space-y-0.5">
-                          <div className="text-sm font-medium text-slate-900">{primaryLine}</div>
-                          {secondaryLine && (
-                            <div className="text-xs text-slate-600">{secondaryLine}</div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* 5. Runner Strip (When Allowed) */}
-              {showRunnerIdentity && localOrder.runner ? (
-                <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar
-                      src={localOrder.runner.avatar_url || undefined}
-                      fallback={localOrder.runner.first_name || 'Runner'}
-                      size="md"
-                      className={cn(
-                        "transition-all duration-300",
-                        shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
-                      )}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900">
-                        {localOrder.runner.first_name || 'Runner'}
-                        {localOrder.runner.last_name && ` ${localOrder.runner.last_name}`}
-                      </p>
-                      <p className="text-xs text-slate-500">Your Benjamin runner</p>
-                    </div>
-                    
-                    {/* Message Button - Canonical IconButton */}
-                    {allowContact && !isCompleted && !isCancelled && (
-                      <IconButton
-                        onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
-                        className="relative shrink-0"
-                        aria-label="Message runner"
-                      >
-                        <MessageCircle className="h-5 w-5" />
-                        {unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                          </span>
-                        )}
-                      </IconButton>
+                {/* Message Button - Canonical IconButton */}
+                {allowContact && !isCompleted && !isCancelled && (
+                  <IconButton
+                    onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
+                    className="relative shrink-0"
+                    aria-label="Message runner"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
                     )}
-                  </div>
-                  
-                  {/* Runner Fun Fact */}
-                  {localOrder.runner.first_name && (localOrder.runner as any)?.fun_fact && (
-                    <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-                      <p className="text-sm text-blue-900 leading-relaxed">
-                        <span className="font-medium">{localOrder.runner.first_name}</span>
-                        {' — '}
-                        {(localOrder.runner as any).fun_fact}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : !isFinal && !isCancelled ? (
-                <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    {/* Loader Animation - Same size as Avatar (md = lg = ~48px) */}
-                    <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
-                      <LottieComponent
-                        animationData={runnerLoadingAnimationData}
-                        loop={true}
-                        autoplay={true}
-                        style={{ width: '48px', height: '48px' }}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-normal text-slate-900">
-                        Benjamin is finding the best runner available to complete your order.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* OTP Display (when OTP is generated) - Collapsed State */}
-            {shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
-              <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
-            )}
-
-
-            {/* Help Link (Completed) */}
-            {isCompleted && (
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    // Navigate to support or show help
-                    toast.info('Help feature coming soon');
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
-                >
-                  <HelpCircle className="h-3 w-3" />
-                  Help with this delivery
-                </button>
-              </div>
-            )}
-            </div>
-          ) : (
-            /* EXPANDED STATE */
-            <div className="space-y-6">
-            {/* 1. Title and Sub Label - Grouped together (same as collapsed) */}
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">{customerStatus.label}...</h2>
-              <p className="text-sm text-slate-600 pt-[6px]">
-                {customerStatus.step === 'ON_THE_WAY'
-                  ? (() => {
-                      const showRunnerIdentity = canRevealRunnerIdentity(localOrder.status);
-                      const runnerName = showRunnerIdentity && localOrder.runner
-                        ? getRunnerDisplayName(
-                            (localOrder.runner as any)?.first_name,
-                            (localOrder.runner as any)?.last_name,
-                            localOrder.status
-                          )
-                        : 'Your runner';
-                      return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
-                    })()
-                  : customerStatus.step === 'ARRIVED'
-                  ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
-                  : getExpandedStatusCopy(localOrder.status)}
-              </p>
-            </div>
-
-            {/* 3. Progress Bar */}
-            <DeliveryProgressBar currentStep={customerStatus.step} />
-
-            {/* 4. Order Snapshot: Cash Amount, Total Payment, Delivery Address */}
-            <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash Amount</div>
-                  <div className="text-lg font-semibold text-slate-900">${localOrder.requested_amount.toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500">Total Payment</div>
-                  <div className="text-lg font-semibold text-slate-900">${localOrder.total_payment.toFixed(2)}</div>
-                </div>
-              </div>
-              
-              {/* Delivery Address - Expanded View (Same Format as Collapsed) */}
-              <div className="pt-2 border-t border-neutral-100">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Delivery Address</div>
-                  {(() => {
-                    const { primaryLine, secondaryLine } = formatAddressForCollapsed();
-                    return (
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium text-slate-900">{primaryLine}</div>
-                        {secondaryLine && (
-                          <div className="text-xs text-slate-600">{secondaryLine}</div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            {/* 5. Runner Strip (When Allowed) */}
-            {showRunnerIdentity && localOrder.runner ? (
-              <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    src={localOrder.runner.avatar_url || undefined}
-                    fallback={localOrder.runner.first_name || 'Runner'}
-                    size="md"
-                    className={cn(
-                      "transition-all duration-300",
-                      shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
-                    )}
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-slate-900">
-                      {localOrder.runner.first_name || 'Runner'}
-                      {localOrder.runner.last_name && ` ${localOrder.runner.last_name}`}
-                    </p>
-                    <p className="text-xs text-slate-500">Your Benjamin runner</p>
-                  </div>
-                  
-                  {/* Message Button - Canonical IconButton */}
-                  {allowContact && !isCompleted && !isCancelled && (
-                    <IconButton
-                      onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
-                      className="relative shrink-0"
-                      aria-label="Message runner"
-                    >
-                      <MessageCircle className="h-5 w-5" />
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
-                    </IconButton>
-                  )}
-                </div>
-                
-                {/* Runner Fun Fact */}
-                {localOrder.runner.first_name && (localOrder.runner as any)?.fun_fact && (
-                  <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-                    <p className="text-sm text-blue-900 leading-relaxed">
-                      <span className="font-medium">{localOrder.runner.first_name}</span>
-                      {' — '}
-                      {(localOrder.runner as any).fun_fact}
-                    </p>
-                  </div>
+                  </IconButton>
                 )}
               </div>
-            ) : !isFinal && !isCancelled ? (
-              <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  {/* Loader Animation - Same size as Avatar (md = lg = ~48px) */}
-                  <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
-                    <LottieComponent
-                      animationData={runnerLoadingAnimationData}
-                      loop={true}
-                      autoplay={true}
-                      style={{ width: '48px', height: '48px' }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-normal text-slate-900">
-                      Benjamin is finding the best runner available to complete your order.
-                    </p>
-                  </div>
+              
+              {/* Runner Fun Fact */}
+              {localOrder.runner.first_name && (localOrder.runner as any)?.fun_fact && (
+                <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+                  <p className="text-sm text-blue-900 leading-relaxed">
+                    <span className="font-medium">{localOrder.runner.first_name}</span>
+                    {' — '}
+                    {(localOrder.runner as any).fun_fact}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : !isFinal && !isCancelled ? (
+            <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                {/* Loader Animation - Same size as Avatar (md = lg = ~48px) */}
+                <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
+                  <LottieComponent
+                    animationData={runnerLoadingAnimationData}
+                    loop={true}
+                    autoplay={true}
+                    style={{ width: '48px', height: '48px' }}
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="font-normal text-slate-900">
+                    Benjamin is finding the best runner available to complete your order.
+                  </p>
                 </div>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {/* OTP Display (when OTP is generated) */}
-            {shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
-              <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
-            )}
+          {/* 3. Order Snapshot: Cash Amount, Total Payment, Delivery Address */}
+          <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash Amount</div>
+                <div className="text-lg font-semibold text-slate-900">${localOrder.requested_amount.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-500">Total Payment</div>
+                <div className="text-lg font-semibold text-slate-900">${localOrder.total_payment.toFixed(2)}</div>
+              </div>
+            </div>
+            
+            {/* Delivery Address */}
+            <div className="pt-2 border-t border-neutral-100">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Delivery Address</div>
+                {(() => {
+                  const { primaryLine, secondaryLine } = formatAddressForCollapsed();
+                  return (
+                    <div className="space-y-0.5">
+                      <div className="text-sm font-medium text-slate-900">{primaryLine}</div>
+                      {secondaryLine && (
+                        <div className="text-xs text-slate-600">{secondaryLine}</div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
 
-            {/* Delivery Progress Timeline */}
-            <div ref={progressTimelineRef} className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Delivery Progress</h3>
-              <OrderProgressTimeline
-                currentStatus={localOrder.status}
-                variant="customer"
-                tone="customer"
-                currentStep={customerStatus.step}
-                order={localOrder}
+          {/* 4. OTP Display (when OTP is generated, but not when runner is on the way - that's shown above) */}
+          {customerStatus.step !== 'ON_THE_WAY' && shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
+            <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
+          )}
+
+          {/* 6. Delivery Progress Timeline */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900">Delivery Progress</h3>
+            <OrderProgressTimeline
+              currentStatus={localOrder.status}
+              variant="customer"
+              tone="customer"
+              currentStep={customerStatus.step}
+              order={localOrder}
+            />
+          </div>
+
+          {/* 7. Rate Your Runner (Completed Only) - Hidden while guardrail is active */}
+          {isCompleted && !showCountGuardrail && (
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-slate-900">Rate your runner</div>
+              <RatingStars
+                value={localOrder.runner_rating ?? 0}
+                onChange={localOrder.runner_rating ? undefined : handleRateRunner}
+                readOnly={!!localOrder.runner_rating || submittingRating}
               />
             </div>
-
-
-            {/* Rate Your Runner (Completed Only) - Hidden while guardrail is active */}
-            {isCompleted && !showCountGuardrail && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-slate-900">Rate your runner</div>
-                <RatingStars
-                  value={localOrder.runner_rating ?? 0}
-                  onChange={localOrder.runner_rating ? undefined : handleRateRunner}
-                  readOnly={!!localOrder.runner_rating || submittingRating}
-                />
-              </div>
-            )}
-
-            {/* Reorder CTA (Completed Only) - Hidden while guardrail is active */}
-            {isCompleted && !showCountGuardrail && onReorder && (
-              <Button
-                onClick={onReorder}
-                className="w-full rounded-2xl bg-black text-white hover:bg-black/90 h-12"
-              >
-                Reorder this delivery
-              </Button>
-            )}
-
-            {/* Cancel Button - Standard Button with Red Stroke */}
-            {canCancel && onCancel && (
-              <Button
-                onClick={onCancel}
-                variant="outline"
-                size="default"
-                className="w-full h-[56px] border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600"
-              >
-                Cancel Delivery
-              </Button>
-            )}
-
-            {/* Order ID Footer */}
-            <div className="text-center pt-4 border-t border-neutral-100">
-              <p className="text-xs text-neutral-400">
-                Order #{localOrder.id.slice(0, 8).toUpperCase()}
-              </p>
-            </div>
-            </div>
           )}
+
+          {/* 8. Reorder CTA (Completed Only) - Hidden while guardrail is active */}
+          {isCompleted && !showCountGuardrail && onReorder && (
+            <Button
+              onClick={onReorder}
+              className="w-full rounded-2xl bg-black text-white hover:bg-black/90 h-12"
+            >
+              Reorder this delivery
+            </Button>
+          )}
+
+          {/* 9. Cancel Button - Standard Button with Red Stroke */}
+          {canCancel && onCancel && (
+            <Button
+              onClick={onCancel}
+              variant="outline"
+              size="default"
+              className="w-full h-[56px] border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600"
+            >
+              Cancel Delivery
+            </Button>
+          )}
+
+          {/* 10. Order ID Footer */}
+          <div className="text-center pt-4 border-t border-neutral-100">
+            <p className="text-xs text-neutral-400">
+              Order #{localOrder.id.slice(0, 8).toUpperCase()}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ReportIssueSheet for COUNTED guardrail */}
@@ -1411,7 +1085,7 @@ export function ActiveDeliverySheet({
           </div>
         </div>
         )}
-    </motion.div>
+    </div>
   );
 }
 

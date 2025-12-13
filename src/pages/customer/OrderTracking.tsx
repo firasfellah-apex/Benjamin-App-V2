@@ -28,11 +28,10 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [previousStatus, setPreviousStatus] = useState<OrderStatus | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false); // Kept for backward compatibility but not used
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [hasIssue, setHasIssue] = useState(false);
-  const [mapBottomPadding, setMapBottomPadding] = useState<number>(260); // sensible default
 
   const loadOrder = async () => {
     if (!orderId) return;
@@ -274,29 +273,65 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   
   // Get map locations based on order status - MUST match runner map exactly
   // Customer only sees map after cash withdrawal (when live location is revealed)
+  // Uses the SAME real locations as runner (pickup_lat/lng for ATM, custom_pin or address_snapshot for customer)
   const getMapLocations = () => {
     if (!showLiveMap) return null;
     
-    const dummyLocations = getDummyLocations();
     // Customer map only shows route from ATM to customer (after cash withdrawal)
     // This should match runner's map when status is Cash Withdrawn / Pending Handoff / Completed
     const showCustomerRoute = ['Cash Withdrawn', 'Pending Handoff', 'Completed'].includes(order.status);
     
     if (showCustomerRoute) {
-      // After cash withdrawal: show route from ATM to customer
-      // Use EXACT same logic and locations as runner map for consistency
-      const customerLocation = {
-        // Use dummy customer location for consistency with runner map (which uses dummyLocations.customer)
-        // Fallback to order address if available, but prefer dummy for testing consistency
-        lat: dummyLocations.customer.lat, // Use dummy first to match runner
-        lng: dummyLocations.customer.lng,
-        address: order.customer_address || 'Customer Address',
-      };
+      // Get pickup location (ATM) - same as runner uses
+      const hasPickup = !!(order as any).pickup_lat && !!(order as any).pickup_lng;
+      const pickupLocation = hasPickup
+        ? {
+            lat: (order as any).pickup_lat,
+            lng: (order as any).pickup_lng,
+            address: (order as any).pickup_address || (order as any).pickup_name || 'ATM Location',
+          }
+        : null;
       
-      // Use EXACT same locations as runner map
+      // Get dropoff location (customer) - same as runner uses
+      // Priority: custom_pin_lat/lng > latitude/longitude from address_snapshot
+      const addressSnapshot = order.address_snapshot;
+      const dropoffLocation = 
+        (addressSnapshot?.custom_pin_lat && addressSnapshot?.custom_pin_lng)
+          ? {
+              lat: addressSnapshot.custom_pin_lat,
+              lng: addressSnapshot.custom_pin_lng,
+              address: order.address_snapshot?.line1 
+                ? `${order.address_snapshot.line1}${order.address_snapshot.line2 ? `, ${order.address_snapshot.line2}` : ''}, ${order.address_snapshot.city || ''}, ${order.address_snapshot.state || ''}`
+                : order.customer_address || 'Customer Address',
+            }
+          : (addressSnapshot?.latitude && addressSnapshot?.longitude)
+            ? {
+                lat: addressSnapshot.latitude,
+                lng: addressSnapshot.longitude,
+                address: order.address_snapshot?.line1 
+                  ? `${order.address_snapshot.line1}${order.address_snapshot.line2 ? `, ${order.address_snapshot.line2}` : ''}, ${order.address_snapshot.city || ''}, ${order.address_snapshot.state || ''}`
+                  : order.customer_address || 'Customer Address',
+              }
+            : null;
+      
+      if (pickupLocation && dropoffLocation) {
+        return {
+          origin: pickupLocation,
+          destination: dropoffLocation,
+          title: 'Route to You',
+        };
+      }
+      
+      // Fallback to dummy locations if real locations are not available
+      console.warn('[OrderTracking] Missing real locations, using dummy locations as fallback', {
+        hasPickup,
+        hasDropoff: !!dropoffLocation,
+        orderId: order.id,
+      });
+      const dummyLocations = getDummyLocations();
       return {
-        origin: dummyLocations.atm, // ATM location (exactly same as runner)
-        destination: customerLocation,
+        origin: pickupLocation || dummyLocations.atm,
+        destination: dropoffLocation || dummyLocations.customer,
         title: 'Route to You',
       };
     }
@@ -322,8 +357,8 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         </IconButton>
       </div>
 
-      {/* Map Background - Extended to cover behind bottom sheet button */}
-      <div className="absolute inset-x-0 top-0 h-[60%] z-0 pointer-events-none">
+      {/* Map Background - Fixed viewport, always visible (50% of viewport height) */}
+      <div className="absolute inset-x-0 top-0 h-[50vh] z-0 pointer-events-none">
         {mapLocations ? (
           <RunnerDirectionsMap
             origin={mapLocations.origin}
@@ -331,7 +366,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
             title={mapLocations.title}
             height="100%"
             className="pointer-events-none"
-            bottomPadding={mapBottomPadding}
+            bottomPadding={0}
             interactive={true}
           />
         ) : (
@@ -368,17 +403,16 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         />
       )}
 
-      {/* Bottom Sheet */}
+      {/* Bottom Sheet - Always scrollable, max 50vh so map stays visible */}
       <ActiveDeliverySheet
         order={order}
-        isExpanded={sheetExpanded}
-        onToggleExpand={() => setSheetExpanded(v => !v)}
+        isExpanded={false}
+        onToggleExpand={() => {}}
         onCancel={handleCancel}
         onReorder={handleReorder}
         onMessage={handleMessage}
         onCallSupport={handleCallSupport}
         onOrderUpdate={(updatedOrder) => setOrder(updatedOrder)}
-        onCollapsedHeightChange={setMapBottomPadding}
       />
     </div>
   );

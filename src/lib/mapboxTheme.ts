@@ -46,9 +46,11 @@ export const BENJAMIN_COLORS = {
 
 /**
  * Applies Benjamin brand theme to a Mapbox map instance
- * Darkens the background/land/water, simplifies roads, hides POIs and transit
+ * Darkens the background/land/water, simplifies roads, enhances 3D buildings for navigation
  */
-export function applyBenjaminTheme(map: mapboxgl.Map) {
+export function applyBenjaminTheme(map: mapboxgl.Map, options?: { enable3DBuildings?: boolean; isRunner?: boolean }) {
+  const { enable3DBuildings = true, isRunner = false } = options || {};
+  
   const applyTheme = () => {
     if (!map || !map.isStyleLoaded()) return;
 
@@ -73,13 +75,67 @@ export function applyBenjaminTheme(map: mapboxgl.Map) {
           map.setPaintProperty(id, 'fill-color', BENJAMIN_COLORS.water);
         }
 
-        // Buildings
-        if (id.includes('building') && type === 'fill') {
-          map.setPaintProperty(id, 'fill-color', BENJAMIN_COLORS.buildingFill);
-          map.setPaintProperty(id, 'fill-outline-color', BENJAMIN_COLORS.buildingOutline);
+        // Buildings - Enhanced for navigation with 3D extrusion
+        if (id.includes('building')) {
+          if (type === 'fill' || type === 'fill-extrusion') {
+            // For fill-extrusion layers (3D buildings in navigation styles)
+            if (type === 'fill-extrusion' && enable3DBuildings) {
+              try {
+                // Enhance 3D building visibility for navigation
+                map.setPaintProperty(id, 'fill-extrusion-color', '#1A1F2E');
+                map.setPaintProperty(id, 'fill-extrusion-opacity', 0.75);
+                // Make buildings slightly more visible
+                map.setPaintProperty(id, 'fill-extrusion-height', [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  15,
+                  ['get', 'height'],
+                  20,
+                  ['*', ['get', 'height'], 1.2]
+                ]);
+              } catch (e) {
+                console.log('[mapboxTheme] Could not enhance 3D building layer:', id, e);
+              }
+            } else if (type === 'fill') {
+              // For regular fill layers, try to convert to 3D if possible
+              map.setPaintProperty(id, 'fill-color', BENJAMIN_COLORS.buildingFill);
+              map.setPaintProperty(id, 'fill-outline-color', BENJAMIN_COLORS.buildingOutline);
+              
+              // Try to enable 3D extrusion if the layer supports it
+              if (enable3DBuildings) {
+                try {
+                  // Check if we can add extrusion properties
+                  const source = style.sources[layer.source as string];
+                  if (source && (source.type === 'vector' || source.type === 'geojson')) {
+                    // Try to enable extrusion - navigation styles often have height data
+                    map.setPaintProperty(id, 'fill-extrusion-height', [
+                      'coalesce',
+                      ['get', 'height'],
+                      ['get', 'render_height'],
+                      10 // Default height if not available
+                    ]);
+                    map.setPaintProperty(id, 'fill-extrusion-base', 0);
+                    map.setPaintProperty(id, 'fill-extrusion-color', '#1A1F2E');
+                    map.setPaintProperty(id, 'fill-extrusion-opacity', 0.7);
+                  }
+                } catch (e) {
+                  // Layer might not support extrusion, that's okay
+                  console.log('[mapboxTheme] Building fill layer does not support 3D extrusion:', id);
+                }
+              }
+            }
+          }
+        }
+        
+        // Building outlines - make them more visible for navigation
+        if (id.includes('building') && type === 'line') {
+          map.setPaintProperty(id, 'line-color', BENJAMIN_COLORS.buildingOutline);
+          map.setPaintProperty(id, 'line-opacity', isRunner ? 0.7 : 0.6);
+          map.setPaintProperty(id, 'line-width', isRunner ? 1.0 : 0.8);
         }
 
-        // Roads – strong hierarchy
+        // Roads – strong hierarchy, enhanced for navigation
         if (id.includes('road') && type === 'line') {
           const isMotorway =
             id.includes('motorway') || id.includes('trunk') || id.includes('primary');
@@ -87,27 +143,40 @@ export function applyBenjaminTheme(map: mapboxgl.Map) {
             id.includes('secondary') || id.includes('tertiary');
 
           if (id.includes('service') || id.includes('path') || id.includes('track')) {
-            // Hide noisy micro-roads
-            map.setLayoutProperty(id, 'visibility', 'none');
+            // For runner: show service roads for better navigation context
+            // For customer: hide noisy micro-roads
+            if (isRunner) {
+              map.setPaintProperty(id, 'line-color', BENJAMIN_COLORS.roadTertiary);
+              map.setPaintProperty(id, 'line-width', 0.6);
+              map.setPaintProperty(id, 'line-opacity', 0.25);
+            } else {
+              map.setLayoutProperty(id, 'visibility', 'none');
+            }
           } else if (isMotorway) {
             map.setPaintProperty(id, 'line-color', BENJAMIN_COLORS.roadPrimary);
-            map.setPaintProperty(id, 'line-width', 1.6);
+            // Slightly thicker for better navigation visibility
+            map.setPaintProperty(id, 'line-width', isRunner ? 2.0 : 1.6);
           } else if (isSecondary) {
             map.setPaintProperty(id, 'line-color', BENJAMIN_COLORS.roadSecondary);
-            map.setPaintProperty(id, 'line-width', 1.1);
+            map.setPaintProperty(id, 'line-width', isRunner ? 1.4 : 1.1);
           } else {
-            // local roads very subtle
+            // local roads - more visible for navigation
             map.setPaintProperty(id, 'line-color', BENJAMIN_COLORS.roadTertiary);
-            map.setPaintProperty(id, 'line-width', 0.8);
-            map.setPaintProperty(id, 'line-opacity', 0.35);
+            map.setPaintProperty(id, 'line-width', isRunner ? 1.0 : 0.8);
+            map.setPaintProperty(id, 'line-opacity', isRunner ? 0.5 : 0.35);
           }
         }
 
-        // Road labels
+        // Road labels - Enhanced for navigation
         if (id.includes('road') && type === 'symbol' && id.includes('label')) {
           map.setPaintProperty(id, 'text-color', BENJAMIN_COLORS.roadLabel);
           map.setPaintProperty(id, 'text-halo-color', BENJAMIN_COLORS.canvas);
-          map.setPaintProperty(id, 'text-halo-width', 1);
+          // Thicker halo for better readability during navigation
+          map.setPaintProperty(id, 'text-halo-width', isRunner ? 1.5 : 1);
+          // Slightly larger text for runner navigation
+          if (isRunner) {
+            map.setLayoutProperty(id, 'text-size', ['interpolate', ['linear'], ['zoom'], 10, 11, 16, 13]);
+          }
         }
 
         // Place labels (city / neighborhood)
@@ -174,8 +243,9 @@ export function getBenjaminMapStyle(): string {
     console.log('[mapboxTheme] Could not read MAPBOX_STYLE_URL from env, using fallback');
   }
   
-  // Fallback to dark base – we'll override colors with applyBenjaminTheme
-  return 'mapbox://styles/mapbox/dark-v11';
+  // Fallback to navigation-night for better navigation features (3D buildings, better road hierarchy)
+  // This style is optimized for turn-by-turn navigation
+  return 'mapbox://styles/mapbox/navigation-night-v1';
 }
 
 /**
