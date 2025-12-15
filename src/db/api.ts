@@ -22,6 +22,96 @@ export function calculateFees(requestedAmount: number): FeeCalculation {
 // Profile APIs
 
 /**
+ * Updates daily_usage when an order is completed
+ * Only completed orders should count against the daily limit
+ */
+async function updateDailyUsageOnCompletion(userId: string, orderAmount: number): Promise<void> {
+  try {
+    const { data: profile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("daily_usage")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (fetchError || !profile) {
+      console.error("[Daily Usage] Error fetching profile for completion update:", fetchError);
+      return;
+    }
+
+    const currentDailyUsage = Number(profile.daily_usage) || 0;
+    const newDailyUsage = currentDailyUsage + orderAmount;
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        daily_usage: newDailyUsage,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", userId);
+
+    if (updateError) {
+      console.error("[Daily Usage] ❌ Error updating daily_usage on completion:", updateError);
+    } else {
+      console.log("[Daily Usage] ✅ Updated daily_usage on order completion:", {
+        previous: currentDailyUsage,
+        added: orderAmount,
+        new: newDailyUsage,
+      });
+    }
+  } catch (error) {
+    console.error("[Daily Usage] Unexpected error updating daily_usage on completion:", error);
+  }
+}
+
+/**
+ * Reduces daily_usage when an order is cancelled
+ * Only reduces if the order was previously counted (i.e., if it was completed)
+ */
+async function reduceDailyUsageOnCancellation(userId: string, orderAmount: number, wasCompleted: boolean): Promise<void> {
+  // Only reduce if the order was previously completed (and thus counted)
+  if (!wasCompleted) {
+    console.log("[Daily Usage] Order was not completed, skipping daily_usage reduction on cancellation");
+    return;
+  }
+
+  try {
+    const { data: profile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("daily_usage")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (fetchError || !profile) {
+      console.error("[Daily Usage] Error fetching profile for cancellation update:", fetchError);
+      return;
+    }
+
+    const currentDailyUsage = Number(profile.daily_usage) || 0;
+    const newDailyUsage = Math.max(0, currentDailyUsage - orderAmount); // Don't go below 0
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        daily_usage: newDailyUsage,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", userId);
+
+    if (updateError) {
+      console.error("[Daily Usage] ❌ Error reducing daily_usage on cancellation:", updateError);
+    } else {
+      console.log("[Daily Usage] ✅ Reduced daily_usage on order cancellation:", {
+        previous: currentDailyUsage,
+        reduced: orderAmount,
+        new: newDailyUsage,
+      });
+    }
+  } catch (error) {
+    console.error("[Daily Usage] Unexpected error reducing daily_usage on cancellation:", error);
+  }
+}
+
+/**
  * Checks if daily_usage should be reset (new day since last reset)
  * and resets it if needed
  */
@@ -833,31 +923,9 @@ export async function createOrder(
       });
     }
 
-    // Update daily_usage by adding the requested amount
-    if (profile) {
-      const currentDailyUsage = Number(profile.daily_usage) || 0;
-      const newDailyUsage = currentDailyUsage + requestedAmount;
-      
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          daily_usage: newDailyUsage,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", user.id);
-
-      if (updateError) {
-        console.error("[Order Creation] ❌ Error updating daily_usage:", updateError);
-        // Don't throw - order was created successfully, this is just a tracking update
-      } else {
-        console.log("[Order Creation] ✅ Updated daily_usage:", {
-          previous: currentDailyUsage,
-          added: requestedAmount,
-          new: newDailyUsage,
-          dailyLimit: profile.daily_limit || 1000,
-        });
-      }
-    }
+    // NOTE: daily_usage is NOT updated here anymore
+    // It will be updated only when the order is completed (not when created)
+    // This ensures cancelled orders don't count against the daily limit
   }
 
   return data;
@@ -1660,6 +1728,11 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
  * Confirm customer count for counted delivery mode
  * This completes the order after OTP has been verified and customer has counted
  * 
+ * IMPORTANT: Customer confirmation is the highest source of truth.
+ * When a customer confirms the amount is correct, the order completes immediately,
+ * overriding any runner-side cooling off period (20 seconds). This ensures the
+ * customer's decision takes precedence over the runner's waiting period.
+ * 
  * @param orderId - Order ID
  * @returns Success status
  */
@@ -1693,20 +1766,27 @@ export async function confirmCount(orderId: string): Promise<{ success: boolean;
       return { success: false, error: "Count confirmation is only required for counted delivery mode." };
     }
 
-    // Complete the order
+    // Complete the order immediately - customer confirmation overrides runner cooling off period
+    // No check for cooling off period here - customer decision is final
     const updatedOrder = await advanceOrderStatus(
       orderId,
       "Completed",
       undefined,
       {
         action: "confirm_count",
-        count_verified: true
+        count_verified: true,
+        confirmed_by: "customer" // Track that customer confirmed
       }
     );
 
     if (!updatedOrder) {
       return { success: false, error: "Failed to complete delivery. Please contact support." };
     }
+
+    console.log('[confirmCount] Order completed via customer confirmation:', {
+      orderId,
+      status: updatedOrder.status,
+    });
 
     return { success: true };
   } catch (error) {
@@ -1774,6 +1854,10 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
       return { success: false, message: "Unauthorized: Only customers and admins can cancel orders" };
     }
 
+    // Check if order was previously completed (to know if we need to reduce daily_usage)
+    const wasCompleted = order.status === 'Completed';
+    const orderAmount = Number(order.requested_amount) || 0;
+
     // Use FSM to cancel the order (this handles state transitions properly)
     // FSM will validate:
     // - Customers can cancel their own orders from Pending/Runner Accepted
@@ -1812,6 +1896,12 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
         success: false, 
         message: errorMessage
       };
+    }
+
+    // Update daily_usage if order was previously completed
+    // If order was never completed, it was never counted, so no need to reduce
+    if (order.customer_id && wasCompleted) {
+      await reduceDailyUsageOnCancellation(order.customer_id, orderAmount, true);
     }
 
     // Create audit log entry
@@ -2292,6 +2382,15 @@ export async function advanceOrderStatus(
   metadata?: Record<string, any>
 ): Promise<Order | null> {
   try {
+    // Get order before status change to check if it was completed
+    const { data: orderBefore, error: fetchError } = await supabase
+      .from("orders")
+      .select("customer_id, requested_amount, status")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    const wasCompleted = orderBefore?.status === 'Completed';
+    
     // Generate idempotency key if not provided
     const actionId = clientActionId || crypto.randomUUID();
     
@@ -2305,6 +2404,20 @@ export async function advanceOrderStatus(
     if (error) {
       console.error('Error advancing order status:', error);
       throw new Error(error.message);
+    }
+
+    // Update daily_usage based on status change
+    if (orderBefore && orderBefore.customer_id) {
+      const orderAmount = Number(orderBefore.requested_amount) || 0;
+      
+      if (nextStatus === 'Completed' && !wasCompleted) {
+        // Order just completed - add to daily_usage
+        await updateDailyUsageOnCompletion(orderBefore.customer_id, orderAmount);
+      } else if (nextStatus === 'Cancelled' && wasCompleted) {
+        // Order was completed but now cancelled - reduce daily_usage
+        await reduceDailyUsageOnCancellation(orderBefore.customer_id, orderAmount, true);
+      }
+      // If order is cancelled but was never completed, don't do anything (it was never counted)
     }
 
     return data;

@@ -102,6 +102,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     });
     
     // Update state immediately with payload data for instant UI update
+    // Always create a new object reference to ensure React detects the change
     setOrder((prev) => {
       if (!prev || prev.id !== updatedOrder.id) {
         console.log('[OrderTracking] Order ID mismatch or no previous order, skipping update');
@@ -109,12 +110,15 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       }
       
       // Merge the update into existing order to preserve relations
+      // Create a new object to ensure React detects the change
       const merged = {
         ...prev,
         ...updatedOrder,
+        // Ensure nested objects are also new references
+        updated_at: updatedOrder.updated_at || prev.updated_at,
       } as OrderWithDetails;
       
-      console.log('[OrderTracking] Order state updated:', {
+      console.log('[OrderTracking] Order state updated (merged):', {
         orderId: merged.id,
         status: merged.status,
         updated_at: merged.updated_at,
@@ -139,8 +143,15 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     
     // Fetch full order details in background to get relations and trigger status re-check
     // This ensures ActiveDeliverySheet can detect runner arrival
+    // IMPORTANT: This creates a new object reference, ensuring ActiveDeliverySheet re-renders
     getOrderById(orderId).then((data) => {
       if (data && data.id === orderId) {
+        console.log('[OrderTracking] Full order details fetched, updating state:', {
+          orderId: data.id,
+          status: data.status,
+          updated_at: data.updated_at,
+        });
+        // This will create a new object reference, triggering ActiveDeliverySheet to sync
         setOrder(data);
         // Show completion modal if order just completed and hasn't been rated
         if (previousStatus && previousStatus !== "Completed" && data.status === "Completed" && !data.runner_rating) {

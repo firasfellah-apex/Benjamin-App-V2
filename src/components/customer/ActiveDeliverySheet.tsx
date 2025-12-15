@@ -20,7 +20,7 @@ import {
 } from '@/lib/reveal';
 import { shouldShowCustomerOtpToCustomer } from '@/lib/revealRunnerView';
 import { OtpDisplay } from '@/components/customer/OtpDisplay';
-import { rateRunner, getOrderById } from '@/db/api';
+import { rateRunner, getOrderById, confirmCount } from '@/db/api';
 import { toast } from 'sonner';
 import { supabase } from '@/db/supabase';
 import { resolveDeliveryStyleFromOrder } from '@/lib/deliveryStyle';
@@ -68,6 +68,7 @@ export function ActiveDeliverySheet({
   const [showCountIssueSheet, setShowCountIssueSheet] = useState(false);
   const [hasDismissedGuardrail, setHasDismissedGuardrail] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+  const [isConfirmingCount, setIsConfirmingCount] = useState(false);
 
   // COUNTED guardrail constants
   const COUNT_GUARDRAIL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
@@ -77,11 +78,33 @@ export function ActiveDeliverySheet({
   const [localOrder, setLocalOrder] = useState<OrderWithDetails>(order);
 
   // Sync localOrder when order prop changes (from parent)
+  // This ensures we always reflect the parent's order state
+  // Use a ref to track the last synced order to avoid unnecessary updates
+  const lastSyncedOrderRef = useRef<string>('');
   useEffect(() => {
-    setLocalOrder(order);
-  }, [order]);
+    // Create a unique key from order properties to detect changes
+    const orderKey = `${order.id}-${order.status}-${order.updated_at || ''}`;
+    
+    // Only sync if order actually changed
+    if (lastSyncedOrderRef.current !== orderKey) {
+      console.log('[ActiveDeliverySheet] Order prop updated, syncing localOrder:', {
+        orderId: order.id,
+        status: order.status,
+        updated_at: order.updated_at,
+        previousKey: lastSyncedOrderRef.current,
+        newKey: orderKey,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Always create a new object reference to ensure React detects the change
+      setLocalOrder({ ...order });
+      lastSyncedOrderRef.current = orderKey;
+    }
+  }, [order.id, order.status, order.updated_at, order]);
 
   // Subscribe to realtime updates for this order
+  // This acts as a backup/fallback if parent doesn't receive updates
+  // But we prioritize the parent's order prop as the source of truth
   useOrderRealtime(order.id, {
     onUpdate: async (updatedOrder) => {
       console.log('[ActiveDeliverySheet] Realtime update received:', {
@@ -91,41 +114,54 @@ export function ActiveDeliverySheet({
         timestamp: new Date().toISOString(),
       });
 
+      // Always notify parent first - parent is the source of truth
       // Fetch full order details to get relations (runner, address_snapshot, etc.)
       try {
         const fullOrder = await getOrderById(updatedOrder.id);
         if (fullOrder) {
-          setLocalOrder(fullOrder);
-          // Notify parent component of the update
+          // Notify parent component of the update first
+          // Parent will update its state and pass it back as order prop
           if (onOrderUpdate) {
+            console.log('[ActiveDeliverySheet] Notifying parent of order update:', {
+              orderId: fullOrder.id,
+              status: fullOrder.status,
+            });
             onOrderUpdate(fullOrder);
           }
+          // Also update local state as fallback (in case parent doesn't update)
+          setLocalOrder(fullOrder);
         } else {
           // Fallback: merge update into existing order
-          setLocalOrder((prev) => ({
-            ...prev,
+          const mergedOrder = {
+            ...order,
             ...updatedOrder,
-          } as OrderWithDetails));
+          } as OrderWithDetails;
+          
           if (onOrderUpdate) {
-            onOrderUpdate({
-              ...order,
-              ...updatedOrder,
-            } as OrderWithDetails);
+            console.log('[ActiveDeliverySheet] Notifying parent of merged order update:', {
+              orderId: mergedOrder.id,
+              status: mergedOrder.status,
+            });
+            onOrderUpdate(mergedOrder);
           }
+          setLocalOrder(mergedOrder);
         }
       } catch (error) {
         console.error('[ActiveDeliverySheet] Error fetching full order after realtime update:', error);
         // Fallback: merge update into existing order
-        setLocalOrder((prev) => ({
-          ...prev,
+        const mergedOrder = {
+          ...order,
           ...updatedOrder,
-        } as OrderWithDetails));
+        } as OrderWithDetails;
+        
         if (onOrderUpdate) {
-          onOrderUpdate({
-            ...order,
-            ...updatedOrder,
-          } as OrderWithDetails);
+          console.log('[ActiveDeliverySheet] Notifying parent of merged order update (error fallback):', {
+            orderId: mergedOrder.id,
+            status: mergedOrder.status,
+          });
+          onOrderUpdate(mergedOrder);
         }
+        setLocalOrder(mergedOrder);
       }
     },
     enabled: !!order.id,
@@ -1052,33 +1088,58 @@ export function ActiveDeliverySheet({
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => {
-                    setShowCountGuardrail(false);
-                    setHasDismissedGuardrail(true);
-                    try {
-                      const key = makeGuardrailKey(localOrder.id);
-                      const raw = localStorage.getItem(key);
-                      const parsed = raw ? JSON.parse(raw) : {};
-                      const expiresAt = parsed?.expiresAt ?? Date.now();
-                      localStorage.setItem(
-                        key,
-                        JSON.stringify({ ...parsed, dismissed: true, expiresAt })
-                      );
-                    } catch (e) {
-                      console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
-                    }
+                  onClick={async () => {
+                    if (isConfirmingCount) return; // Prevent double-clicks
                     
-                    // For COUNTED deliveries, navigate to home page to close the active delivery sheet
-                    // This happens after runner marks "All good" and order is completed
-                    const deliveryStyle = resolveDeliveryStyleFromOrder(localOrder);
-                    if (deliveryStyle === 'COUNTED') {
-                      // Navigate to home page to close the active delivery sheet
-                      navigate('/customer/home', { replace: true });
+                    setIsConfirmingCount(true);
+                    console.log('[ActiveDeliverySheet] Customer confirmed count is correct, completing order immediately:', {
+                      orderId: localOrder.id,
+                      status: localOrder.status,
+                    });
+                    
+                    try {
+                      // Complete the order immediately - customer confirmation overrides runner cooling off period
+                      const result = await confirmCount(localOrder.id);
+                      
+                      if (result.success) {
+                        console.log('[ActiveDeliverySheet] Order completed successfully via customer confirmation');
+                        
+                        // Close guardrail modal
+                        setShowCountGuardrail(false);
+                        setHasDismissedGuardrail(true);
+                        
+                        // Persist dismissal
+                        try {
+                          const key = makeGuardrailKey(localOrder.id);
+                          const raw = localStorage.getItem(key);
+                          const parsed = raw ? JSON.parse(raw) : {};
+                          const expiresAt = parsed?.expiresAt ?? Date.now();
+                          localStorage.setItem(
+                            key,
+                            JSON.stringify({ ...parsed, dismissed: true, expiresAt })
+                          );
+                        } catch (e) {
+                          console.warn('[ActiveDeliverySheet] Failed to persist guardrail dismissal', e);
+                        }
+                        
+                        // Navigate to home page - order is now completed
+                        // The order will update via realtime, and the sheet will auto-close
+                        navigate('/customer/home', { replace: true });
+                      } else {
+                        console.error('[ActiveDeliverySheet] Failed to confirm count:', result.error);
+                        toast.error(result.error || 'Failed to complete order. Please try again.');
+                        setIsConfirmingCount(false);
+                      }
+                    } catch (error: any) {
+                      console.error('[ActiveDeliverySheet] Error confirming count:', error);
+                      toast.error(error?.message || 'An unexpected error occurred. Please try again.');
+                      setIsConfirmingCount(false);
                     }
                   }}
-                  className="flex-1 h-14 text-base font-semibold bg-black text-white hover:bg-black/90"
+                  disabled={isConfirmingCount}
+                  className="flex-1 h-14 text-base font-semibold bg-black text-white hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Looks Correct
+                  {isConfirmingCount ? 'Completing...' : 'Looks Correct'}
                 </Button>
               </div>
             </div>
