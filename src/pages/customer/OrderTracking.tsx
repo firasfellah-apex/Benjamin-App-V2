@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { toast } from "sonner";
 import { getOrderById, cancelOrder, hasOrderIssue } from "@/db/api";
-import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
+import { useOrderRealtime, useOrdersRealtime } from "@/hooks/useOrdersRealtime";
+import { useAuth } from "@/contexts/AuthContext";
 import type { OrderWithDetails, OrderStatus, Order } from "@/types/types";
 import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
 import { RunnerDirectionsMap } from "@/components/maps/RunnerDirectionsMap";
@@ -27,6 +28,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const orderId = orderIdProp || params.orderId || params.deliveryId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [previousStatus, setPreviousStatus] = useState<OrderStatus | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // Kept for backward compatibility but not used
   const [isCancelling, setIsCancelling] = useState(false);
@@ -34,16 +36,40 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const [hasIssue, setHasIssue] = useState(false);
 
   // Use React Query as the single source of truth for order data
-  const { data: order, isLoading: loading } = useQuery<OrderWithDetails | null>({
+  const { data: order, isLoading: loading, dataUpdatedAt } = useQuery<OrderWithDetails | null>({
     queryKey: ['order', orderId],
     queryFn: async () => {
       if (!orderId) return null;
-      return await getOrderById(orderId);
+      const data = await getOrderById(orderId);
+      console.log('[OrderTracking] Query function fetched order:', {
+        orderId: data?.id,
+        status: data?.status,
+        timestamp: new Date().toISOString(),
+      });
+      // Always return a new object reference
+      return data ? { ...data } : null;
     },
     enabled: !!orderId,
     staleTime: 0, // Always consider stale to allow realtime updates
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    // Refetch on window focus to catch any missed updates
+    refetchOnWindowFocus: false, // Disable to avoid unnecessary refetches
+    // Ensure we get notified of data changes
+    notifyOnChangeProps: ['data', 'error', 'status', 'dataUpdatedAt'],
   });
+  
+  // Debug: Log when order data changes
+  useEffect(() => {
+    if (order) {
+      console.log('[OrderTracking] useQuery order data changed:', {
+        orderId: order.id,
+        status: order.status,
+        updated_at: order.updated_at,
+        dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [order?.id, order?.status, order?.updated_at, dataUpdatedAt, order]);
 
   // Track status transitions for confetti and modal
   useEffect(() => {
@@ -102,31 +128,53 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     });
     
     // Update React Query cache immediately with payload data for instant UI update
-    queryClient.setQueryData<OrderWithDetails | null>(['order', orderId], (prev) => {
-      if (!prev || prev.id !== updatedOrder.id) {
-        console.log('[OrderTracking] No previous order in cache, skipping immediate update');
-        return prev;
-      }
-      
-      // Merge the update into existing order to preserve relations
+    // CRITICAL: Always create a completely new object to ensure React Query detects the change
+    const currentCacheData = queryClient.getQueryData<OrderWithDetails | null>(['order', orderId]);
+    
+    if (currentCacheData && currentCacheData.id === updatedOrder.id) {
+      // Create a completely new object with all nested objects also new references
+      // This ensures React Query detects the change and triggers re-renders
       const merged: OrderWithDetails = {
-        ...prev,
+        ...currentCacheData,
         ...updatedOrder,
-        updated_at: updatedOrder.updated_at || prev.updated_at,
-        // Preserve relations (will be refreshed in background)
-        runner: prev.runner,
-        customer: prev.customer,
-        address_snapshot: prev.address_snapshot,
+        updated_at: updatedOrder.updated_at || currentCacheData.updated_at,
+        // Preserve relations but create new references
+        runner: currentCacheData.runner ? { ...currentCacheData.runner } : undefined,
+        customer: currentCacheData.customer ? { ...currentCacheData.customer } : undefined,
+        address_snapshot: currentCacheData.address_snapshot ? { ...currentCacheData.address_snapshot } : undefined,
       };
       
-      console.log('[OrderTracking] Query cache updated (merged):', {
+      console.log('[OrderTracking] Updating query cache (merged):', {
         orderId: merged.id,
         status: merged.status,
         updated_at: merged.updated_at,
+        previousStatus: currentCacheData.status,
+        newStatus: merged.status,
+        statusChanged: currentCacheData.status !== merged.status,
+        updatedAtChanged: currentCacheData.updated_at !== merged.updated_at,
       });
       
-      return merged;
-    });
+      // Set the new data using setQueryData with a function
+      // This ensures React Query detects the change and triggers re-renders
+      queryClient.setQueryData<OrderWithDetails | null>(['order', orderId], (prev) => {
+        // Always return a new object reference
+        return merged;
+      });
+      
+      // Debug: Verify the cache was updated
+      const verifyCache = queryClient.getQueryData<OrderWithDetails | null>(['order', orderId]);
+      console.log('[OrderTracking] Cache verification after setQueryData:', {
+        cacheUpdated: !!verifyCache,
+        cacheStatus: verifyCache?.status,
+        cacheUpdatedAt: verifyCache?.updated_at,
+        previousStatus: currentCacheData.status,
+        newStatus: verifyCache?.status,
+        statusChanged: currentCacheData.status !== verifyCache?.status,
+        sameReference: verifyCache === currentCacheData,
+      });
+    } else {
+      console.log('[OrderTracking] No previous order in cache, will fetch in background');
+    }
     
     // Fetch full order details in background to hydrate relations (runner, address_snapshot, etc.)
     // This ensures ActiveDeliverySheet has complete data
@@ -139,7 +187,10 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
           hasAddressSnapshot: !!data.address_snapshot,
         });
         // Update cache with full order data including relations
-        queryClient.setQueryData(['order', orderId], data);
+        // Always create new object reference to ensure React Query detects the change
+        queryClient.setQueryData(['order', orderId], { ...data });
+        
+        console.log('[OrderTracking] Full order data set in cache, should trigger re-render');
       }
     }).catch((error) => {
       console.error('[OrderTracking] Error fetching full order details:', error);
@@ -148,16 +199,29 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   }, [orderId, queryClient]);
 
   // Subscribe to realtime updates for this order
-  useOrderRealtime(orderId, {
-    onUpdate: handleOrderUpdate,
-    enabled: !!orderId, // Explicitly enable when orderId exists
+  // CRITICAL FIX: Use customer orders subscription instead of single order subscription
+  // This avoids CHANNEL_ERROR issues with single order filters
+  // We filter client-side to match the specific orderId
+  useOrdersRealtime({
+    filter: { mode: 'customer', customerId: user?.id || '' },
+    onUpdate: (updatedOrder: Order) => {
+      // Only process updates for the order we're tracking
+      if (updatedOrder.id === orderId) {
+        handleOrderUpdate(updatedOrder);
+      }
+    },
+    enabled: !!orderId && !!user?.id && !loading, // Only enable after initial load and when we have user
   });
 
-  // Debug logging for PWA
+  // Debug logging for subscription status
   useEffect(() => {
     if (orderId) {
-      console.log('[OrderTracking] Realtime subscription mounted', {
+      console.log('[OrderTracking] Realtime subscription status:', {
         orderId,
+        enabled: !!orderId && !loading,
+        loading,
+        hasOrder: !!order,
+        orderStatus: order?.status,
         mode: import.meta.env.MODE,
         isDev: import.meta.env.DEV,
         timestamp: new Date().toISOString(),
@@ -168,7 +232,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         console.log('[OrderTracking] Realtime subscription unmounting', { orderId });
       }
     };
-  }, [orderId]);
+  }, [orderId, loading, order?.status]);
 
   const handleCancel = async () => {
     if (!orderId || !order) {

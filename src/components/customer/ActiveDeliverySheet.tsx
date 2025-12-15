@@ -731,8 +731,8 @@ export function ActiveDeliverySheet({
           {/* 2. Progress Bar */}
           <DeliveryProgressBar currentStep={customerStatus.step} />
 
-          {/* 2.5. OTP Display (when runner is on the way) - Higher priority, shown before order snapshot */}
-          {customerStatus.step === 'ON_THE_WAY' && shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
+          {/* 2.5. OTP Display (when runner is on the way OR arrived) - Always shown before order snapshot */}
+          {(customerStatus.step === 'ON_THE_WAY' || customerStatus.step === 'ARRIVED') && shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
             <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
           )}
 
@@ -838,8 +838,8 @@ export function ActiveDeliverySheet({
             </div>
           </div>
 
-          {/* 4. OTP Display (when OTP is generated, but not when runner is on the way - that's shown above) */}
-          {customerStatus.step !== 'ON_THE_WAY' && shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
+          {/* 4. OTP Display (when OTP is generated, but not when runner is on the way or arrived - those are shown above) */}
+          {customerStatus.step !== 'ON_THE_WAY' && customerStatus.step !== 'ARRIVED' && shouldShowCustomerOtpToCustomer(localOrder.status, !!localOrder.otp_code) && localOrder.otp_code && (
             <OtpDisplay otpCode={localOrder.otp_code} customerStatusStep={customerStatus.step} />
           )}
 

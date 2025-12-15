@@ -676,13 +676,24 @@ export default function CashRequest() {
       const deliveryNotes = selectedAddress.delivery_notes || "";
       
       // Use deliveryStyle from draft (already mapped from deliveryMode)
+      // CRITICAL: Ensure we're using the correct mapping
+      // draft.deliveryStyle should be 'counted' or 'speed' (lowercase)
       const deliveryStyle = draft.deliveryStyle === 'counted' ? 'COUNTED' as const : 'SPEED' as const;
       
       // Debug logging for delivery style mapping
       console.log('[CashRequest] Creating order with delivery style:', {
-        deliveryStyle: draft.deliveryStyle,
+        draftDeliveryStyle: draft.deliveryStyle,
+        deliveryMode: deliveryMode, // Current UI state
         mappedStyle: deliveryStyle,
+        willBeSavedAs: deliveryStyle,
       });
+      
+      // CRITICAL VALIDATION: Ensure deliveryStyle is set correctly
+      if (!draft.deliveryStyle || (draft.deliveryStyle !== 'counted' && draft.deliveryStyle !== 'speed')) {
+        console.error('[CashRequest] ❌ INVALID deliveryStyle in draft:', draft.deliveryStyle);
+        toast.error("Delivery style is missing. Please select a delivery style.");
+        return;
+      }
       
       const order = await createOrder(
         draft.amount,
@@ -691,7 +702,23 @@ export default function CashRequest() {
         draft.addressId,
         deliveryStyle
       );
+      
+      // CRITICAL: Verify the order was created with the correct delivery style
       if (order) {
+        console.log('[CashRequest] Order created, verifying delivery style:', {
+          requested: deliveryStyle,
+          saved: (order as any).delivery_style,
+          matches: (order as any).delivery_style === deliveryStyle,
+        });
+        
+        if ((order as any).delivery_style !== deliveryStyle) {
+          console.error('[CashRequest] ❌ DELIVERY STYLE MISMATCH!', {
+            requested: deliveryStyle,
+            saved: (order as any).delivery_style,
+            orderId: order.id,
+          });
+          toast.error(`Warning: Delivery style may not have been saved correctly. Expected: ${deliveryStyle}, Got: ${(order as any).delivery_style}`);
+        }
         // Clear draft after successful order creation
         clearDraft();
         hasRestoredFromDraftRef.current = false;

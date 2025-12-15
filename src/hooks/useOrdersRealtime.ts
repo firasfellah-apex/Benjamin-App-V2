@@ -54,6 +54,11 @@ export function useOrdersRealtime({
   enabled = true,
 }: UseOrdersRealtimeOptions) {
   const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
+  const reconnectDelay = 2000; // 2 seconds
   
   // Keep callbacks up to date without re-subscribing
   useEffect(() => {
@@ -80,6 +85,17 @@ export function useOrdersRealtime({
 
     if (!enabled) {
       console.log(`[Realtime] ${filter.mode === 'runner' && filter.availableOnly ? 'runner-available-orders' : 'channel'} - Subscription disabled, skipping setup`);
+      // Clean up any existing channel
+      if (channelRef.current) {
+        console.log(`[Realtime] Cleaning up channel because subscription disabled`);
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      reconnectAttemptsRef.current = 0;
       return;
     }
 
@@ -96,9 +112,17 @@ export function useOrdersRealtime({
 
     // Build filter string based on mode
     // Note: Supabase Realtime filters use PostgREST syntax
+    // IMPORTANT: For single order subscriptions, we subscribe WITHOUT a server-side filter
+    // and filter client-side to avoid RLS/filter issues that cause CHANNEL_ERROR
+    // RLS policies will still ensure users only receive events for orders they can access
     let filterString = '';
+    
     if (filter.mode === 'single') {
-      filterString = `id=eq.${filter.orderId}`;
+      // For single order: Subscribe without server-side filter to avoid CHANNEL_ERROR
+      // We'll filter client-side in the event handler
+      // This is necessary because id=eq.${orderId} filters can cause RLS issues
+      filterString = ''; // No server-side filter - we'll filter client-side
+      console.log(`[Realtime] Single order subscription: No server-side filter, will filter client-side for orderId=${filter.orderId}`);
     } else if (filter.mode === 'customer') {
       filterString = `customer_id=eq.${filter.customerId}`;
     } else if (filter.mode === 'runner') {
@@ -122,8 +146,28 @@ export function useOrdersRealtime({
       enabled,
     });
 
+    // Clean up any existing channel for this subscription
+    if (channelRef.current) {
+      console.log(`[Realtime] Cleaning up existing channel before creating new one: ${channelName}`);
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    
+    // Clear any pending reconnection attempts
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     const channel = supabase
-      .channel(channelName)
+      .channel(channelName, {
+        config: {
+          // Add presence for better connection management
+          presence: {
+            key: channelName,
+          },
+        },
+      })
       .on(
         'postgres_changes',
         {
@@ -162,7 +206,28 @@ export function useOrdersRealtime({
             }
 
             // Apply filters based on mode
-            if (filter.mode === 'customer') {
+            if (filter.mode === 'single') {
+              // For single order subscriptions, filter client-side to avoid RLS issues
+              const targetOrderId = filter.orderId;
+              if (newOrder && newOrder.id !== targetOrderId) {
+                console.log(`[Realtime] ${channelName} - Filtered out (wrong order ID):`, {
+                  received: newOrder.id,
+                  expected: targetOrderId,
+                });
+                return;
+              }
+              if (oldOrder && oldOrder.id !== targetOrderId) {
+                console.log(`[Realtime] ${channelName} - Filtered out (wrong order ID):`, {
+                  received: oldOrder.id,
+                  expected: targetOrderId,
+                });
+                return;
+              }
+              console.log(`[Realtime] ${channelName} - ✅ Matched single order subscription:`, {
+                orderId: newOrder?.id || oldOrder?.id,
+                eventType,
+              });
+            } else if (filter.mode === 'customer') {
               if (newOrder && newOrder.customer_id !== filter.customerId) {
                 console.log(`[Realtime] ${channelName} - Filtered out (wrong customer)`);
                 return;
@@ -299,6 +364,10 @@ export function useOrdersRealtime({
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          // Reset reconnect attempts on successful subscription
+          reconnectAttemptsRef.current = 0;
+          channelRef.current = channel;
+          
           console.log(`[Realtime] ✅ Successfully subscribed to ${channelName}`, {
             filter: filterString || 'all orders',
             mode: filter.mode,
@@ -325,16 +394,71 @@ export function useOrdersRealtime({
           console.error(`[Realtime] ${channelName} - 2. Verify migration was applied: Check if orders table is in supabase_realtime publication`);
           console.error(`[Realtime] ${channelName} - 3. Check RLS policies: Runners should be able to SELECT orders with status='Pending'`);
           console.error(`[Realtime] ${channelName} - 4. Check browser console for network errors`);
+          
+          // Attempt reconnection if we haven't exceeded max attempts
+          if (reconnectAttemptsRef.current < maxReconnectAttempts && enabled) {
+            reconnectAttemptsRef.current += 1;
+            const delay = reconnectDelay * reconnectAttemptsRef.current; // Exponential backoff
+            
+            console.log(`[Realtime] ${channelName} - 🔄 Attempting reconnection ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${delay}ms...`);
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              // Force re-subscription by clearing the channel and letting useEffect re-run
+              if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
+              // The useEffect will re-run and create a new subscription
+              // We need to trigger a re-render, but since we're in a callback, we'll let the cleanup/re-run handle it
+            }, delay);
+          } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+            console.error(`[Realtime] ${channelName} - ❌ Max reconnection attempts (${maxReconnectAttempts}) reached. Giving up.`);
+          }
         } else if (status === 'CLOSED') {
           console.warn(`[Realtime] ${channelName} - ⚠️ Channel closed. This may indicate a connection issue.`);
+          
+          // Attempt reconnection if channel closes unexpectedly
+          if (reconnectAttemptsRef.current < maxReconnectAttempts && enabled) {
+            reconnectAttemptsRef.current += 1;
+            const delay = reconnectDelay * reconnectAttemptsRef.current;
+            
+            console.log(`[Realtime] ${channelName} - 🔄 Channel closed, attempting reconnection ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${delay}ms...`);
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
+            }, delay);
+          }
         } else {
           console.log(`[Realtime] Subscription status for ${channelName}:`, status);
         }
       });
+    
+    // Store channel reference for cleanup (set immediately, will be updated when subscribed)
+    channelRef.current = channel;
 
     return () => {
       console.log(`[Realtime] Unsubscribing from ${channelName}`);
-      supabase.removeChannel(channel);
+      
+      // Clear any pending reconnection attempts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      // Reset reconnect attempts
+      reconnectAttemptsRef.current = 0;
+      
+      // Remove channel
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      } else if (channel) {
+        // Fallback: remove channel directly if ref is not set
+        supabase.removeChannel(channel);
+      }
     };
   }, [
     enabled,

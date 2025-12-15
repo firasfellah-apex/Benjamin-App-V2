@@ -248,6 +248,35 @@ export async function updateProfile(id: string, updates: Partial<Profile>): Prom
   return data;
 }
 
+/**
+ * Reset a customer's daily limit (set daily_usage to 0 and update reset timestamp)
+ * Admin-only function to manually reset daily usage
+ */
+export async function resetCustomerDailyLimit(userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const now = new Date();
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        daily_usage: 0,
+        daily_limit_last_reset: now.toISOString(),
+        updated_at: now.toISOString(),
+      })
+      .eq("id", userId);
+
+    if (updateError) {
+      console.error("[Reset Daily Limit] Error resetting daily limit:", updateError);
+      return { success: false, error: updateError.message || "Failed to reset daily limit" };
+    }
+
+    console.log("[Reset Daily Limit] ✅ Successfully reset daily limit for user:", userId);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Reset Daily Limit] Unexpected error:", error);
+    return { success: false, error: error?.message || "An unexpected error occurred" };
+  }
+}
+
 export async function getAllProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from("profiles")
@@ -915,11 +944,24 @@ export async function createOrder(
     });
     console.log("[Order Creation] 📡 This order should now be available to runners via Realtime");
     
-    // Warn if delivery_style was not saved
+    // CRITICAL: Validate delivery_style was saved correctly
     if (deliveryStyle && !data.delivery_style) {
-      console.warn("[Order Creation] ⚠️ WARNING: delivery_style was provided but not saved to database!", {
+      console.error("[Order Creation] ❌ CRITICAL ERROR: delivery_style was provided but not saved to database!", {
         provided: deliveryStyle,
         saved: data.delivery_style,
+        orderId: data.id,
+      });
+    } else if (deliveryStyle && data.delivery_style !== deliveryStyle) {
+      console.error("[Order Creation] ❌ CRITICAL ERROR: delivery_style mismatch!", {
+        provided: deliveryStyle,
+        saved: data.delivery_style,
+        orderId: data.id,
+      });
+    } else if (deliveryStyle && data.delivery_style === deliveryStyle) {
+      console.log("[Order Creation] ✅ delivery_style saved correctly:", {
+        provided: deliveryStyle,
+        saved: data.delivery_style,
+        orderId: data.id,
       });
     }
 

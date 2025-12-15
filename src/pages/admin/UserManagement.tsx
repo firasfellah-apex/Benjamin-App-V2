@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { getAllProfiles, assignRole, revokeRole, updateProfile, syncAuthUsersToProfiles, getRunnerStatsForAdmin, getCustomerStatsForAdmin } from "@/db/api";
+import { getAllProfiles, assignRole, revokeRole, updateProfile, syncAuthUsersToProfiles, getRunnerStatsForAdmin, getCustomerStatsForAdmin, resetCustomerDailyLimit } from "@/db/api";
 import { supabase } from "@/db/supabase";
 import type { Profile, UserRole } from "@/types/types";
 import { cn } from "@/lib/utils";
@@ -229,6 +229,21 @@ export default function UserManagement() {
       toast.error('Failed to sync users. Check console for details.');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleResetDailyLimit = async (userId: string) => {
+    try {
+      const result = await resetCustomerDailyLimit(userId);
+      if (result.success) {
+        toast.success("Daily limit reset successfully");
+        loadProfiles(); // Refresh profiles to show updated daily_usage
+      } else {
+        toast.error(result.error || "Failed to reset daily limit");
+      }
+    } catch (error) {
+      console.error('Error resetting daily limit:', error);
+      toast.error('Failed to reset daily limit. Check console for details.');
     }
   };
 
@@ -935,6 +950,38 @@ export default function UserManagement() {
                                         >
                                           {customer.is_suspended ? "Unsuspend" : "Suspend"}
                                         </Button>
+                                      </div>
+                                    </div>
+                                    {/* Daily Limit */}
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-[#F1F3F5]">Daily Limit</h4>
+                                      <div className="p-4 bg-[#1B1D21] rounded-xl border border-[#2F3238]">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div>
+                                            <p className="text-xs text-[#A7A9AC] mb-1">Available Today</p>
+                                            <p className="text-xl font-semibold text-[#3CD5A0]">
+                                              ${((customer.daily_limit || 1000) - (customer.daily_usage || 0)).toFixed(2)}
+                                            </p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-xs text-[#A7A9AC] mb-1">Used Today</p>
+                                            <p className="text-xl font-semibold text-[#F1F3F5]">
+                                              ${(customer.daily_usage || 0).toFixed(2)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-[#2F3238]">
+                                          <p className="text-xs text-[#A7A9AC] mb-2">Daily Limit: ${(customer.daily_limit || 1000).toFixed(2)}</p>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleResetDailyLimit(customer.id)}
+                                            className="w-full border-[#5865F2] text-[#F1F3F5] hover:bg-[#2D3036]"
+                                          >
+                                            <DollarSign className="mr-2 h-4 w-4" />
+                                            Reset Daily Limit
+                                          </Button>
+                                        </div>
                                       </div>
                                     </div>
                                     {/* KYC Status */}

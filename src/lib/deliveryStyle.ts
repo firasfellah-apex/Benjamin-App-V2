@@ -15,11 +15,21 @@ export function resolveDeliveryStyleFromOrder(order: any): DeliveryStyle {
   const style = (order as any).delivery_style as DeliveryStyle | null;
   const mode = (order as any).delivery_mode as ('quick_handoff' | 'count_confirm' | null);
 
-  // Source of truth: delivery_style
+  // CRITICAL: Log for debugging delivery style issues
+  if (import.meta.env.DEV) {
+    console.log('[resolveDeliveryStyleFromOrder] Resolving delivery style:', {
+      orderId: order?.id,
+      delivery_style: style,
+      delivery_mode: mode,
+      resolved: style || (mode === 'count_confirm' ? 'COUNTED' : mode === 'quick_handoff' ? 'SPEED' : 'SPEED'),
+    });
+  }
+
+  // Source of truth: delivery_style (must be exact match)
   if (style === 'COUNTED') return 'COUNTED';
   if (style === 'SPEED') return 'SPEED';
 
-  // Legacy fallback: delivery_mode
+  // Legacy fallback: delivery_mode (only if delivery_style is not set)
   if (mode === 'count_confirm') return 'COUNTED';
   if (mode === 'quick_handoff') return 'SPEED';
 
