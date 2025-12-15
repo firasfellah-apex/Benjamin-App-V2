@@ -110,19 +110,25 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       }
       
       // Merge the update into existing order to preserve relations
-      // Create a new object to ensure React detects the change
-      const merged = {
+      // Create a completely new object with all nested objects also new references
+      const merged: OrderWithDetails = {
         ...prev,
         ...updatedOrder,
         // Ensure nested objects are also new references
         updated_at: updatedOrder.updated_at || prev.updated_at,
-      } as OrderWithDetails;
+        // Preserve relations but create new references
+        runner: prev.runner ? { ...prev.runner } : updatedOrder.runner_id ? prev.runner : undefined,
+        customer: prev.customer ? { ...prev.customer } : undefined,
+        address_snapshot: prev.address_snapshot ? { ...prev.address_snapshot } : undefined,
+      };
       
       console.log('[OrderTracking] Order state updated (merged):', {
         orderId: merged.id,
         status: merged.status,
         updated_at: merged.updated_at,
         willTriggerReRender: true,
+        hasRunner: !!merged.runner,
+        hasAddressSnapshot: !!merged.address_snapshot,
       });
       
       return merged;
@@ -150,9 +156,12 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
           orderId: data.id,
           status: data.status,
           updated_at: data.updated_at,
+          hasRunner: !!data.runner,
+          hasAddressSnapshot: !!data.address_snapshot,
         });
-        // This will create a new object reference, triggering ActiveDeliverySheet to sync
-        setOrder(data);
+        // Always create a new object reference to ensure React detects the change
+        // This triggers ActiveDeliverySheet to sync via the order prop
+        setOrder({ ...data });
         // Show completion modal if order just completed and hasn't been rated
         if (previousStatus && previousStatus !== "Completed" && data.status === "Completed" && !data.runner_rating) {
           // Small delay to let confetti animation play first

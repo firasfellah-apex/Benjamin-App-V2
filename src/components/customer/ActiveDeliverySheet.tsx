@@ -28,7 +28,7 @@ import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
 import { X } from 'lucide-react';
 import { IconButton } from '@/components/ui/icon-button';
 import countConfirmationIllustration from '@/assets/illustrations/CountConfirmation.png';
-import { useOrderRealtime } from '@/hooks/useOrdersRealtime';
+// Removed useOrderRealtime - parent component handles all realtime subscriptions
 
 // Loader component for runner assignment state
 import LottieComponent from "lottie-react";
@@ -79,105 +79,21 @@ export function ActiveDeliverySheet({
 
   // Sync localOrder when order prop changes (from parent)
   // This ensures we always reflect the parent's order state
-  // Use a ref to track the last synced order to avoid unnecessary updates
-  const lastSyncedOrderRef = useRef<string>('');
-  useEffect(() => {
-    // Create a unique key from order properties to detect changes
-    const orderKey = `${order.id}-${order.status}-${order.updated_at || ''}`;
-    
-    // Only sync if order actually changed
-    if (lastSyncedOrderRef.current !== orderKey) {
-      console.log('[ActiveDeliverySheet] Order prop updated, syncing localOrder:', {
-        orderId: order.id,
-        status: order.status,
-        updated_at: order.updated_at,
-        previousKey: lastSyncedOrderRef.current,
-        newKey: orderKey,
-        timestamp: new Date().toISOString(),
-      });
-      
-      // Always create a new object reference to ensure React detects the change
-      setLocalOrder({ ...order });
-      lastSyncedOrderRef.current = orderKey;
-    }
-  }, [order.id, order.status, order.updated_at, order]);
-
-  // Subscribe to realtime updates for this order
-  // This acts as a backup/fallback if parent doesn't receive updates
-  // But we prioritize the parent's order prop as the source of truth
-  useOrderRealtime(order.id, {
-    onUpdate: async (updatedOrder) => {
-      console.log('[ActiveDeliverySheet] Realtime update received:', {
-        orderId: updatedOrder.id,
-        status: updatedOrder.status,
-        updated_at: updatedOrder.updated_at,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Always notify parent first - parent is the source of truth
-      // Fetch full order details to get relations (runner, address_snapshot, etc.)
-      try {
-        const fullOrder = await getOrderById(updatedOrder.id);
-        if (fullOrder) {
-          // Notify parent component of the update first
-          // Parent will update its state and pass it back as order prop
-          if (onOrderUpdate) {
-            console.log('[ActiveDeliverySheet] Notifying parent of order update:', {
-              orderId: fullOrder.id,
-              status: fullOrder.status,
-            });
-            onOrderUpdate(fullOrder);
-          }
-          // Also update local state as fallback (in case parent doesn't update)
-          setLocalOrder(fullOrder);
-        } else {
-          // Fallback: merge update into existing order
-          const mergedOrder = {
-            ...order,
-            ...updatedOrder,
-          } as OrderWithDetails;
-          
-          if (onOrderUpdate) {
-            console.log('[ActiveDeliverySheet] Notifying parent of merged order update:', {
-              orderId: mergedOrder.id,
-              status: mergedOrder.status,
-            });
-            onOrderUpdate(mergedOrder);
-          }
-          setLocalOrder(mergedOrder);
-        }
-      } catch (error) {
-        console.error('[ActiveDeliverySheet] Error fetching full order after realtime update:', error);
-        // Fallback: merge update into existing order
-        const mergedOrder = {
-          ...order,
-          ...updatedOrder,
-        } as OrderWithDetails;
-        
-        if (onOrderUpdate) {
-          console.log('[ActiveDeliverySheet] Notifying parent of merged order update (error fallback):', {
-            orderId: mergedOrder.id,
-            status: mergedOrder.status,
-          });
-          onOrderUpdate(mergedOrder);
-        }
-        setLocalOrder(mergedOrder);
-      }
-    },
-    enabled: !!order.id,
-  });
-
-  // Debug: Log when order prop changes (for PWA troubleshooting)
+  // Parent is the single source of truth and handles all realtime subscriptions
   const prevOrderRef = useRef<OrderWithDetails | null>(null);
   useEffect(() => {
+    // Check if order actually changed by comparing key properties
     const prevOrder = prevOrderRef.current;
     const hasChanged = !prevOrder || 
+      prevOrder.id !== order.id ||
       prevOrder.status !== order.status || 
       prevOrder.updated_at !== order.updated_at ||
-      prevOrder.id !== order.id;
+      prevOrder.runner_id !== order.runner_id ||
+      prevOrder.otp_code !== order.otp_code ||
+      (prevOrder as any).otp_verified_at !== (order as any).otp_verified_at;
     
     if (hasChanged) {
-      console.log('[ActiveDeliverySheet] Order prop updated:', {
+      console.log('[ActiveDeliverySheet] Order prop updated, syncing localOrder:', {
         orderId: order.id,
         status: order.status,
         updated_at: order.updated_at,
@@ -187,9 +103,19 @@ export function ActiveDeliverySheet({
         mode: import.meta.env.MODE,
         isDev: import.meta.env.DEV,
       });
+      
+      // Always create a new object reference to ensure React detects the change
+      // This ensures all child components re-render when order updates
+      setLocalOrder({ ...order });
       prevOrderRef.current = order;
     }
   }, [order]);
+
+  // NOTE: We do NOT subscribe to realtime updates here
+  // The parent component (OrderTracking or CustomerHome) is the single source of truth
+  // and handles all realtime subscriptions. We simply sync from the order prop.
+  // This ensures there's only one subscription per order, preventing conflicts and ensuring
+  // all components see the same updates.
 
   // Check for runner arrival when status is Pending Handoff
   // Re-check whenever order updates (including when order_events change)
