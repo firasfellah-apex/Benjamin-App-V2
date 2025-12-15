@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -25,72 +26,71 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   // Use prop if provided, otherwise try orderId param, then deliveryId param
   const orderId = orderIdProp || params.orderId || params.deliveryId;
   const navigate = useNavigate();
-  const [order, setOrder] = useState<OrderWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [previousStatus, setPreviousStatus] = useState<OrderStatus | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // Kept for backward compatibility but not used
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [hasIssue, setHasIssue] = useState(false);
 
-  const loadOrder = async () => {
-    if (!orderId) return;
-    const data = await getOrderById(orderId);
+  // Use React Query as the single source of truth for order data
+  const { data: order, isLoading: loading } = useQuery<OrderWithDetails | null>({
+    queryKey: ['order', orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+      return await getOrderById(orderId);
+    },
+    enabled: !!orderId,
+    staleTime: 0, // Always consider stale to allow realtime updates
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+  });
+
+  // Track status transitions for confetti and modal
+  useEffect(() => {
+    if (!order) return;
     
     // Trigger confetti on completion
-    if (data && previousStatus && previousStatus !== "Completed" && data.status === "Completed") {
+    if (previousStatus && previousStatus !== "Completed" && order.status === "Completed") {
       triggerConfetti(3000);
       toast.success(strings.toasts.otpVerified);
     }
     
-    if (data) {
-      const wasCompleted = previousStatus === "Completed";
-      const isNowCompleted = data.status === "Completed";
-      setPreviousStatus(data.status);
-      
-      // Check if order has a reported issue
-      if (isNowCompleted) {
-        hasOrderIssue(data.id).then(issueExists => {
-          setHasIssue(issueExists);
-        });
-      }
-      
-      // Show completion modal if order is completed and hasn't been rated and no issue reported
-      // Only show if transitioning to completed or if already completed on initial load
-      if (isNowCompleted && !data.runner_rating) {
-        // Check if issue was reported before showing modal
-        hasOrderIssue(data.id).then(issueExists => {
-          setHasIssue(issueExists);
-          if (!issueExists) {
-            if (!wasCompleted) {
-              // Just transitioned to completed - show after confetti
-              setTimeout(() => {
-                setShowCompletionModal(true);
-              }, 1000);
-            } else if (!showCompletionModal) {
-              // Already completed on initial load - show after page loads
-              setTimeout(() => {
-                setShowCompletionModal(true);
-              }, 500);
-            }
-          }
-        });
-      }
+    const wasCompleted = previousStatus === "Completed";
+    const isNowCompleted = order.status === "Completed";
+    setPreviousStatus(order.status);
+    
+    // Check if order has a reported issue
+    if (isNowCompleted) {
+      hasOrderIssue(order.id).then(issueExists => {
+        setHasIssue(issueExists);
+      });
     }
     
-    setOrder(data);
-    setLoading(false);
-  };
-
-  // Initial load
-  useEffect(() => {
-    if (!orderId) return;
-    loadOrder();
-  }, [orderId]);
+    // Show completion modal if order is completed and hasn't been rated and no issue reported
+    if (isNowCompleted && !order.runner_rating) {
+      hasOrderIssue(order.id).then(issueExists => {
+        setHasIssue(issueExists);
+        if (!issueExists) {
+          if (!wasCompleted) {
+            // Just transitioned to completed - show after confetti
+            setTimeout(() => {
+              setShowCompletionModal(true);
+            }, 1000);
+          } else if (!showCompletionModal) {
+            // Already completed on initial load - show after page loads
+            setTimeout(() => {
+              setShowCompletionModal(true);
+            }, 500);
+          }
+        }
+      });
+    }
+  }, [order?.status, order?.id, previousStatus, order?.runner_rating]);
 
   // Handle realtime updates for this specific order
+  // Update React Query cache immediately, then refresh in background for full relations
   const handleOrderUpdate = useCallback((updatedOrder: Order, oldOrder?: Order) => {
-    if (!orderId || !updatedOrder) return;
+    if (!orderId || !updatedOrder || updatedOrder.id !== orderId) return;
     
     console.log('[OrderTracking] Realtime update received:', {
       orderId: updatedOrder.id,
@@ -101,80 +101,51 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       timestamp: new Date().toISOString(),
     });
     
-    // Update state immediately with payload data for instant UI update
-    // Always create a new object reference to ensure React detects the change
-    setOrder((prev) => {
+    // Update React Query cache immediately with payload data for instant UI update
+    queryClient.setQueryData<OrderWithDetails | null>(['order', orderId], (prev) => {
       if (!prev || prev.id !== updatedOrder.id) {
-        console.log('[OrderTracking] Order ID mismatch or no previous order, skipping update');
+        console.log('[OrderTracking] No previous order in cache, skipping immediate update');
         return prev;
       }
       
       // Merge the update into existing order to preserve relations
-      // Create a completely new object with all nested objects also new references
       const merged: OrderWithDetails = {
         ...prev,
         ...updatedOrder,
-        // Ensure nested objects are also new references
         updated_at: updatedOrder.updated_at || prev.updated_at,
-        // Preserve relations but create new references
-        runner: prev.runner ? { ...prev.runner } : updatedOrder.runner_id ? prev.runner : undefined,
-        customer: prev.customer ? { ...prev.customer } : undefined,
-        address_snapshot: prev.address_snapshot ? { ...prev.address_snapshot } : undefined,
+        // Preserve relations (will be refreshed in background)
+        runner: prev.runner,
+        customer: prev.customer,
+        address_snapshot: prev.address_snapshot,
       };
       
-      console.log('[OrderTracking] Order state updated (merged):', {
+      console.log('[OrderTracking] Query cache updated (merged):', {
         orderId: merged.id,
         status: merged.status,
         updated_at: merged.updated_at,
-        willTriggerReRender: true,
-        hasRunner: !!merged.runner,
-        hasAddressSnapshot: !!merged.address_snapshot,
       });
       
       return merged;
     });
     
-    // Check for status transitions
-    if (previousStatus && previousStatus !== "Completed" && updatedOrder.status === "Completed") {
-      triggerConfetti(3000);
-      toast.success(strings.toasts.otpVerified);
-      // Show completion modal if order hasn't been rated yet
-      // We'll check this after fetching full order details
-    }
-    
-    // Update previous status
-    if (updatedOrder.status) {
-      setPreviousStatus(updatedOrder.status);
-    }
-    
-    // Fetch full order details in background to get relations and trigger status re-check
-    // This ensures ActiveDeliverySheet can detect runner arrival
-    // IMPORTANT: This creates a new object reference, ensuring ActiveDeliverySheet re-renders
+    // Fetch full order details in background to hydrate relations (runner, address_snapshot, etc.)
+    // This ensures ActiveDeliverySheet has complete data
     getOrderById(orderId).then((data) => {
       if (data && data.id === orderId) {
-        console.log('[OrderTracking] Full order details fetched, updating state:', {
+        console.log('[OrderTracking] Full order details fetched, updating cache:', {
           orderId: data.id,
           status: data.status,
-          updated_at: data.updated_at,
           hasRunner: !!data.runner,
           hasAddressSnapshot: !!data.address_snapshot,
         });
-        // Always create a new object reference to ensure React detects the change
-        // This triggers ActiveDeliverySheet to sync via the order prop
-        setOrder({ ...data });
-        // Show completion modal if order just completed and hasn't been rated
-        if (previousStatus && previousStatus !== "Completed" && data.status === "Completed" && !data.runner_rating) {
-          // Small delay to let confetti animation play first
-          setTimeout(() => {
-            setShowCompletionModal(true);
-          }, 1000);
-        }
+        // Update cache with full order data including relations
+        queryClient.setQueryData(['order', orderId], data);
       }
     }).catch((error) => {
       console.error('[OrderTracking] Error fetching full order details:', error);
       // Don't show error to user, we already updated with payload data
     });
-  }, [orderId, previousStatus]);
+  }, [orderId, queryClient]);
 
   // Subscribe to realtime updates for this order
   useOrderRealtime(orderId, {
@@ -231,8 +202,13 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       const result = await cancelOrder(orderId, "Cancelled by customer");
       if (result.success) {
         toast.success(result.message || strings.toasts.orderCanceled);
-        // Update order status immediately for instant UI feedback
-        setOrder((prev) => prev ? { ...prev, status: 'Cancelled' as OrderStatus } : null);
+        // Update React Query cache immediately for instant UI feedback
+        queryClient.setQueryData<OrderWithDetails | null>(['order', orderId], (prev) => {
+          if (!prev) return prev;
+          return { ...prev, status: 'Cancelled' as OrderStatus };
+        });
+        // Invalidate to ensure fresh data on next fetch
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
         // Navigate back to home after a short delay
         setTimeout(() => {
           navigate("/customer/home");
@@ -413,11 +389,9 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
           open={showCompletionModal}
           onClose={() => setShowCompletionModal(false)}
           onRated={() => {
-            // Refresh order to get updated rating
+            // Invalidate query to refresh order with updated rating
             if (orderId) {
-              getOrderById(orderId).then((data) => {
-                if (data) setOrder(data);
-              });
+              queryClient.invalidateQueries({ queryKey: ['order', orderId] });
             }
           }}
         />
@@ -432,7 +406,10 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         onReorder={handleReorder}
         onMessage={handleMessage}
         onCallSupport={handleCallSupport}
-        onOrderUpdate={(updatedOrder) => setOrder(updatedOrder)}
+        onOrderUpdate={(updatedOrder) => {
+          // Update React Query cache when ActiveDeliverySheet notifies of changes
+          queryClient.setQueryData(['order', orderId], updatedOrder);
+        }}
       />
     </div>
   );

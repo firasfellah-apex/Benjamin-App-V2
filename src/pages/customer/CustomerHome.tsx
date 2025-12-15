@@ -16,11 +16,11 @@ import { RequestFlowBottomBar } from '@/components/customer/RequestFlowBottomBar
 import { LastDeliveryCard } from '@/components/customer/LastDeliveryCard';
 import CustomerCard from '@/pages/customer/components/CustomerCard';
 import { CompletionRatingModal } from '@/components/customer/CompletionRatingModal';
-import { getCustomerOrders, hasOrderIssue } from '@/db/api';
+import { getCustomerOrders, getOrderById, hasOrderIssue } from '@/db/api';
 import { useOrdersRealtime } from '@/hooks/useOrdersRealtime';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useCustomerBottomSlot } from '@/contexts/CustomerBottomSlotContext';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { OrderWithDetails, Order } from '@/types/types';
 import protectedIllustration from '@/assets/illustrations/Protected.png';
 import noAtmIllustration from '@/assets/illustrations/NoATM.png';
@@ -78,8 +78,23 @@ export default function CustomerHome() {
   }, [location.pathname, loadOrders]);
 
   // Handle realtime order updates
+  // Update both local state AND React Query cache to keep everything in sync
   const handleOrderUpdate = useCallback((updatedOrder: Order) => {
     console.log('[CustomerHome] Order update received:', updatedOrder.id, updatedOrder.status);
+    
+    // Update React Query cache for this specific order (shared with OrderTracking)
+    queryClient.setQueryData<OrderWithDetails | null>(['order', updatedOrder.id], (prev) => {
+      if (!prev) {
+        // Order not in cache yet, will be fetched when needed
+        return null;
+      }
+      // Merge update into existing order, preserving relations
+      return {
+        ...prev,
+        ...updatedOrder,
+        updated_at: updatedOrder.updated_at || prev.updated_at,
+      } as OrderWithDetails;
+    });
     
     // If order was cancelled, reload all orders to ensure consistency
     if (updatedOrder.status === 'Cancelled' || updatedOrder.cancelled_at) {
@@ -87,7 +102,7 @@ export default function CustomerHome() {
       return;
     }
     
-    // Update the order in the list
+    // Update the order in the local list
     setOrders((prev) => {
       const existingIndex = prev.findIndex((o) => o.id === updatedOrder.id);
       
@@ -104,7 +119,26 @@ export default function CustomerHome() {
         return prev;
       }
     });
-  }, [loadOrders]);
+    
+    // Fetch full order details in background to hydrate relations
+    // This ensures both local state and React Query cache have complete data
+    getOrderById(updatedOrder.id).then((data) => {
+      if (data) {
+        // Update React Query cache with full order data including relations
+        queryClient.setQueryData(['order', updatedOrder.id], data);
+        // Also update local state if order exists in list
+        setOrders((prev) => {
+          const existingIndex = prev.findIndex((o) => o.id === data.id);
+          if (existingIndex >= 0) {
+            return prev.map((o) => o.id === data.id ? data : o);
+          }
+          return prev;
+        });
+      }
+    }).catch((error) => {
+      console.error('[CustomerHome] Error fetching full order details:', error);
+    });
+  }, [loadOrders, queryClient]);
 
   // Subscribe to realtime updates for customer orders
   useOrdersRealtime({
@@ -114,6 +148,33 @@ export default function CustomerHome() {
     enabled: !!user?.id,
   });
   
+  // For active order, prefer React Query cache if available (shared with OrderTracking)
+  // Fallback to local state if not in cache yet
+  const activeOrderId = useMemo(() => {
+    const activeStatuses = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
+    const activeOrders = orders.filter(order => 
+      activeStatuses.includes(order.status) && 
+      order.status !== 'Cancelled' &&
+      !order.cancelled_at
+    );
+    const sortedActiveOrders = activeOrders.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    return sortedActiveOrders.length > 0 ? sortedActiveOrders[0].id : null;
+  }, [orders]);
+
+  // Use React Query to get active order (shared cache with OrderTracking)
+  const { data: activeOrderFromCache } = useQuery<OrderWithDetails | null>({
+    queryKey: ['order', activeOrderId],
+    queryFn: async () => {
+      if (!activeOrderId) return null;
+      return await getOrderById(activeOrderId);
+    },
+    enabled: !!activeOrderId,
+    staleTime: 0, // Always consider stale to allow realtime updates
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+  });
+
   // Determine order states
   const { hasActiveOrder, activeOrder, lastCompletedOrder } = useMemo(() => {
     const activeStatuses = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Withdrawn', 'Pending Handoff'];
@@ -145,12 +206,16 @@ export default function CustomerHome() {
       return dateB - dateA;
     });
     
+    // Use React Query cache for active order if available, otherwise fallback to local state
+    const activeOrderFromLocal = sortedActiveOrders.length > 0 ? sortedActiveOrders[0] : null;
+    const activeOrder = activeOrderFromCache || activeOrderFromLocal;
+
     return {
       hasActiveOrder: activeOrders.length > 0,
-      activeOrder: sortedActiveOrders.length > 0 ? sortedActiveOrders[0] : null,
+      activeOrder,
       lastCompletedOrder: sortedOrders.length > 0 ? sortedOrders[0] : null,
     };
-  }, [orders]);
+  }, [orders, activeOrderFromCache]);
   
   // Check for reported issues when orders load (only check completed orders without ratings)
   useEffect(() => {
