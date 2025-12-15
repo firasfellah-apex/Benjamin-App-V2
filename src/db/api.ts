@@ -20,9 +20,84 @@ export function calculateFees(requestedAmount: number): FeeCalculation {
 }
 
 // Profile APIs
+
+/**
+ * Checks if daily_usage should be reset (new day since last reset)
+ * and resets it if needed
+ */
+export async function checkAndResetDailyUsage(userId: string): Promise<void> {
+  try {
+    // Get current profile to check reset date
+    const { data: profile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("daily_limit_last_reset, daily_usage")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (fetchError || !profile) {
+      console.error("[Daily Reset] Error fetching profile for reset check:", fetchError);
+      return;
+    }
+
+    const lastReset = profile.daily_limit_last_reset 
+      ? new Date(profile.daily_limit_last_reset) 
+      : null;
+    
+    if (!lastReset) {
+      // No reset date set, initialize it
+      await supabase
+        .from("profiles")
+        .update({
+          daily_limit_last_reset: new Date().toISOString(),
+          daily_usage: 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", userId);
+      return;
+    }
+
+    // Check if it's a new day (compare dates, not times)
+    const now = new Date();
+    const lastResetDate = new Date(lastReset);
+    
+    // Reset dates to midnight for comparison
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const resetDate = new Date(lastResetDate.getFullYear(), lastResetDate.getMonth(), lastResetDate.getDate());
+
+    // If today is after the reset date, reset daily_usage
+    if (today > resetDate) {
+      console.log("[Daily Reset] New day detected, resetting daily_usage", {
+        lastReset: lastResetDate.toISOString(),
+        today: today.toISOString(),
+        previousUsage: profile.daily_usage
+      });
+
+      const { error: resetError } = await supabase
+        .from("profiles")
+        .update({
+          daily_usage: 0,
+          daily_limit_last_reset: now.toISOString(),
+          updated_at: now.toISOString()
+        })
+        .eq("id", userId);
+
+      if (resetError) {
+        console.error("[Daily Reset] Error resetting daily_usage:", resetError);
+      } else {
+        console.log("[Daily Reset] ✅ Successfully reset daily_usage to 0");
+      }
+    }
+  } catch (error) {
+    console.error("[Daily Reset] Unexpected error checking/resetting daily usage:", error);
+  }
+}
+
 export async function getCurrentProfile(): Promise<Profile | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+
+  // Check and reset daily usage if needed before fetching profile
+  await checkAndResetDailyUsage(user.id);
 
   const { data, error } = await supabase
     .from("profiles")

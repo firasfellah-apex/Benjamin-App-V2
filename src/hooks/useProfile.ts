@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
 import { useEffect } from 'react';
+import { checkAndResetDailyUsage } from '@/db/api';
 
 const LS_KEY = 'benjamin:profile:v1';
 
@@ -43,6 +44,9 @@ export function useProfile(userId?: string) {
     },
     queryFn: async () => {
       if (!userId) return null;
+      
+      // Check and reset daily usage if it's a new day
+      await checkAndResetDailyUsage(userId);
       
       const { data, error } = await supabase
         .from('profiles')
