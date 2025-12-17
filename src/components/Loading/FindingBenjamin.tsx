@@ -6,6 +6,12 @@ type FindingBenjaminProps = {
   isFullscreen?: boolean;
 };
 
+// Mapbox 3D building palette (matches RunnerDirectionsMap.tsx:add3DBuildingsLayer)
+// Dark map canvas (less "blue", closer to Mapbox dark)
+const MAP_BG = "#0b0f14";
+const BUILDING_COLORS = ["#1A1A1A", "#252525", "#2A2A2A"];
+const ROUTE_GREEN = "#13F287"; // Matches Mapbox route color
+
 export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen = false }) => {
   // ROUTES CONFIGURATION
   // 4 lines from 4 different quadrants, all converging to center at the same time
@@ -285,23 +291,49 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
   // In half-screen mode, constrain to visible 50vh area (top half only)
   // In fullscreen mode, use full height
   const containerClasses = isFullscreen 
-    ? "absolute inset-0 w-full h-full bg-[#05060A] overflow-hidden"
-    : "absolute top-0 left-0 right-0 w-full h-[50vh] bg-[#05060A] overflow-hidden";
+    ? "absolute inset-0 w-full h-full overflow-hidden"
+    : "absolute top-0 left-0 right-0 w-full h-[50vh] overflow-hidden";
   
   return (
-    <div className={containerClasses}>
-      {/* 1. BACKGROUND GRID (Visuals Only) */}
-      <div className="absolute inset-0 z-0 opacity-40">
-        <div className="grid grid-cols-8 grid-rows-8 gap-[4px] h-full w-full p-4">
-          {[...Array(64)].map((_, i) => (
-            <div
-              key={i}
-              className="rounded-[4px]"
-              style={{
-                backgroundColor: i % 3 === 0 ? '#1A1F2E' : i % 7 === 0 ? '#202636' : '#151923',
-              }}
-            />
-          ))}
+    <div className={containerClasses} style={{ backgroundColor: MAP_BG }}>
+      {/* Subtle vignette / depth like a real map canvas */}
+      <div
+        className="absolute inset-0 z-[1] pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.0) 38%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
+      {/* 1. BACKGROUND GRID (Fake Buildings - Matches Mapbox 3D Building Palette) */}
+      <div className="absolute inset-0 z-0">
+        <div
+          className="grid grid-cols-8 grid-rows-8 gap-[4px] h-full w-full p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+        >
+          {[...Array(64)].map((_, i) => {
+            // Deterministic random pick per tile (stable across renders, but feels random)
+            const r = seeded(1337 + i * 97)();
+            const colorIndex = Math.floor(r * BUILDING_COLORS.length);
+            const buildingColor = BUILDING_COLORS[colorIndex];
+            
+            // Subtle per-tile variance (still deterministic)
+            const tileOpacity = 0.78 + r * 0.18; // 0.78–0.96
+            const edgeAlpha = 0.03 + r * 0.05;   // 0.03–0.08
+            
+            return (
+              <div
+                key={i}
+                className="rounded-[4px]"
+                style={{
+                  backgroundColor: buildingColor,
+                  opacity: tileOpacity,
+                  border: `1px solid rgba(255,255,255,${edgeAlpha})`,
+                  boxShadow:
+                    "inset 0 -1px 0 rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
+                }}
+              />
+            );
+          })}
         </div>
       </div>
       {/* 2. SVG ANIMATION LAYER (The Routes) */}
@@ -322,7 +354,7 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
             key={path.id}
             d={path.d}
             fill="none"
-            stroke="#02C97A"
+            stroke={ROUTE_GREEN}
             strokeWidth="0.8"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -341,11 +373,11 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
       {/* These pulse animations are perfectly timed in tailwind.config.js to start exactly when the lines hit (50% mark) */}
       <div className="absolute inset-0 z-20 flex items-center justify-center">
         {/* The Dot itself */}
-        <div className="w-3 h-3 bg-[#02C97A] rounded-full shadow-[0_0_15px_#02C97A] animate-dot-impact" />
+        <div className="w-3 h-3 rounded-full shadow-[0_0_15px] animate-dot-impact" style={{ backgroundColor: ROUTE_GREEN, boxShadow: `0 0 15px ${ROUTE_GREEN}` }} />
         {/* The Shockwaves */}
         <div className="absolute w-full h-full max-w-[300px] max-h-[300px] flex items-center justify-center">
-          <div className="absolute w-20 h-20 rounded-full bg-[#02C97A]/30 animate-radar-shockwave" />
-          <div className="absolute w-20 h-20 rounded-full bg-[#02C97A]/20 animate-radar-shockwave" style={{ animationDelay: '0.1s' }} />
+          <div className="absolute w-20 h-20 rounded-full animate-radar-shockwave" style={{ backgroundColor: `${ROUTE_GREEN}30` }} />
+          <div className="absolute w-20 h-20 rounded-full animate-radar-shockwave" style={{ backgroundColor: `${ROUTE_GREEN}20`, animationDelay: '0.1s' }} />
         </div>
       </div>
     </div>
