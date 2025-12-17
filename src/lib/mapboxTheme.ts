@@ -42,6 +42,7 @@ export const BENJAMIN_COLORS = {
   midGrey: '#6A6A6F',
   white: '#FFFFFF',
   black: '#000000',
+  charcoal: '#2D3748',  // Used for destination markers
 } as const;
 
 /**

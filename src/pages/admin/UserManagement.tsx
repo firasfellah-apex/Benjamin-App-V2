@@ -267,7 +267,7 @@ export default function UserManagement() {
 
   if (loading) {
     return (
-      <div className="container max-w-7xl mx-auto py-8 px-4">
+      <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-[#A7A9AC]">Loading users...</div>
         </div>
@@ -276,7 +276,7 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto py-8 px-4">
+    <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -298,7 +298,7 @@ export default function UserManagement() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-4 mb-8">
+      <div className="grid gap-6 grid-cols-2 md:grid-cols-4 mb-8">
         <Card className="bg-[#23262B] border border-[#2F3238] rounded-2xl p-5 text-[#F1F3F5] hover:bg-[#2D3036] transition-all duration-150 ease-out">
           <CardHeader className="pb-3 p-0">
             <CardDescription className="text-[#A7A9AC] mb-1">Total Users</CardDescription>
@@ -356,20 +356,20 @@ export default function UserManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-6 px-6">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-[#2F3238] hover:bg-[#2D3036]">
-                      <TableHead className="text-[#A7A9AC]">Runner</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Status</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Active Deliveries</TableHead>
-                      <TableHead className="text-[#A7A9AC]">This Month</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Total Earnings</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Accepted</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Skipped</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Timed-Out</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Account</TableHead>
-                      <TableHead className="text-right text-[#A7A9AC]">Actions</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[180px]">Runner</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[100px]">Status</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[120px]">Active Deliveries</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[110px]">This Month</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[120px]">Total Earnings</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[90px]">Accepted</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[90px]">Skipped</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[100px]">Timed-Out</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[100px]">Account</TableHead>
+                      <TableHead className="text-right text-[#A7A9AC] min-w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -721,17 +721,17 @@ export default function UserManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-6 px-6">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-[#2F3238] hover:bg-[#2D3036]">
-                      <TableHead className="text-[#A7A9AC]">Customer</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Active Orders</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Total Orders</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Total Spent</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Account</TableHead>
-                      <TableHead className="text-[#A7A9AC]">Joined</TableHead>
-                      <TableHead className="text-right text-[#A7A9AC]">Actions</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[180px]">Customer</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[120px]">Active Orders</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[110px]">Total Orders</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[120px]">Total Spent</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[100px]">Account</TableHead>
+                      <TableHead className="text-[#A7A9AC] min-w-[140px]">Joined</TableHead>
+                      <TableHead className="text-right text-[#A7A9AC] min-w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

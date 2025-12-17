@@ -14,6 +14,7 @@ export interface BenjaminMapProps {
   minimal?: boolean; // If true, hide POI labels and reduce map features
   draggable?: boolean; // If true, marker can be dragged
   onMarkerDrag?: (position: LatLngLiteral) => void; // Callback when marker is dragged
+  showGoogleLogo?: boolean; // If true, show Google logo on bottom left
 }
 
 export function BenjaminMap({
@@ -24,6 +25,7 @@ export function BenjaminMap({
   minimal = false,
   draggable = false,
   onMarkerDrag,
+  showGoogleLogo = false,
 }: BenjaminMapProps) {
   const { isReady, isError } = useGoogleMaps();
   const mapDivRef = useRef<HTMLDivElement | null>(null);
@@ -236,44 +238,60 @@ export function BenjaminMap({
       }
     }
 
-    // Always hide Google Maps attribution
+    // Handle Google Maps attribution visibility
     let hideAttributionTimeout: ReturnType<typeof setTimeout> | null = null;
     let observer: MutationObserver | null = null;
     
     if (mapInstanceRef.current && mapDivRef.current) {
-      const hideAttribution = () => {
+      const adjustAttribution = () => {
         const mapContainer = mapDivRef.current;
         if (mapContainer) {
-          // Hide attribution links
-          const attributionLinks = mapContainer.querySelectorAll('a[href*="google.com"], a[href*="keyboard_shortcuts"]');
+          // Always hide keyboard shortcuts and terms links
+          const attributionLinks = mapContainer.querySelectorAll('a[href*="keyboard_shortcuts"], a[href*="terms"]');
           attributionLinks.forEach((link: any) => {
             if (link.parentElement) {
               link.parentElement.style.display = 'none';
             }
           });
           
-          // Hide copyright container and Google logo
-          const copyrightContainers = mapContainer.querySelectorAll('.gm-style-cc, .gmnoprint, .gm-bundled-control, a[href*="google.com/maps"]');
+          // Hide copyright container but keep the Google logo if showGoogleLogo is true
+          const copyrightContainers = mapContainer.querySelectorAll('.gm-style-cc, .gm-bundled-control');
           copyrightContainers.forEach((container: any) => {
             container.style.display = 'none';
           });
 
-          // Hide the Google logo image
-          const googleLogos = mapContainer.querySelectorAll('img[src*="google"], img[alt="Google"]');
-          googleLogos.forEach((img: any) => {
-            if (img.closest('.gm-style-cc') || img.closest('.gmnoprint')) {
-              img.style.display = 'none';
-            }
-          });
+          // Handle Google logo visibility
+          if (showGoogleLogo) {
+            // Find and style the Google logo to show it in bottom left
+            const googleLogos = mapContainer.querySelectorAll('img[src*="google"], img[alt="Google"]');
+            googleLogos.forEach((img: any) => {
+              const parent = img.closest('div');
+              if (parent && parent.classList.contains('gmnoprint')) {
+                // Show the logo container
+                parent.style.display = 'block';
+                parent.style.position = 'absolute';
+                parent.style.left = '10px';
+                parent.style.bottom = '10px';
+                parent.style.zIndex = '1';
+                img.style.display = 'block';
+              }
+            });
+          } else {
+            // Hide everything including the logo
+            const gmnoprints = mapContainer.querySelectorAll('.gmnoprint');
+            gmnoprints.forEach((container: any) => {
+              container.style.display = 'none';
+            });
+          }
         }
       };
 
-      // Initial hide after map renders
-      hideAttributionTimeout = setTimeout(hideAttribution, 500);
+      // Initial adjustment after map renders
+      hideAttributionTimeout = setTimeout(adjustAttribution, 500);
 
-      // Use MutationObserver to hide attribution as it appears
+      // Use MutationObserver to adjust attribution as it appears
       observer = new MutationObserver(() => {
-        hideAttribution();
+        adjustAttribution();
       });
 
       observer.observe(mapDivRef.current, {
@@ -301,7 +319,7 @@ export function BenjaminMap({
         markerRef.current = null;
       }
     };
-  }, [isReady, center.lat, center.lng, zoom, isError, marker?.lat, marker?.lng, minimal, draggable, onMarkerDrag]);
+  }, [isReady, center.lat, center.lng, zoom, isError, marker?.lat, marker?.lng, minimal, draggable, onMarkerDrag, showGoogleLogo]);
 
   const showSkeleton =
     !isReady ||
@@ -324,20 +342,24 @@ export function BenjaminMap({
           overflow: "hidden",
         }}
       >
-        {/* Always hide Google Maps attribution and controls */}
+        {/* Hide unnecessary Google Maps controls */}
           <style>{`
             .gm-style-cc,
             .gm-style-cc div,
-            .gmnoprint,
             .gm-bundled-control,
             .gm-fullscreen-control,
-            a[href*="google.com/maps"],
             a[href*="keyboard_shortcuts"],
-          a[href*="terms_maps"],
-          img[src*="google"][alt="Google"],
-            .gm-style > div:last-child {
+            a[href*="terms_maps"] {
               display: none !important;
             }
+            ${!showGoogleLogo ? `
+              .gmnoprint,
+              img[src*="google"][alt="Google"],
+              a[href*="google.com/maps"],
+              .gm-style > div:last-child {
+                display: none !important;
+              }
+            ` : ''}
           `}</style>
 
         {showSkeleton && (

@@ -696,7 +696,7 @@ export function ActiveDeliverySheet({
   return (
     <div
       className={cn(
-        'absolute inset-x-0 top-[50vh] bottom-0 z-20 bg-white rounded-t-[24px] shadow-2xl',
+        'absolute inset-x-0 top-[50vh] bottom-0 z-20 bg-white shadow-2xl',
         'pointer-events-auto flex flex-col',
         'overflow-hidden' // Container doesn't scroll, only inner content
       )}
@@ -723,7 +723,7 @@ export function ActiveDeliverySheet({
                     return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
                   })()
                 : customerStatus.step === 'ARRIVED'
-                ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+                ? 'Your runner has arrived. Please meet up and share your verification PIN to receive your cash.'
                 : getExpandedStatusCopy(localOrder.status)}
             </p>
           </div>
@@ -737,45 +737,66 @@ export function ActiveDeliverySheet({
           )}
 
           {/* 2.75. Runner Strip (When Allowed) - Shown right after OTP, before order snapshot */}
-          {showRunnerIdentity && localOrder.runner ? (
+          {/* Show runner info if we can reveal identity AND (runner object exists OR runner_id exists) */}
+          {/* This ensures we show runner info as soon as a runner is assigned, even if runner object isn't fully loaded */}
+          {/* NOTE: Both "Runner Assigned" and "Preparing Cash" (Runner at ATM) use the same display logic - */}
+          {/* they both show the runner's first name (via getRunnerDisplayName) since both are before cash pickup */}
+          {showRunnerIdentity && (localOrder.runner || localOrder.runner_id) ? (
             <div className="rounded-2xl bg-white border border-black/5 p-4 space-y-3">
               <div className="flex items-center gap-3">
-                <Avatar
-                  src={localOrder.runner.avatar_url || undefined}
-                  fallback={localOrder.runner.first_name || 'Runner'}
-                  size="md"
-                  className={cn(
-                    "transition-all duration-300",
-                    shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
-                  )}
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-slate-900">
-                    {localOrder.runner.first_name || 'Runner'}
-                    {localOrder.runner.last_name && ` ${localOrder.runner.last_name}`}
-                  </p>
-                  <p className="text-xs text-slate-500">Your Benjamin runner</p>
-                </div>
-                
-                {/* Message Button - Canonical IconButton */}
-                {allowContact && !isCompleted && !isCancelled && (
-                  <IconButton
-                    onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
-                    className="relative shrink-0"
-                    aria-label="Message runner"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
+                {localOrder.runner ? (
+                  <>
+                    <Avatar
+                      src={localOrder.runner.avatar_url || undefined}
+                      fallback={localOrder.runner.first_name || 'Runner'}
+                      size="md"
+                      className={cn(
+                        "transition-all duration-300",
+                        shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
+                      )}
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-900">
+                        {getRunnerDisplayName(
+                          localOrder.runner.first_name || undefined,
+                          localOrder.runner.last_name || undefined,
+                          localOrder.status
+                        )}
+                      </p>
+                      <p className="text-xs text-slate-500">Your Benjamin runner</p>
+                    </div>
+                    
+                    {/* Message Button - Canonical IconButton (48x48, 12px roundness, #F7F7F7) */}
+                    {allowContact && !isCompleted && !isCancelled && (
+                      <IconButton
+                        onClick={() => navigate(`/customer/chat/${localOrder.id}`)}
+                        size="lg"
+                        className="relative shrink-0"
+                        aria-label="Message runner"
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        {unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </span>
+                        )}
+                      </IconButton>
                     )}
-                  </IconButton>
+                  </>
+                ) : (
+                  <>
+                    {/* Runner object not loaded yet, but runner_id exists - show loading state */}
+                    <div className="h-10 w-10 rounded-full bg-slate-200 animate-pulse flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="h-4 w-24 bg-slate-200 animate-pulse rounded mb-1" />
+                      <p className="text-xs text-slate-500">Loading runner info...</p>
+                    </div>
+                  </>
                 )}
               </div>
               
-              {/* Runner Fun Fact */}
-              {localOrder.runner.first_name && (localOrder.runner as any)?.fun_fact && (
+              {/* Runner Fun Fact - Only show if runner object is loaded */}
+              {localOrder.runner?.first_name && (localOrder.runner as any)?.fun_fact && (
                 <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
                   <p className="text-sm text-blue-900 leading-relaxed">
                     <span className="font-medium">{localOrder.runner.first_name}</span>
@@ -811,7 +832,7 @@ export function ActiveDeliverySheet({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-slate-500">Cash Amount</div>
-                <div className="text-lg font-semibold text-slate-900">${localOrder.requested_amount.toFixed(2)}</div>
+                <div className="text-lg font-semibold text-slate-900">${Math.round(localOrder.requested_amount)}</div>
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-slate-500">Total Payment</div>
@@ -877,15 +898,15 @@ export function ActiveDeliverySheet({
             </Button>
           )}
 
-          {/* 9. Cancel Button - Standard Button with Red Stroke */}
+          {/* 9. Cancel Button - Filled Button with Red Text */}
           {canCancel && onCancel && (
             <Button
               onClick={onCancel}
               variant="outline"
               size="default"
-              className="w-full h-[56px] border border-red-500 text-red-500 hover:bg-red-50 hover:border-red-600 hover:text-red-600"
+              className="w-full h-[56px] bg-[#F7F7F7] border-0 text-[#E84855] hover:bg-[#F0F0F0] hover:text-[#E84855]"
             >
-              Cancel Delivery
+              Cancel Order
             </Button>
           )}
 

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { getOrderById, cancelOrder, hasOrderIssue } from "@/db/api";
 import { useOrderRealtime, useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import type { OrderWithDetails, OrderStatus, Order } from "@/types/types";
 import { CustomerOrderMap } from "@/components/order/CustomerOrderMap";
 import { RunnerDirectionsMap } from "@/components/maps/RunnerDirectionsMap";
@@ -29,6 +30,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { profile } = useProfile();
   const [previousStatus, setPreviousStatus] = useState<OrderStatus | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // Kept for backward compatibility but not used
   const [isCancelling, setIsCancelling] = useState(false);
@@ -78,7 +80,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
     // Trigger confetti on completion
     if (previousStatus && previousStatus !== "Completed" && order.status === "Completed") {
       triggerConfetti(3000);
-      toast.success(strings.toasts.otpVerified);
+      toast.success(strings.toasts.pinVerified);
     }
     
     const wasCompleted = previousStatus === "Completed";
@@ -115,22 +117,52 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
 
   // Handle realtime updates for this specific order
   // Update React Query cache immediately, then refresh in background for full relations
-  const handleOrderUpdate = useCallback((updatedOrder: Order, oldOrder?: Order) => {
+  const handleOrderUpdate = useCallback(async (updatedOrder: Order, oldOrder?: Order) => {
     if (!orderId || !updatedOrder || updatedOrder.id !== orderId) return;
     
     console.log('[OrderTracking] Realtime update received:', {
       orderId: updatedOrder.id,
       oldStatus: oldOrder?.status,
       newStatus: updatedOrder.status,
+      runnerId: updatedOrder.runner_id,
       mode: import.meta.env.MODE,
       isDev: import.meta.env.DEV,
       timestamp: new Date().toISOString(),
     });
     
-    // Update React Query cache immediately with payload data for instant UI update
-    // CRITICAL: Always create a completely new object to ensure React Query detects the change
     const currentCacheData = queryClient.getQueryData<OrderWithDetails | null>(['order', orderId]);
     
+    // CRITICAL: If runner was just assigned and we don't have runner object,
+    // fetch full order FIRST before updating cache to avoid showing "Runner" placeholder
+    const runnerJustAssigned = (
+      updatedOrder.runner_id &&
+      (!currentCacheData?.runner_id || currentCacheData.runner_id !== updatedOrder.runner_id)
+    );
+    
+    if (runnerJustAssigned) {
+      console.log('[OrderTracking] Runner just assigned, fetching full order with runner data FIRST');
+      try {
+        const fullData = await getOrderById(orderId);
+        if (fullData && fullData.id === orderId) {
+          console.log('[OrderTracking] Got full order with runner data:', {
+            orderId: fullData.id,
+            status: fullData.status,
+            hasRunner: !!fullData.runner,
+            runnerFirstName: fullData.runner?.first_name || 'N/A',
+            runnerAvatarUrl: fullData.runner?.avatar_url || 'N/A',
+          });
+          // Update cache with complete data including runner
+          queryClient.setQueryData(['order', orderId], { ...fullData });
+          return; // Done - we have complete data
+        }
+      } catch (error) {
+        console.error('[OrderTracking] Error fetching full order details:', error);
+        // Fall through to update with partial data
+      }
+    }
+    
+    // Update React Query cache immediately with payload data for instant UI update
+    // CRITICAL: Always create a completely new object to ensure React Query detects the change
     if (currentCacheData && currentCacheData.id === updatedOrder.id) {
       // Create a completely new object with all nested objects also new references
       // This ensures React Query detects the change and triggers re-renders
@@ -147,54 +179,28 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       console.log('[OrderTracking] Updating query cache (merged):', {
         orderId: merged.id,
         status: merged.status,
-        updated_at: merged.updated_at,
-        previousStatus: currentCacheData.status,
-        newStatus: merged.status,
-        statusChanged: currentCacheData.status !== merged.status,
-        updatedAtChanged: currentCacheData.updated_at !== merged.updated_at,
+        hasRunner: !!merged.runner,
+        runnerFirstName: merged.runner?.first_name || 'N/A',
       });
       
-      // Set the new data using setQueryData with a function
-      // This ensures React Query detects the change and triggers re-renders
-      queryClient.setQueryData<OrderWithDetails | null>(['order', orderId], (prev) => {
-        // Always return a new object reference
-        return merged;
-      });
-      
-      // Debug: Verify the cache was updated
-      const verifyCache = queryClient.getQueryData<OrderWithDetails | null>(['order', orderId]);
-      console.log('[OrderTracking] Cache verification after setQueryData:', {
-        cacheUpdated: !!verifyCache,
-        cacheStatus: verifyCache?.status,
-        cacheUpdatedAt: verifyCache?.updated_at,
-        previousStatus: currentCacheData.status,
-        newStatus: verifyCache?.status,
-        statusChanged: currentCacheData.status !== verifyCache?.status,
-        sameReference: verifyCache === currentCacheData,
-      });
+      queryClient.setQueryData<OrderWithDetails | null>(['order', orderId], () => merged);
     } else {
-      console.log('[OrderTracking] No previous order in cache, will fetch in background');
+      console.log('[OrderTracking] No previous order in cache, will fetch');
     }
     
     // Fetch full order details in background to hydrate relations (runner, address_snapshot, etc.)
-    // This ensures ActiveDeliverySheet has complete data
     getOrderById(orderId).then((data) => {
       if (data && data.id === orderId) {
         console.log('[OrderTracking] Full order details fetched, updating cache:', {
           orderId: data.id,
           status: data.status,
           hasRunner: !!data.runner,
-          hasAddressSnapshot: !!data.address_snapshot,
+          runnerFirstName: data.runner?.first_name || 'N/A',
         });
-        // Update cache with full order data including relations
-        // Always create new object reference to ensure React Query detects the change
         queryClient.setQueryData(['order', orderId], { ...data });
-        
-        console.log('[OrderTracking] Full order data set in cache, should trigger re-render');
       }
     }).catch((error) => {
       console.error('[OrderTracking] Error fetching full order details:', error);
-      // Don't show error to user, we already updated with payload data
     });
   }, [orderId, queryClient]);
 
@@ -418,16 +424,20 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       </div>
 
       {/* Map Background - Fixed viewport, always visible (50% of viewport height) */}
-      <div className="absolute inset-x-0 top-0 h-[50vh] z-0 pointer-events-none">
+      <div className="absolute inset-x-0 top-0 h-[50vh] z-0">
         {mapLocations ? (
           <RunnerDirectionsMap
             origin={mapLocations.origin}
             destination={mapLocations.destination}
             title={mapLocations.title}
             height="100%"
-            className="pointer-events-none"
             bottomPadding={0}
             interactive={true}
+            hideOpenInMaps
+            showRecenterButton
+            showLayerSwitcher
+            originAvatarUrl={order?.runner?.avatar_url}
+            destinationAvatarUrl={profile?.avatar_url}
           />
         ) : (
           <CustomerOrderMap

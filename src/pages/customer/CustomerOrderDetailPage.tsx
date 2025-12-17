@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getOrderById } from "@/db/api";
 import { isTerminalStatus } from "@/lib/orderStatus";
@@ -11,10 +11,11 @@ import { useOrderRealtime } from "@/hooks/useOrdersRealtime";
  * CustomerOrderDetailPage
  * 
  * Unified route handler for order details.
- * - If order is completed → shows CompletedOrderDetail
+ * - If order is terminal (Completed or Cancelled) → shows CustomerDeliveryDetail (history view)
  * - Otherwise → shows live tracking (OrderTracking)
  * 
- * Handles realtime updates and switches to completed view when order becomes completed.
+ * When an order TRANSITIONS to Completed during active tracking, navigate to home.
+ * But if viewing a past completed order from history, show the detail view.
  */
 export default function CustomerOrderDetailPage() {
   // Route uses :deliveryId but it's actually an order ID
@@ -22,6 +23,11 @@ export default function CustomerOrderDetailPage() {
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Track if order was already completed when we first loaded it
+  // This distinguishes "viewing history" from "order just completed during tracking"
+  const wasAlreadyCompletedRef = useRef<boolean | null>(null);
+  const hasNavigatedToHomeRef = useRef(false);
 
   // Load order
   useEffect(() => {
@@ -30,6 +36,12 @@ export default function CustomerOrderDetailPage() {
       try {
         const data = await getOrderById(orderId);
         setOrder(data);
+        
+        // Remember if order was already completed on first load
+        // If true, user is viewing history. If false, user is tracking active order.
+        if (wasAlreadyCompletedRef.current === null) {
+          wasAlreadyCompletedRef.current = data?.status === 'Completed';
+        }
       } catch (error) {
         console.error("Error loading order:", error);
         navigate("/customer/orders");
@@ -45,6 +57,18 @@ export default function CustomerOrderDetailPage() {
   const handleOrderUpdate = useCallback((updatedOrder: Order) => {
     if (!orderId || !updatedOrder || updatedOrder.id !== orderId) return;
     
+    // If order just completed (was NOT already completed when we loaded),
+    // navigate to home - this means user was tracking and it completed
+    if (
+      updatedOrder.status === 'Completed' && 
+      wasAlreadyCompletedRef.current === false && 
+      !hasNavigatedToHomeRef.current
+    ) {
+      hasNavigatedToHomeRef.current = true;
+      navigate('/customer/home', { replace: true });
+      return;
+    }
+    
     // Update order state
     setOrder((prev) => {
       if (!prev || prev.id !== updatedOrder.id) return prev;
@@ -54,7 +78,7 @@ export default function CustomerOrderDetailPage() {
       } as OrderWithDetails;
     });
     
-    // If order becomes terminal (Completed or Cancelled), fetch full details to get relations
+    // If order becomes terminal, fetch full details to get relations
     if (isTerminalStatus(updatedOrder.status)) {
       getOrderById(orderId)
         .then((data) => {
@@ -64,12 +88,15 @@ export default function CustomerOrderDetailPage() {
           console.error("Error fetching terminal order details:", error);
         });
     }
-  }, [orderId]);
+  }, [orderId, navigate]);
 
   // Subscribe to realtime updates
   useOrderRealtime(loading ? null : orderId || null, {
     onUpdate: handleOrderUpdate,
   });
+
+  // Determine if order is terminal (Completed or Cancelled)
+  const isTerminal = order ? isTerminalStatus(order.status) : false;
 
   if (loading) {
     return (
@@ -97,17 +124,13 @@ export default function CustomerOrderDetailPage() {
     );
   }
 
-  // Determine if order is terminal (Completed or Cancelled)
-  const terminal = isTerminalStatus(order.status);
-
-  if (terminal) {
-    // Terminal order → history detail view (top shelf)
+  if (isTerminal) {
+    // Terminal order (Completed or Cancelled) → history detail view
     // CustomerDeliveryDetail expects deliveryId param and will find it from useCustomerDeliveries
-    // Since we filtered deliveries to only terminal orders, it will find this one
     return <CustomerDeliveryDetail />;
   }
 
-  // Active order → live tracking flow (bottom sheet, OTP, real-time updates)
+  // Active order → live tracking flow
   return <OrderTracking orderId={order.id} />;
 }
 

@@ -168,14 +168,14 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
               </>
             ) : isRated && order.runner_rating ? (
               <>
-                <div className="flex items-center justify-between flex-1">
+                <div className="flex flex-col gap-3 flex-1 justify-center">
                   <span className="text-xs text-slate-600">You rated this runner:</span>
                   <div className="inline-flex items-center gap-1">
                     {Array.from({ length: 5 }).map((_, i) => (
                       <span
                         key={i}
                         className="text-base leading-[0]"
-                        style={{ color: i < Math.round(order.runner_rating || 0) ? '#DFB300' : '#E5E7EB' }}
+                        style={{ color: i < Math.round(order.runner_rating || 0) ? '#F2AB58' : '#E5E7EB' }}
                       >
                         ★
                       </span>

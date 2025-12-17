@@ -169,7 +169,8 @@ export function RequestFlowMapLayer({ lat, lng, label }: RequestFlowMapLayerProp
         <BenjaminMap
           center={center}
           customerPosition={center}
-          zoom={15}
+          zoom={17}
+          showGoogleLogo
           height={`${safeHeight}px`}
           fallback={
             <div 

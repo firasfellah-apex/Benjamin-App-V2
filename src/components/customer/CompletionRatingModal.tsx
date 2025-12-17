@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import { rateRunner } from '@/db/api';
 import { toast } from 'sonner';
 import type { OrderWithDetails } from '@/types/types';
 import { getRunnerDisplayName } from '@/lib/reveal';
-import OnTimeIllustration from '@/assets/illustrations/OnTime.png';
+import DiamondIllustration from '@/assets/illustrations/Diamond.png';
 import { ReportIssueSheet } from '@/components/customer/ReportIssueSheet';
 
 interface CompletionRatingModalProps {
@@ -87,21 +88,26 @@ export function CompletionRatingModal({
     setShowReportSheet(true);
   };
 
-  return (
+  // Render modal as portal at document body level to ensure it covers everything
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(
     <AnimatePresence>
       {open && !showReportSheet && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - covers entire viewport including top header */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleSkip}
-            className="fixed inset-0 bg-black/50 z-[1000]"
+            className="fixed top-0 left-0 right-0 bottom-0 bg-black/50 z-[1000]"
             style={{ zIndex: 1000 }}
           />
 
-          {/* Slide-up Modal */}
+          {/* Slide-up Modal - slides down on exit */}
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -121,16 +127,17 @@ export function CompletionRatingModal({
                 variant="default"
                 size="lg"
                 aria-label="Close"
+                className="bg-black/60 hover:bg-black/70"
               >
-                <X className="h-5 w-5 text-slate-900" />
+                <X className="h-5 w-5 text-white" />
               </IconButton>
             </div>
 
             <div className="relative">
               {/* Illustration Section */}
-              <div className="h-48 flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: 'rgb(242, 171, 88)' }}>
+              <div className="h-64 flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: '#F7F7F7' }}>
                 <img
-                  src={OnTimeIllustration}
+                  src={DiamondIllustration}
                   alt="Delivery completed"
                   className="w-3/4 h-3/4 object-contain object-center"
                 />
@@ -276,7 +283,8 @@ export function CompletionRatingModal({
           }}
         />
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

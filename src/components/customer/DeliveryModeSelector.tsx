@@ -4,17 +4,6 @@ import { cn } from "@/lib/utils";
 import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import speedAnimation from "@/assets/animations/speed.json";
 import countedAnimation from "@/assets/animations/counted.json";
-import {
-  HeartIcon,
-  CurrencyDollarIcon,
-  StarIcon,
-  ArrowPathIcon,
-  UserIcon,
-  CheckCircleIcon,
-  EyeSlashIcon,
-} from "@heroicons/react/24/solid";
-import type { ComponentType, SVGProps } from "react";
-
 export type DeliveryMode = "quick_handoff" | "count_confirm";
 
 interface DeliveryModeSelectorProps {
@@ -23,34 +12,19 @@ interface DeliveryModeSelectorProps {
   className?: string;
 }
 
-interface Benefit {
-  text: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-}
-
 const modes = [
   {
     value: "count_confirm" as DeliveryMode,
     title: "Counted",
-    mainTitle: "You count the cash in front of the runner.",
-    subtitle: "For when you want certainty and a moment to double-check every bill.",
-    benefits: [
-      { text: "Larger amounts", icon: CurrencyDollarIcon },
-      { text: "Extra peace of mind", icon: HeartIcon },
-      { text: "First-time confidence", icon: StarIcon },
-    ] as Benefit[],
+    mainTitle: "Count the cash with the runner during hand-off.",
+    subtitle: "Recommended for first deliveries.",
     animationData: countedAnimation,
   },
   {
     value: "quick_handoff" as DeliveryMode,
     title: "Speed",
-    mainTitle: "Fast handoff, no counting together.",
-    subtitle: "For when you want the envelope now — quick, discreet, and in-and-out.",
-    benefits: [
-      { text: "Discretion", icon: EyeSlashIcon },
-      { text: "Minimal interaction", icon: UserIcon },
-      { text: "Regular users who trust the flow", icon: CheckCircleIcon },
-    ] as Benefit[],
+    mainTitle: "Quick, discreet hand-off — no counting.",
+    subtitle: "Best for repeat deliveries.",
     animationData: speedAnimation,
   },
 ];
@@ -138,29 +112,13 @@ export function DeliveryModeSelector({
         {value && (() => {
           const selectedMode = modes.find(m => m.value === value);
           return (
-            <div className="pt-3 pb-3 text-left">
+            <div className="pt-3 pb-3 text-center">
               <p className="text-sm font-semibold text-slate-900 leading-relaxed">
                 {selectedMode?.mainTitle}
               </p>
               <p className="text-sm text-slate-600 leading-relaxed mt-1">
                 {selectedMode?.subtitle}
               </p>
-              {selectedMode?.benefits && selectedMode.benefits.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-slate-900 mb-2">Choose this for:</p>
-                  <ul className="space-y-2.5">
-                    {selectedMode.benefits.map((benefit, index) => {
-                      const Icon = benefit.icon;
-                      return (
-                        <li key={index} className="flex items-center gap-3">
-                          <Icon className="w-4 h-4 text-black shrink-0" />
-                          <span className="text-sm text-slate-600 leading-relaxed">{benefit.text}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
             </div>
           );
         })()}

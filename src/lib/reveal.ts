@@ -25,6 +25,7 @@ import type { OrderStatus } from '@/types/types';
  */
 export function canRevealRunnerIdentity(status: OrderStatus): boolean {
   return [
+    'Runner Assigned',
     'Runner Accepted',
     'Runner at ATM',
     'Cash Withdrawn',
@@ -40,12 +41,13 @@ export function canRevealRunnerIdentity(status: OrderStatus): boolean {
  * This protects runner identity during the ATM phase.
  * 
  * Timeline:
- * - Accepted → Blurred (show first name only)
+ * - Assigned/Accepted → Blurred (show first name only)
  * - At ATM → Still blurred
  * - Cash Withdrawn → Unblurred (show full name + clear photo)
  */
 export function shouldBlurRunnerAvatar(status: OrderStatus): boolean {
   return [
+    'Runner Assigned',
     'Runner Accepted',
     'Runner at ATM'
   ].includes(status);

@@ -79,22 +79,8 @@ export default function CustomerHome() {
 
   // Handle realtime order updates
   // Update both local state AND React Query cache to keep everything in sync
-  const handleOrderUpdate = useCallback((updatedOrder: Order) => {
-    console.log('[CustomerHome] Order update received:', updatedOrder.id, updatedOrder.status);
-    
-    // Update React Query cache for this specific order (shared with OrderTracking)
-    queryClient.setQueryData<OrderWithDetails | null>(['order', updatedOrder.id], (prev) => {
-      if (!prev) {
-        // Order not in cache yet, will be fetched when needed
-        return null;
-      }
-      // Merge update into existing order, preserving relations
-      return {
-        ...prev,
-        ...updatedOrder,
-        updated_at: updatedOrder.updated_at || prev.updated_at,
-      } as OrderWithDetails;
-    });
+  const handleOrderUpdate = useCallback(async (updatedOrder: Order) => {
+    console.log('[CustomerHome] Order update received:', updatedOrder.id, updatedOrder.status, 'runner_id:', updatedOrder.runner_id);
     
     // If order was cancelled, reload all orders to ensure consistency
     if (updatedOrder.status === 'Cancelled' || updatedOrder.cancelled_at) {
@@ -102,31 +88,70 @@ export default function CustomerHome() {
       return;
     }
     
+    // CRITICAL: If runner was just assigned, fetch complete order data FIRST
+    // This ensures we show runner name/avatar immediately instead of placeholder
+    const currentCachedOrder = queryClient.getQueryData<OrderWithDetails | null>(['order', updatedOrder.id]);
+    const runnerJustAssigned = (
+      updatedOrder.runner_id &&
+      (!currentCachedOrder?.runner_id || currentCachedOrder.runner_id !== updatedOrder.runner_id)
+    );
+    
+    if (runnerJustAssigned) {
+      console.log('[CustomerHome] Runner just assigned, fetching full order with runner data FIRST');
+      try {
+        const fullData = await getOrderById(updatedOrder.id);
+        if (fullData) {
+          console.log('[CustomerHome] Got full order with runner data:', {
+            orderId: fullData.id,
+            runnerFirstName: fullData.runner?.first_name || 'N/A',
+          });
+          // Update React Query cache with complete data
+          queryClient.setQueryData(['order', updatedOrder.id], fullData);
+          // Update local state with complete data
+          setOrders((prev) => {
+            const existingIndex = prev.findIndex((o) => o.id === fullData.id);
+            if (existingIndex >= 0) {
+              return prev.map((o) => o.id === fullData.id ? fullData : o);
+            }
+            return prev;
+          });
+          return; // Done - we have complete data
+        }
+      } catch (error) {
+        console.error('[CustomerHome] Error fetching full order details:', error);
+        // Fall through to update with partial data
+      }
+    }
+    
+    // Update React Query cache for this specific order (shared with OrderTracking)
+    queryClient.setQueryData<OrderWithDetails | null>(['order', updatedOrder.id], (prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        ...updatedOrder,
+        updated_at: updatedOrder.updated_at || prev.updated_at,
+      } as OrderWithDetails;
+    });
+    
     // Update the order in the local list
     setOrders((prev) => {
       const existingIndex = prev.findIndex((o) => o.id === updatedOrder.id);
-      
       if (existingIndex >= 0) {
-        // Update existing order
         return prev.map((o) => 
           o.id === updatedOrder.id 
             ? { ...o, ...updatedOrder } as OrderWithDetails
             : o
         );
       } else {
-        // New order, reload to get full details
         loadOrders();
         return prev;
       }
     });
     
     // Fetch full order details in background to hydrate relations
-    // This ensures both local state and React Query cache have complete data
     getOrderById(updatedOrder.id).then((data) => {
       if (data) {
-        // Update React Query cache with full order data including relations
         queryClient.setQueryData(['order', updatedOrder.id], data);
-        // Also update local state if order exists in list
         setOrders((prev) => {
           const existingIndex = prev.findIndex((o) => o.id === data.id);
           if (existingIndex >= 0) {

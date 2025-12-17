@@ -82,7 +82,9 @@ export function CustomerHeader({
   const kycStatus = profile?.kyc_status;
   const isKycVerified = kycStatus === "verified";
 
-  const menuButton = !showBack && isHomePage ? (
+  // Menu button should show when NOT showing back button (i.e., on home page or pages without back button)
+  // This ensures menu is always accessible when not in a flow/back navigation context
+  const menuButton = !showBack ? (
     <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <SheetTrigger asChild>
         <Button 

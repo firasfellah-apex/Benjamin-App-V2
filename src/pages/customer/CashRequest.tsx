@@ -13,7 +13,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "@/lib/icons";
-import { Landmark, MapPin, Pencil, Shield, ChevronDown } from "lucide-react";
+import { Landmark, MapPin, Pencil, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { getIconByName } from "@/components/address/IconPicker";
@@ -42,6 +42,7 @@ import { addAddressCopy } from "@/lib/copy/addAddress";
 import { useOrderDraftStore } from "@/stores/useOrderDraftStore";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { SlideToConfirm } from "@/components/customer/SlideToConfirm";
+import { BankingHelpStories } from "@/components/customer/BankingHelpStories";
 
 type Step = 1 | 2 | 3;
 
@@ -74,6 +75,11 @@ export default function CashRequest() {
   const { bankAccounts, hasAnyBank } = useBankAccounts();
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
   const [showBankDropdown, setShowBankDropdown] = useState(false);
+  
+  // Help stories for step 3 (delivery style)
+  const [showHelpStories, setShowHelpStories] = useState(false);
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const [helpButtonPosition, setHelpButtonPosition] = useState<{ top: number; right: number } | null>(null);
   
   // Order draft store for persisting order state during navigation
   const { draft, returnTo, setDraft, clearDraft } = useOrderDraftStore();
@@ -576,12 +582,12 @@ export default function CashRequest() {
       toast.error("Please connect a bank account to continue");
       return;
     }
-    // Save draft before moving to step 3
+    // Save draft before moving to step 3 (without deliveryStyle - user will select it on step 3)
     setDraft({
       addressId: selectedAddress.id,
       amount,
       bankAccountId: selectedBankAccountId,
-      deliveryStyle: deliveryMode === 'count_confirm' ? 'counted' : 'speed',
+      // Don't save deliveryStyle here - it will be saved when user selects it on step 3
     });
     isInternalStepUpdate.current = true;
     setStep(3);
@@ -592,7 +598,25 @@ export default function CashRequest() {
       newParams.set('address_id', selectedAddress.id);
     }
     setSearchParams(newParams, { replace: true });
-  }, [selectedAddress, amount, selectedBankAccountId, deliveryMode, hasAnyBank, setDraft, searchParams, setSearchParams]);
+  }, [selectedAddress, amount, selectedBankAccountId, hasAnyBank, setDraft, searchParams, setSearchParams]);
+  
+  // CRITICAL: Update draft whenever deliveryMode changes on step 3
+  // This ensures the selected delivery style is saved to draft before order creation
+  useEffect(() => {
+    if (step === 3 && selectedAddress && selectedBankAccountId) {
+      setDraft({
+        addressId: selectedAddress.id,
+        amount,
+        bankAccountId: selectedBankAccountId,
+        deliveryStyle: deliveryMode === 'count_confirm' ? 'counted' : 'speed',
+      });
+      console.log('[CashRequest] Draft updated with delivery style:', {
+        step,
+        deliveryMode,
+        deliveryStyle: deliveryMode === 'count_confirm' ? 'counted' : 'speed',
+      });
+    }
+  }, [step, deliveryMode, selectedAddress, amount, selectedBankAccountId, setDraft]);
   
   const handleBackToAddress = useCallback(() => {
     // Update both state and URL when going back to address selection
@@ -650,7 +674,9 @@ export default function CashRequest() {
     }
 
     // Validate draft has all required fields
-    if (!draft?.addressId || !draft?.bankAccountId || !draft?.amount || !draft?.deliveryStyle) {
+    // Use current deliveryMode as source of truth (user might have just changed it)
+    const currentDeliveryStyle = deliveryMode === 'count_confirm' ? 'counted' : 'speed';
+    if (!draft?.addressId || !draft?.bankAccountId || !draft?.amount || !deliveryMode) {
       toast.error("Missing order information. Please go back and complete all steps.");
       return;
     }
@@ -675,22 +701,32 @@ export default function CashRequest() {
     try {
       const deliveryNotes = selectedAddress.delivery_notes || "";
       
-      // Use deliveryStyle from draft (already mapped from deliveryMode)
-      // CRITICAL: Ensure we're using the correct mapping
-      // draft.deliveryStyle should be 'counted' or 'speed' (lowercase)
-      const deliveryStyle = draft.deliveryStyle === 'counted' ? 'COUNTED' as const : 'SPEED' as const;
+      // CRITICAL: Use current deliveryMode as source of truth, with draft as fallback
+      // This ensures we always use what the user has selected, not what was saved earlier
+      const deliveryStyleFromMode = deliveryMode === 'count_confirm' ? 'counted' : 'speed';
+      const deliveryStyleFromDraft = draft.deliveryStyle;
+      
+      // Prefer current deliveryMode over draft (user might have changed it)
+      const finalDeliveryStyleLowercase = deliveryStyleFromMode || deliveryStyleFromDraft || 'speed';
+      const deliveryStyle = finalDeliveryStyleLowercase === 'counted' ? 'COUNTED' as const : 'SPEED' as const;
       
       // Debug logging for delivery style mapping
       console.log('[CashRequest] Creating order with delivery style:', {
+        currentDeliveryMode: deliveryMode,
+        deliveryStyleFromMode,
         draftDeliveryStyle: draft.deliveryStyle,
-        deliveryMode: deliveryMode, // Current UI state
+        finalDeliveryStyleLowercase,
         mappedStyle: deliveryStyle,
         willBeSavedAs: deliveryStyle,
       });
       
       // CRITICAL VALIDATION: Ensure deliveryStyle is set correctly
-      if (!draft.deliveryStyle || (draft.deliveryStyle !== 'counted' && draft.deliveryStyle !== 'speed')) {
-        console.error('[CashRequest] ❌ INVALID deliveryStyle in draft:', draft.deliveryStyle);
+      if (!finalDeliveryStyleLowercase || (finalDeliveryStyleLowercase !== 'counted' && finalDeliveryStyleLowercase !== 'speed')) {
+        console.error('[CashRequest] ❌ INVALID deliveryStyle:', {
+          finalDeliveryStyleLowercase,
+          deliveryMode,
+          draftDeliveryStyle: draft.deliveryStyle,
+        });
         toast.error("Delivery style is missing. Please select a delivery style.");
         return;
       }
@@ -806,19 +842,19 @@ export default function CashRequest() {
                     <div className="flex justify-between items-center text-sm" style={{ marginBottom: '8px' }}>
                       <span className="text-slate-600">Platform Fee</span>
                       <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        ${pricing.platformFee.toFixed(2)}
+                        +${pricing.platformFee.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm" style={{ marginBottom: '8px' }}>
                       <span className="text-slate-600">Compliance Fee</span>
                       <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        ${pricing.complianceFee.toFixed(2)}
+                        +${pricing.complianceFee.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-slate-600">Runner Fee</span>
                       <span className="text-slate-900 font-medium" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        ${pricing.deliveryFee.toFixed(2)}
+                        +${pricing.deliveryFee.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -918,9 +954,17 @@ export default function CashRequest() {
           title="How would you like it delivered?"
           subtitle="Choose a delivery style and confirm your request."
           showHelp={true}
+          helpButtonRef={helpButtonRef}
           onHelpClick={() => {
-            // Placeholder for help functionality - will be implemented later
-            console.log('Help clicked on delivery style step');
+            // Get button position before opening modal
+            if (helpButtonRef.current) {
+              const rect = helpButtonRef.current.getBoundingClientRect();
+              setHelpButtonPosition({
+                top: rect.top,
+                right: window.innerWidth - rect.right,
+              });
+            }
+            setShowHelpStories(true);
           }}
         />
       );
@@ -929,6 +973,14 @@ export default function CashRequest() {
 
   // Fixed content for step 2 (cash amount) - divider under title
   const cashAmountFixedContent = step === 2 ? (
+    <>
+      {/* Divider under title/subtitle - 24px spacing from subtitle (fixed, doesn't scroll) */}
+      <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+    </>
+  ) : null;
+
+  // Fixed content for step 3 (delivery style) - divider under title
+  const deliveryStyleFixedContent = step === 3 ? (
     <>
       {/* Divider under title/subtitle - 24px spacing from subtitle (fixed, doesn't scroll) */}
       <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
@@ -1029,18 +1081,14 @@ export default function CashRequest() {
                           **** {selectedBankAccount?.bank_last4 || ''}
                         </p>
                       </div>
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        className="w-12 h-12 rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60"
-                      >
+                      <div className="w-12 h-12 rounded-xl bg-[#F7F7F7] flex items-center justify-center flex-shrink-0 pointer-events-none">
                         <ChevronDown
                           className={cn(
                             "h-5 w-5 text-slate-600 transition-transform duration-300 ease-in-out",
                             showBankDropdown && "rotate-180"
                           )}
                         />
-                      </IconButton>
+                      </div>
                     </button>
                     {/* Expandable dropdown container with smooth animation */}
                     <div
@@ -1099,17 +1147,13 @@ export default function CashRequest() {
                                 **** {bank.bank_last4}
                               </p>
                             </div>
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              className="w-12 h-12 rounded-xl bg-[#F7F7F7] hover:bg-[#F7F7F7]/80 active:bg-[#F7F7F7]/60"
-                            >
+                            <div className="w-12 h-12 rounded-xl bg-[#F7F7F7] flex items-center justify-center flex-shrink-0 pointer-events-none">
                               {selectedBankAccountId === bank.id && (
                                 <div className="h-5 w-5 rounded-full bg-black flex items-center justify-center">
                                   <div className="h-2 w-2 rounded-full bg-white" />
                                 </div>
                               )}
-                            </IconButton>
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -1160,22 +1204,17 @@ export default function CashRequest() {
             <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
           </div>
 
-          {/* Security Tip - OTP Education */}
+          {/* At Delivery - OTP Education */}
           <div style={{ paddingTop: '24px' }}>
-            <div className="w-full rounded-xl bg-[#FEF9C3]" style={{ padding: '18px' }}>
+            <div className="w-full rounded-xl" style={{ padding: '18px', backgroundColor: '#FFFBEB' }}>
               <div className="flex flex-col items-center text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Shield className="h-5 w-5 text-orange-500 flex-shrink-0" />
-                  <p className="text-sm font-semibold text-slate-900">
-                    Never Share Your Code Early
-                  </p>
-                </div>
-                <div className="h-[1px] bg-orange-500 mb-3 w-full" />
-                <div className="space-y-1.5 text-sm text-slate-600">
-                  <p>Anyone with the code can receive your envelope.</p>
-                  <p>Only share it when your runner is with you.</p>
-                  <p>Benjamin will never ask for it by phone or text.</p>
-                </div>
+                <p className="text-sm font-semibold text-slate-900 mb-2">
+                  At Delivery
+                </p>
+                <div className="h-[1px] mb-3 w-full" style={{ backgroundColor: '#D97708' }} />
+                <p className="text-sm text-slate-600">
+                  When your runner arrives, you'll see a 4-digit PIN in the app. Share it in person to receive your cash.
+                </p>
               </div>
             </div>
           </div>
@@ -1199,6 +1238,51 @@ export default function CashRequest() {
     showBankDropdown,
     handleBankAccounts,
   ]);
+
+  // Help story pages for delivery style (Step 3)
+  const deliveryStyleHelpPages = useMemo(() => [
+    {
+      id: "page-1",
+      content: (
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-slate-900">The hand-off</h2>
+          <p className="text-base text-slate-600 leading-relaxed">
+            When your runner arrives, you'll see a 4-digit PIN.
+          </p>
+          <p className="text-base text-slate-600 leading-relaxed">
+            Share it in person to receive your cash.
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "page-2",
+      content: (
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-slate-900">Counted vs Speed</h2>
+          <div className="space-y-3 text-left">
+            <p className="text-base text-slate-600 leading-relaxed">
+              <span className="font-semibold text-slate-900">Counted:</span> Count together before confirming
+            </p>
+            <p className="text-base text-slate-600 leading-relaxed">
+              <span className="font-semibold text-slate-900">Speed:</span> Quick hand-off, no counting
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "page-3",
+      content: (
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-slate-900">Staying safe</h2>
+          <p className="text-base text-slate-600 leading-relaxed">
+            Only share your PIN in person. Benjamin will never ask for it remotely.
+          </p>
+        </div>
+      ),
+    },
+  ], []);
 
   // Memoize terms content for footer
   const termsContent = useMemo(() => {
@@ -1816,7 +1900,7 @@ export default function CashRequest() {
       <>
         <CustomerScreen
           flowHeader={flowHeader}
-          fixedContent={step === 2 ? cashAmountFixedContent : null}
+          fixedContent={step === 2 ? cashAmountFixedContent : step === 3 ? deliveryStyleFixedContent : null}
           topContent={topContent}
           customBottomPadding={step === 3 ? "calc(24px + max(24px, env(safe-area-inset-bottom)) + 200px)" : "calc(24px + max(24px, env(safe-area-inset-bottom)) + 120px)"}
         />
@@ -1933,6 +2017,14 @@ export default function CashRequest() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Delivery Style Help Stories (Step 3) */}
+      <BankingHelpStories
+        isOpen={showHelpStories}
+        onClose={() => setShowHelpStories(false)}
+        pages={deliveryStyleHelpPages}
+        closeButtonPosition={helpButtonPosition}
+      />
 
       </>
     );

@@ -15,13 +15,14 @@ export function resolveDeliveryStyleFromOrder(order: any): DeliveryStyle {
   const style = (order as any).delivery_style as DeliveryStyle | null;
   const mode = (order as any).delivery_mode as ('quick_handoff' | 'count_confirm' | null);
 
-  // CRITICAL: Log for debugging delivery style issues
-  if (import.meta.env.DEV) {
-    console.log('[resolveDeliveryStyleFromOrder] Resolving delivery style:', {
+  // Only log when there's a potential issue (delivery_style is missing and we're using fallback)
+  // This reduces noise in the console - we only care about cases where delivery_style isn't set
+  if (import.meta.env.DEV && !style && mode) {
+    console.warn('[resolveDeliveryStyleFromOrder] Using legacy delivery_mode fallback:', {
       orderId: order?.id,
       delivery_style: style,
       delivery_mode: mode,
-      resolved: style || (mode === 'count_confirm' ? 'COUNTED' : mode === 'quick_handoff' ? 'SPEED' : 'SPEED'),
+      resolved: mode === 'count_confirm' ? 'COUNTED' : 'SPEED',
     });
   }
 
@@ -75,12 +76,12 @@ export function getDeliveryStyleShortHint(style: DeliveryStyle): string {
 }
 
 /**
- * Get chip label for delivery style (shown above OTP input)
+ * Get chip label for delivery style (shown above PIN input)
  */
 export function getDeliveryStyleChipLabel(style: DeliveryStyle): string {
   return style === 'COUNTED' 
     ? 'Counted · let them count in front of you'
-    : 'Speed · quick handoff after the code';
+    : 'Speed · quick handoff after the PIN';
 }
 
 /**
@@ -90,20 +91,23 @@ export function getDeliveryStyleChipLabel(style: DeliveryStyle): string {
  */
 export function getArrivalInstruction(style: DeliveryStyle): string {
   if (style === 'COUNTED') {
-    return 'This customer chose a Counted handoff.\n\nAfter you enter the OTP, stay with the customer while they count the cash in front of you. Do not leave until they confirm everything is correct.';
+    return 'This customer chose a Counted handoff.\n\nAfter you enter the PIN, stay with the customer while they count the cash in front of you. Do not leave until they confirm everything is correct.';
   }
   
-  return 'This customer chose a Speed handoff.\n\nAfter you enter the OTP, hand the cash to the customer and you may depart. They will count the cash later on their own.';
+  return 'This customer chose a Speed handoff.\n\nAfter you enter the PIN, hand the cash to the customer and you may depart. They will count the cash later on their own.';
 }
 
 /**
- * Get footer text to display under the OTP input field
+ * Get footer text to display under the PIN input field
  */
-export function getOtpFooterText(style: DeliveryStyle): string {
+export function getPinFooterText(style: DeliveryStyle): string {
   return style === 'COUNTED'
-    ? 'Once the code is accepted, wait while the customer counts the cash in front of you.'
-    : 'Once the code is accepted, you may hand the cash and leave.';
+    ? 'Once the PIN is accepted, wait while the customer counts the cash in front of you.'
+    : 'Once the PIN is accepted, you may hand the cash and leave.';
 }
+
+// Backward compatibility alias
+export const getOtpFooterText = getPinFooterText;
 
 /**
  * Get the delivery style from an order, with backward compatibility

@@ -21,6 +21,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { formatDate } from "@/lib/utils";
 import { RunnerDirectionsMap, type Location } from "@/components/maps/RunnerDirectionsMap";
 import { resolveDeliveryStyleFromOrder, getDeliveryStyleCopy, getArrivalInstruction, getOtpFooterText, getDeliveryStyleShortHint, getDeliveryStyleChipLabel } from "@/lib/deliveryStyle";
+import { useProfile } from "@/contexts/ProfileContext";
 
 function shortId(orderId: string): string {
   return orderId.slice(0, 8);
@@ -29,6 +30,7 @@ function shortId(orderId: string): string {
 export default function RunnerOrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
+  const { profile } = useProfile();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -221,11 +223,11 @@ export default function RunnerOrderDetail() {
           try {
             const otp = await generateOTP(orderId);
             if (otp) {
-              toast.success("Verification code generated. The customer can now see it in their app.");
+              toast.success("Verification PIN generated. The customer can now see it in their app.");
             }
           } catch (error: any) {
             console.error("Error auto-generating OTP:", error);
-            toast.error("Failed to generate verification code. Please generate it manually.");
+            toast.error("Failed to generate verification PIN. Please generate it manually.");
           }
         }
         
@@ -243,7 +245,7 @@ export default function RunnerOrderDetail() {
 
   const handleVerifyOTP = async () => {
     if (!orderId || otpValue.length !== 4) {
-      toast.error(strings.errors.invalidOTP);
+      toast.error(strings.errors.invalidPIN);
       return;
     }
 
@@ -266,7 +268,7 @@ export default function RunnerOrderDetail() {
           setTimeout(() => navigate("/runner/work"), 2000);
         }
       } else {
-        toast.error(result.error || "Invalid OTP. Please try again.");
+        toast.error(result.error || "Invalid PIN. Please try again.");
         setOtpValue("");
       }
     } catch (error: any) {
@@ -302,7 +304,7 @@ export default function RunnerOrderDetail() {
         otpVerified,
         orderStatus: order.status
       });
-      toast.error("OTP must be verified before completing delivery. Please verify the OTP first.");
+      toast.error("PIN must be verified before completing delivery. Please verify the PIN first.");
       // Try to reload order to sync state
       await loadOrder();
       return;
@@ -635,6 +637,8 @@ export default function RunnerOrderDetail() {
                       destination={mapLocations.destination}
                       title={mapLocations.title}
                       height="400px"
+                      originAvatarUrl={profile?.avatar_url}
+                      destinationAvatarUrl={order?.customer?.avatar_url}
                     />
                   </section>
                 )}
@@ -677,6 +681,8 @@ export default function RunnerOrderDetail() {
                       destination={mapLocations.destination}
                       title={mapLocations.title}
                       height="400px"
+                      originAvatarUrl={profile?.avatar_url}
+                      destinationAvatarUrl={order?.customer?.avatar_url}
                     />
                   </section>
                 )}
@@ -712,7 +718,7 @@ export default function RunnerOrderDetail() {
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                   <p className="text-sm font-medium text-emerald-400 mb-2">Cash Secured</p>
                   <p className="text-xs text-slate-300 mb-4">
-                    Great! The cash has been secured. Generating verification code...
+                    Great! The cash has been secured. Generating verification PIN...
                   </p>
                   <div className="text-center py-2">
                     <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-400"></div>
@@ -732,6 +738,8 @@ export default function RunnerOrderDetail() {
                       destination={mapLocations.destination}
                       title={mapLocations.title}
                       height="400px"
+                      originAvatarUrl={profile?.avatar_url}
+                      destinationAvatarUrl={order?.customer?.avatar_url}
                     />
                   </section>
                 )}
@@ -822,7 +830,7 @@ export default function RunnerOrderDetail() {
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                       <p className="text-sm font-medium text-emerald-400 mb-2">Arrival Confirmed</p>
                       <p className="text-xs text-slate-300">
-                        Customer has been notified. Please wait for them to provide the verification code.
+                        Customer has been notified. Please wait for them to provide the verification PIN.
                       </p>
                     </div>
                   </section>
@@ -875,7 +883,7 @@ export default function RunnerOrderDetail() {
                             />
                             <div className="flex-1">
                               <div className="text-base font-semibold text-white">{fullName}</div>
-                              <div className="text-xs text-slate-400 mt-0.5">Ask for the verification code</div>
+                              <div className="text-xs text-slate-400 mt-0.5">Ask for the verification PIN</div>
                             </div>
                             
                             {/* Message Button - Circular with Chat Icon (Runner App Style) */}
@@ -933,7 +941,7 @@ export default function RunnerOrderDetail() {
                       {updating 
                         ? "Verifying..." 
                         : resolveDeliveryStyleFromOrder(order) === 'COUNTED'
-                        ? "Verify OTP"
+                        ? "Verify PIN"
                         : "Verify and Complete Delivery"}
                     </Button>
                     

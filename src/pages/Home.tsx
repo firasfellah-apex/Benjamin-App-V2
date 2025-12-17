@@ -114,7 +114,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-semibold mb-2">Secure Delivery</h3>
             <p className="text-muted-foreground">
-              Receive your cash with OTP verification for maximum security
+              Receive your cash with PIN verification for maximum security
             </p>
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                OTP verification and complete audit trail for every transaction
+                PIN verification and complete audit trail for every transaction
               </p>
             </CardContent>
           </Card>

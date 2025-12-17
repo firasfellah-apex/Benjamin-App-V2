@@ -1,7 +1,7 @@
 /**
- * Reusable OTP Display Component
+ * Reusable PIN Display Component
  * 
- * Shows verification code in a consistent format across the app.
+ * Shows verification PIN in a consistent format across the app.
  * Used in ActiveDeliverySheet (collapsed/expanded) and RequestFlowBottomBar (home nav).
  */
 
@@ -16,12 +16,12 @@ interface OtpDisplayProps {
 
 export function OtpDisplay({ otpCode, customerStatusStep, className }: OtpDisplayProps) {
   const sublabelText = customerStatusStep === 'ARRIVED' 
-    ? 'Share this code with your runner to receive your cash'
-    : 'Share this code only with your Benjamin runner when they arrive';
+    ? 'Share this PIN with your runner to receive your cash'
+    : 'Share this PIN only with your Benjamin runner when they arrive';
 
   return (
     <div className={cn("p-3 bg-green-50 border border-green-200 rounded-xl", className)}>
-      <p className="text-xs font-medium text-green-900">Verification Code</p>
+      <p className="text-xs font-medium text-green-900">Verification PIN</p>
       <p className="text-[10px] text-green-700 mt-0.5">
         {sublabelText}
       </p>

@@ -1700,7 +1700,7 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
             });
             // For counted mode, this is a problem
             if (isCounted) {
-              return { success: false, error: "OTP verification was not properly recorded. Please try again." };
+              return { success: false, error: "PIN verification was not properly recorded. Please try again." };
             }
           }
         }
@@ -1713,7 +1713,7 @@ export async function verifyOTP(orderId: string, otp: string): Promise<{ success
         stack: updateError?.stack
       });
       if (isCounted) {
-        return { success: false, error: "Failed to record OTP verification. Please try again." };
+        return { success: false, error: "Failed to record PIN verification. Please try again." };
       }
     }
 
@@ -1798,7 +1798,7 @@ export async function confirmCount(orderId: string): Promise<{ success: boolean;
 
     const otpVerifiedAt = (order as any).otp_verified_at;
     if (!otpVerifiedAt) {
-      return { success: false, error: "OTP must be verified before confirming count." };
+      return { success: false, error: "PIN must be verified before confirming count." };
     }
 
     // Use the same resolver as the UI to check delivery style

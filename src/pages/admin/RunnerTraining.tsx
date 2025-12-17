@@ -30,7 +30,7 @@ export default function RunnerTraining() {
   };
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4">
+    <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <GraduationCap className="h-8 w-8 text-primary" />
@@ -115,7 +115,7 @@ export default function RunnerTraining() {
                   <li>Runner should see the test order in "Available Orders"</li>
                   <li>Runner accepts the order</li>
                   <li>Runner follows the delivery steps</li>
-                  <li>Complete the full workflow including OTP verification</li>
+                  <li>Complete the full workflow including PIN verification</li>
                 </ol>
               </div>
 
@@ -166,21 +166,21 @@ export default function RunnerTraining() {
               <div className="p-4 border rounded-lg">
                 <div className="font-semibold mb-2">4. Cash Withdrawn</div>
                 <p className="text-sm text-muted-foreground">
-                  Runner has withdrawn the cash. OTP is generated and sent to customer.
+                  Runner has withdrawn the cash. PIN is generated and sent to customer.
                 </p>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="font-semibold mb-2">5. Pending Handoff</div>
                 <p className="text-sm text-muted-foreground">
-                  Runner is meeting with customer. Waiting for OTP verification to complete delivery.
+                  Runner is meeting with customer. Waiting for PIN verification to complete delivery.
                 </p>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="font-semibold mb-2">6. Completed</div>
                 <p className="text-sm text-muted-foreground">
-                  OTP verified successfully. Cash delivered. Runner receives payment.
+                  PIN verified successfully. Cash delivered. Runner receives payment.
                 </p>
               </div>
             </div>
@@ -223,18 +223,18 @@ export default function RunnerTraining() {
             </div>
 
             <div className="border-l-4 border-primary pl-4">
-              <h4 className="font-semibold mb-1">OTP not generating</h4>
+              <h4 className="font-semibold mb-1">PIN not generating</h4>
               <p className="text-sm text-muted-foreground">
-                <strong>Solution:</strong> Ensure the order status is "Runner at ATM" before clicking "Cash Withdrawn - Generate OTP".
-                The OTP is valid for 10 minutes with a maximum of 3 attempts.
+                <strong>Solution:</strong> Ensure the order status is "Runner at ATM" before clicking "Cash Withdrawn - Generate PIN".
+                The PIN is valid for 10 minutes with a maximum of 3 attempts.
               </p>
             </div>
 
             <div className="border-l-4 border-primary pl-4">
               <h4 className="font-semibold mb-1">Cannot complete delivery</h4>
               <p className="text-sm text-muted-foreground">
-                <strong>Solution:</strong> Verify that the 6-digit OTP code is entered correctly. Check that the OTP hasn't expired (10-minute limit).
-                If attempts are exhausted, a new OTP must be generated.
+                <strong>Solution:</strong> Verify that the 4-digit PIN is entered correctly. Check that the PIN hasn't expired (10-minute limit).
+                If attempts are exhausted, a new PIN must be generated.
               </p>
             </div>
           </div>

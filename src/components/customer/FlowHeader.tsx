@@ -19,6 +19,7 @@ interface FlowHeaderProps {
   hideProgress?: boolean; // Hide progress dots
   onHelpClick?: () => void; // Optional help button handler
   showHelp?: boolean; // Show help button
+  helpButtonRef?: React.RefObject<HTMLButtonElement>; // Ref for help button position
 }
 
 export function FlowHeader({
@@ -35,6 +36,7 @@ export function FlowHeader({
   hideProgress = false,
   onHelpClick,
   showHelp = false,
+  helpButtonRef,
 }: FlowHeaderProps) {
   const dots = Array.from({ length: totalSteps });
 
@@ -109,6 +111,7 @@ export function FlowHeader({
           </button>
         ) : showHelp && onHelpClick ? (
           <IconButton
+            ref={helpButtonRef}
             type="button"
             onClick={onHelpClick}
             variant="default"

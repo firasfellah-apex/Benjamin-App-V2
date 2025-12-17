@@ -101,7 +101,7 @@ export default function CustomerDeliveryDetail() {
   const { deliveryId } = useParams<{ deliveryId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { deliveries, isLoading } = useCustomerDeliveries();
+  const { deliveries, isLoading, refetch: refetchDeliveries } = useCustomerDeliveries();
   const { setBottomSlot } = useCustomerBottomSlot();
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
@@ -194,11 +194,20 @@ export default function CustomerDeliveryDetail() {
   }, [delivery?.deliveredAt]);
 
   const handleRated = useCallback(() => {
-    // Refetch delivery to get updated rating
-    // The useCustomerDeliveries hook should refetch automatically via query invalidation
-    // For now, we'll just close the modal and let the user refresh if needed
-    // In a production app, we'd invalidate the query cache here
-  }, []);
+    // Refetch deliveries to get updated rating
+    refetchDeliveries();
+    
+    // Also reload the full order to update the order state
+    if (deliveryId) {
+      getOrderById(deliveryId).then((data) => {
+        if (data) {
+          setOrder(data);
+          // Update local delivery state with the new rating
+          setDelivery(prev => prev ? { ...prev, customerRating: data.runner_rating || null } : null);
+        }
+      });
+    }
+  }, [refetchDeliveries, deliveryId]);
 
   const handleReorder = useCallback(() => {
     if (isNavigating) return; // Prevent double-clicks
@@ -442,7 +451,7 @@ export default function CustomerDeliveryDetail() {
                   <Button
                     type="button"
                     onClick={() => setRatingModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150 flex-shrink-0"
+                    className="inline-flex items-center justify-center gap-2 px-5 h-14 bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150 flex-shrink-0"
                     style={{ color: '#D97708' }}
                   >
                     <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>

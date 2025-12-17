@@ -117,7 +117,7 @@ export default function AdminOrderDetail() {
 
   if (loading) {
     return (
-      <div className="container max-w-6xl mx-auto py-8 px-4">
+      <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-muted-foreground">Loading order details...</div>
         </div>
@@ -127,7 +127,7 @@ export default function AdminOrderDetail() {
 
   if (!order) {
     return (
-      <div className="container max-w-6xl mx-auto py-8 px-4">
+      <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center h-64 gap-4">
           <AlertCircle className="h-12 w-12 text-muted-foreground" />
           <div className="text-center">
@@ -147,7 +147,7 @@ export default function AdminOrderDetail() {
   const StatusIcon = statusIcons[order.status];
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4">
+    <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <Button
         variant="ghost"
         onClick={() => navigate("/admin/orders")}
@@ -372,13 +372,13 @@ export default function AdminOrderDetail() {
         {order.otp_code && (
           <Card>
             <CardHeader>
-              <CardTitle>OTP Verification Details</CardTitle>
-              <CardDescription>Complete OTP metadata for support and dispute resolution</CardDescription>
+              <CardTitle>PIN Verification Details</CardTitle>
+              <CardDescription>Complete PIN metadata for support and dispute resolution</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <div className="text-sm font-medium mb-1">OTP Code (Support Only)</div>
+                  <div className="text-sm font-medium mb-1">Verification PIN (Support Only)</div>
                   <div className="font-mono text-lg font-bold p-2 bg-muted rounded-md">
                     {order.otp_code}
                   </div>
@@ -421,7 +421,7 @@ export default function AdminOrderDetail() {
                 {order.status === "Pending Handoff" && (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>OTP Active</AlertTitle>
+                    <AlertTitle>PIN Active</AlertTitle>
                     <AlertDescription>
                       Customer and runner are in the verification process. Runner can enter this code to complete delivery.
                     </AlertDescription>

@@ -111,7 +111,7 @@ export default function OrderMonitoring() {
   };
 
   return (
-    <div className="container max-w-7xl mx-auto py-8 px-4">
+    <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2 text-[#F1F3F5]">{strings.admin.monitorTitle}</h1>
         <p className="text-[#A7A9AC]">
@@ -119,7 +119,7 @@ export default function OrderMonitoring() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-5 mb-8">
+      <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-8">
         <Card className="bg-[#23262B] border border-[#2F3238] rounded-2xl p-5 text-[#F1F3F5] hover:bg-[#2D3036] transition-all duration-150 ease-out">
           <CardHeader className="pb-3 p-0">
             <CardDescription className="text-[#A7A9AC] mb-1">{strings.admin.totalOrders}</CardDescription>
@@ -195,18 +195,18 @@ export default function OrderMonitoring() {
               description={statusFilter === "all" ? strings.admin.emptyDesc : `No orders with status: ${statusFilter}`}
             />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-6 px-6">
               <Table>
                 <TableHeader>
                   <TableRow className="border-[#2F3238] hover:bg-[#2D3036]">
-                    <TableHead className="text-[#A7A9AC]">{strings.admin.orderId}</TableHead>
-                    <TableHead className="text-[#A7A9AC]">{strings.runner.customer}</TableHead>
-                    <TableHead className="text-[#A7A9AC]">{strings.customer.runner}</TableHead>
-                    <TableHead className="text-[#A7A9AC]">{strings.admin.amount}</TableHead>
-                    <TableHead className="text-[#A7A9AC]">{strings.admin.total}</TableHead>
-                    <TableHead className="text-[#A7A9AC]">Status</TableHead>
-                    <TableHead className="text-[#A7A9AC]">{strings.admin.created}</TableHead>
-                    <TableHead className="text-right text-[#A7A9AC]">{strings.admin.actions}</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[120px]">{strings.admin.orderId}</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[180px]">{strings.runner.customer}</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[150px]">{strings.customer.runner}</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[100px]">{strings.admin.amount}</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[100px]">{strings.admin.total}</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[120px]">Status</TableHead>
+                    <TableHead className="text-[#A7A9AC] min-w-[140px]">{strings.admin.created}</TableHead>
+                    <TableHead className="text-right text-[#A7A9AC] min-w-[100px]">{strings.admin.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

@@ -82,8 +82,9 @@ export const CustomerMap: React.FC<CustomerMapProps> = ({
     >
       <BenjaminMap
         center={center}
-        zoom={14}
+        zoom={17}
         marker={markerPosition}
+        showGoogleLogo
       />
     </div>
   );

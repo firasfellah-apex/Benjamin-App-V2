@@ -326,7 +326,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="container max-w-7xl mx-auto py-8 px-4">
+      <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-[#A7A9AC] text-sm font-normal">Loading dashboard...</div>
         </div>
@@ -336,7 +336,7 @@ export default function Dashboard() {
 
   if (!metrics) {
     return (
-      <div className="container max-w-7xl mx-auto py-8 px-4">
+      <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-[#EF4444] text-sm font-normal">Failed to load dashboard data</div>
         </div>
@@ -345,7 +345,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto py-8 px-4">
+    <div className="w-full max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-10">
         <h1 className="text-3xl font-bold text-[#F1F3F5] mb-2 leading-tight">
@@ -357,7 +357,7 @@ export default function Dashboard() {
       </div>
 
       {/* Global Health Strip (top row) */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-8">
         <KPICard
           label="Live Orders"
           value={metrics.liveOrders.active}
@@ -401,7 +401,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 mb-8">
         {/* Active Deliveries (center-left, spans 2 columns on large) */}
         <div className="lg:col-span-2">
           <SectionCard
@@ -418,26 +418,26 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-6 px-6">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-[#2F3238] hover:bg-transparent">
-                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider">
+                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider min-w-[120px]">
                         Order ID
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider">
+                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider min-w-[100px]">
                         Area
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider">
+                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider min-w-[100px]">
                         Amount
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider">
+                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider min-w-[150px]">
                         Runner
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider">
+                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider min-w-[120px]">
                         Status
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider">
+                      <TableHead className="text-xs font-medium text-[#A7A9AC] uppercase tracking-wider min-w-[80px]">
                         Age
                       </TableHead>
                     </TableRow>
