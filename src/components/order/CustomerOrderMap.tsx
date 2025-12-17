@@ -26,6 +26,7 @@ interface CustomerOrderMapProps {
   atmLocation?: Location;
   estimatedArrival?: string;
   className?: string;
+  isFullscreen?: boolean;
 }
 
 export function CustomerOrderMap({
@@ -34,7 +35,8 @@ export function CustomerOrderMap({
   runnerLocation,
   atmLocation,
   estimatedArrival,
-  className
+  className,
+  isFullscreen = false
 }: CustomerOrderMapProps) {
   const canShowMap = canShowLiveRoute(orderStatus);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -56,7 +58,7 @@ export function CustomerOrderMap({
     // This appears before live tracking is available
     return (
       <div className={cn('relative h-full w-full overflow-hidden', className)}>
-        <FindingBenjamin />
+        <FindingBenjamin isFullscreen={isFullscreen} />
       </div>
     );
   }

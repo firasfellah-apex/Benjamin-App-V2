@@ -484,6 +484,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
             }}
             estimatedArrival={showLiveMap ? "5 minutes" : undefined}
             className="h-full pointer-events-none"
+            isFullscreen={isMapFullscreen}
           />
         )}
       </div>

@@ -3,9 +3,10 @@ import React from 'react';
 type FindingBenjaminProps = {
   message?: string;
   subtitle?: string;
+  isFullscreen?: boolean;
 };
 
-export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({}) => {
+export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen = false }) => {
   // Center of the 100x100 SVG coordinate system
   const center = { x: 50, y: 50 };
 
@@ -48,8 +49,14 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({}) => {
     }
   };
 
+  // In half-screen mode, constrain to visible 50vh area (top half only)
+  // In fullscreen mode, use full height
+  const containerClasses = isFullscreen 
+    ? "absolute inset-0 w-full h-full bg-[#05060A] overflow-hidden"
+    : "absolute top-0 left-0 right-0 w-full h-[50vh] bg-[#05060A] overflow-hidden";
+  
   return (
-    <div className="absolute inset-0 w-full h-full bg-[#05060A] overflow-hidden">
+    <div className={containerClasses}>
       {/* 1. BACKGROUND GRID (Visuals Only) */}
       <div className="absolute inset-0 z-0 opacity-40">
         <div className="grid grid-cols-8 grid-rows-8 gap-[4px] h-full w-full p-4">
@@ -65,10 +72,11 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({}) => {
         </div>
       </div>
       {/* 2. SVG ANIMATION LAYER (The Routes) */}
+      {/* viewBox includes padding for routes that start outside (e.g., y: -30, y: 130) */}
       <svg
         className="absolute inset-0 w-full h-full z-10 pointer-events-none p-4"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
+        viewBox="-30 -30 160 160"
+        preserveAspectRatio="xMidYMid meet"
       >
         <defs>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
