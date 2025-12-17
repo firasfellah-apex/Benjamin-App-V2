@@ -11,40 +11,38 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
   const center = { x: 50, y: 50 };
 
   // ROUTES CONFIGURATION
+  // 4 lines from 4 different quadrants, all converging to center at the same time
   // To ensure perfect synchronization, all routes are designed to have
-  // a "Manhattan Distance" (abs(x-50) + abs(y-50)) of exactly 80.
-  // This means they will all traverse the grid and hit the center simultaneously.
+  // a total path length of exactly 80 units (Manhattan distance).
   const routes = [
-    // 1. TOP EDGE (Coming down)
-    { id: 1, start: { x: 50, y: -30 }, elbow: 'v' }, // Dist: |0| + |-80| = 80
-
-    // 2. BOTTOM EDGE (Coming up)
-    { id: 2, start: { x: 50, y: 130 }, elbow: 'v' }, // Dist: |0| + |80| = 80
-
-    // 3. LEFT EDGE (Coming right)
-    { id: 3, start: { x: -30, y: 50 }, elbow: 'h' }, // Dist: |-80| + |0| = 80
-
-    // 4. RIGHT EDGE (Coming left)
-    { id: 4, start: { x: 130, y: 50 }, elbow: 'h' }, // Dist: |80| + |0| = 80
-    // 5. TOP-LEFT DIAGONALISH
-    { id: 5, start: { x: 10, y: -10 }, elbow: 'v' }, // Dist: |40| + |60| = 100 (Adjusted slightly visually, but normalized via dash)
-    // Let's stick to strict 80 dist for perfect sync:
-    { id: 6, start: { x: 10, y: 10 }, elbow: 'h' },  // Dist: |40| + |40| = 80
-    // 6. TOP-RIGHT DIAGONALISH
-    { id: 7, start: { x: 90, y: 10 }, elbow: 'h' },  // Dist: |40| + |40| = 80
-    // 7. BOTTOM-LEFT DIAGONALISH
-    { id: 8, start: { x: 10, y: 90 }, elbow: 'v' },  // Dist: |40| + |40| = 80
-    // 8. BOTTOM-RIGHT DIAGONALISH
-    { id: 9, start: { x: 90, y: 90 }, elbow: 'v' },  // Dist: |40| + |40| = 80
+    // 1. TOP-LEFT QUADRANT: Diagonal path (goes right then down)
+    { id: 1, start: { x: 10, y: 10 }, path: 'elbow-h' },  // Dist: |40| + |40| = 80
+    
+    // 2. TOP-RIGHT QUADRANT: Different path (goes down then left)
+    { id: 2, start: { x: 90, y: 10 }, path: 'elbow-v' },  // Dist: |40| + |40| = 80
+    
+    // 3. BOTTOM-LEFT QUADRANT: Straight up from bottom, then to center
+    // Start in bottom-left quadrant (x < 50), goes straight up first, then to center
+    { id: 3, start: { x: 30, y: 130 }, path: 'elbow-v' },  // Path: up to (30, 50), then to (50, 50)
+    
+    // 4. BOTTOM-RIGHT QUADRANT: Different path (goes left then up)
+    { id: 4, start: { x: 90, y: 90 }, path: 'elbow-h' },  // Dist: |40| + |40| = 80
   ];
 
   // Helper to generate Path Data (d attribute)
-  const getPathData = (start: { x: number; y: number }, elbow: string) => {
-    if (elbow === 'h') {
+  // All paths are normalized to 80 units total length for perfect synchronization
+  const getPathData = (start: { x: number; y: number }, pathType: string) => {
+    if (pathType === 'straight-v') {
+      // Straight vertical: from start directly to center (vertical line)
+      // Used for bottom-left quadrant: goes straight up from bottom
+      return `M ${start.x} ${start.y} L ${center.x} ${center.y}`;
+    } else if (pathType === 'elbow-h') {
       // Horizontal first: Move X to Center, then Y to Center
+      // Used for top-left and bottom-right quadrants
       return `M ${start.x} ${start.y} L ${center.x} ${start.y} L ${center.x} ${center.y}`;
     } else {
-      // Vertical first: Move Y to Center, then X to Center
+      // Vertical first (elbow-v): Move Y to Center, then X to Center
+      // Used for top-right quadrant
       return `M ${start.x} ${start.y} L ${start.x} ${center.y} L ${center.x} ${center.y}`;
     }
   };
@@ -87,7 +85,7 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
         {routes.map((route) => (
           <path
             key={route.id}
-            d={getPathData(route.start, route.elbow)}
+            d={getPathData(route.start, route.path)}
             fill="none"
             stroke="#02C97A"
             strokeWidth="0.8"
@@ -114,11 +112,6 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
           <div className="absolute w-20 h-20 rounded-full bg-[#02C97A]/30 animate-radar-shockwave" />
           <div className="absolute w-20 h-20 rounded-full bg-[#02C97A]/20 animate-radar-shockwave" style={{ animationDelay: '0.1s' }} />
         </div>
-      </div>
-      {/* Optional: Static Crosshairs UI */}
-      <div className="absolute inset-0 z-10 pointer-events-none opacity-20">
-        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-[#02C97A]" />
-        <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-[#02C97A]" />
       </div>
     </div>
   );

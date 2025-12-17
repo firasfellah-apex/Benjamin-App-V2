@@ -70,25 +70,22 @@ export function canShowLiveLocation(status: OrderStatus): boolean {
 }
 
 /**
- * Get runner display name based on status
+ * Get runner display name
  * 
- * Returns appropriate name format:
- * - Before cash pickup: First name only
- * - After cash pickup: Full name
+ * Returns full name when available, otherwise first name or 'Runner'
+ * No reveal logic - shows immediately when runner is assigned
  */
 export function getRunnerDisplayName(
   firstName: string | undefined,
-  lastName: string | undefined,
-  status: OrderStatus
+  lastName: string | undefined
 ): string {
   if (!firstName) return 'Runner';
   
-  // Show full name after cash is picked up
-  if (canShowLiveLocation(status) && lastName) {
+  // Show full name if available, otherwise first name
+  if (lastName) {
     return `${firstName} ${lastName}`;
   }
   
-  // Show first name only during preparation phase
   return firstName;
 }
 

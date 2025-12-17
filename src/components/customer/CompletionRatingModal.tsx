@@ -54,8 +54,7 @@ export function CompletionRatingModal({
   const runnerName = runner
     ? getRunnerDisplayName(
         (runner as any)?.first_name,
-        (runner as any)?.last_name,
-        order.status
+        (runner as any)?.last_name
       )
     : 'Your runner';
 

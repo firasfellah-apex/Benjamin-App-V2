@@ -200,8 +200,10 @@ export function Avatar({
       />
       <AvatarFallback
         className={cn(
-          'bg-primary text-primary-foreground font-medium',
-          'transition-all duration-500'
+          'font-medium transition-all duration-500',
+          blurred 
+            ? 'bg-transparent text-transparent' // Hide fallback when blurred to prevent square showing
+            : 'bg-primary text-primary-foreground'
         )}
       >
         {initials}

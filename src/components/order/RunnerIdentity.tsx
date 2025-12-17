@@ -39,7 +39,7 @@ export function RunnerIdentity({
 }: RunnerIdentityProps) {
   const canReveal = canRevealRunnerIdentity(orderStatus);
   const shouldBlur = shouldBlurRunnerAvatar(orderStatus);
-  const displayName = getRunnerDisplayName(runnerFirstName, runnerLastName, orderStatus);
+  const displayName = getRunnerDisplayName(runnerFirstName, runnerLastName);
   const initial = runnerFirstName?.charAt(0).toUpperCase() || '?';
 
   const sizeClasses = {

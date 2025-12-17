@@ -15,7 +15,6 @@ import {
   canRevealRunnerIdentity, 
   canContactRunner, 
   getRevealMessage, 
-  shouldBlurRunnerAvatar,
   isOrderFinal,
   getRunnerDisplayName
 } from '@/lib/reveal';
@@ -717,8 +716,7 @@ export function ActiveDeliverySheet({
                     const runnerName = showRunnerIdentity && localOrder.runner 
                       ? getRunnerDisplayName(
                           (localOrder.runner as any)?.first_name,
-                          (localOrder.runner as any)?.last_name,
-                          localOrder.status
+                          (localOrder.runner as any)?.last_name
                         )
                       : 'Your runner';
                     return `${runnerName} has your cash and is heading your way.`;
@@ -751,18 +749,13 @@ export function ActiveDeliverySheet({
                       src={localOrder.runner.avatar_url || undefined}
                       fallback={localOrder.runner.first_name || 'Runner'}
                       size="md"
-                      className={cn(
-                        "transition-all duration-300",
-                        shouldBlurRunnerAvatar(localOrder.status) && "blur-sm"
-                      )}
+                      className="transition-all duration-300"
                     />
                     <div className="flex-1">
                       <p className="font-medium text-slate-900">
-                        {getRunnerDisplayName(
-                          localOrder.runner.first_name || undefined,
-                          localOrder.runner.last_name || undefined,
-                          localOrder.status
-                        )}
+                        {localOrder.runner.first_name && localOrder.runner.last_name
+                          ? `${localOrder.runner.first_name} ${localOrder.runner.last_name}`
+                          : localOrder.runner.first_name || 'Runner'}
                       </p>
                       <p className="text-xs text-slate-500">Your Benjamin runner</p>
                     </div>

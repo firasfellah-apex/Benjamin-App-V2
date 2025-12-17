@@ -164,8 +164,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                       const runnerName = showRunnerIdentity && activeOrder.runner 
                         ? getRunnerDisplayName(
                             (activeOrder.runner as any)?.first_name,
-                            (activeOrder.runner as any)?.last_name,
-                            activeOrder.status
+                            (activeOrder.runner as any)?.last_name
                           )
                         : 'Your runner';
                       return `${runnerName} has your cash and is heading your way.`;
