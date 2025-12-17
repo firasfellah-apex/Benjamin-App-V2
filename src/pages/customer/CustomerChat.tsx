@@ -1,12 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { OrderChatThread } from '@/components/chat/OrderChatThread';
 import { getOrderById } from '@/db/api';
 import { useOrderRealtime } from '@/hooks/useOrdersRealtime';
-import type { OrderWithDetails, OrderStatus } from '@/types/types';
-import { cn } from '@/lib/utils';
+import type { OrderWithDetails } from '@/types/types';
 import { Avatar } from '@/components/common/Avatar';
 import { getCustomerPublicProfile } from '@/lib/revealRunnerView';
 import { supabase } from '@/db/supabase';
@@ -14,8 +14,24 @@ import { supabase } from '@/db/supabase';
 export default function CustomerChat() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Check if we came from fullscreen mode
+  const fromFullscreen = (location.state as { fromFullscreen?: boolean } | null)?.fromFullscreen ?? false;
+  
+  // Navigate back to order tracking, restoring fullscreen if needed
+  const handleBack = () => {
+    if (orderId) {
+      navigate(`/customer/deliveries/${orderId}`, { 
+        state: { restoreFullscreen: fromFullscreen },
+        replace: true // Replace to avoid building up history
+      });
+    } else {
+      navigate(-1);
+    }
+  };
 
   const loadOrder = async () => {
     if (!orderId) return;
@@ -104,7 +120,7 @@ export default function CustomerChat() {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 bg-white">
         <div className="text-slate-500">Order not found</div>
-        <Button onClick={() => navigate(-1)}>Go Back</Button>
+        <Button onClick={handleBack}>Go Back</Button>
       </div>
     );
   }
@@ -121,16 +137,15 @@ export default function CustomerChat() {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(-1)}
-          className="p-2 h-auto"
+      {/* Fixed Header - stays at top when keyboard rises */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white fixed top-0 left-0 right-0 z-10">
+        <IconButton
+          onClick={handleBack}
+          size="lg"
+          aria-label="Go back"
         >
           <ArrowLeft className="h-5 w-5 text-slate-900" />
-        </Button>
+        </IconButton>
         
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Avatar
@@ -150,23 +165,11 @@ export default function CustomerChat() {
             )}
           </div>
         </div>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="p-2 h-auto"
-          onClick={() => {
-            // TODO: Implement call functionality
-            console.log('Call runner');
-          }}
-        >
-          <Phone className="h-5 w-5 text-slate-900" />
-        </Button>
       </div>
 
-      {/* Chat Content */}
-      <div className="flex-1 overflow-hidden bg-slate-50 flex flex-col">
-        <div className="flex-1 overflow-hidden p-4">
+      {/* Chat Content - scrolls beneath fixed header */}
+      <div className="flex-1 overflow-hidden bg-slate-50 flex flex-col pt-[73px]">
+        <div className="flex-1 overflow-hidden">
           {(() => {
             if (import.meta.env.DEV) {
               console.log('[CustomerChat] Rendering OrderChatThread with:', {

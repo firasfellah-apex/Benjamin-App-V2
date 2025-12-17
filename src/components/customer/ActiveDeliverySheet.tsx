@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, HelpCircle } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
+import { ChatIcon } from '@/components/ui/ChatIcon';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails, OrderStatus } from '@/types/types';
@@ -720,7 +721,7 @@ export function ActiveDeliverySheet({
                           localOrder.status
                         )
                       : 'Your runner';
-                    return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
+                    return `${runnerName} has your cash and is heading your way.`;
                   })()
                 : customerStatus.step === 'ARRIVED'
                 ? 'Your runner has arrived. Please meet up and share your verification PIN to receive your cash.'
@@ -774,7 +775,7 @@ export function ActiveDeliverySheet({
                         className="relative shrink-0"
                         aria-label="Message runner"
                       >
-                        <MessageCircle className="h-5 w-5" />
+                        <ChatIcon hasUnread={unreadCount > 0} />
                         {unreadCount > 0 && (
                           <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
                             {unreadCount > 9 ? '9+' : unreadCount}

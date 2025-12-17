@@ -319,9 +319,9 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Fixed Bottom Section - Pills and Input */}
+      {/* Fixed Bottom Section - Pills and Input - Full width responsive */}
       <div className={cn(
-        "flex-shrink-0 border-t",
+        "flex-shrink-0 border-t w-full",
         isDark 
           ? "border-slate-700 bg-[#020817]"
           : isAdmin
@@ -348,9 +348,9 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
           </div>
         )}
 
-        {/* Quick Message Pills - Fixed at bottom */}
+        {/* Quick Message Pills - Full width responsive */}
         {canSend && quickMessages.length > 0 && (
-          <div className="flex gap-2 px-4 pt-3 pb-2 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 px-4 pt-3 pb-2 overflow-x-auto scrollbar-hide w-full">
             {quickMessages.map((msg, idx) => (
               <button
                 key={idx}
@@ -373,10 +373,10 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
           </div>
         )}
 
-        {/* Message Input - Fixed at bottom */}
+        {/* Message Input - Full width responsive */}
         {canSend && (
-          <form onSubmit={onSubmit} className="flex gap-2 px-4 pb-4 pt-2">
-          <div className="flex-1 relative">
+          <form onSubmit={onSubmit} className="flex gap-2 px-4 pb-4 pt-2 w-full">
+          <div className="flex-1 relative w-full">
             <input
               type="text"
               className={cn(
@@ -392,9 +392,8 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
           <Button
             type="submit"
             disabled={sending || !input.trim()}
-            size="default"
             className={cn(
-              "rounded-2xl px-5 h-[44px] aspect-square p-0 flex items-center justify-center",
+              "rounded-xl w-12 h-12 p-0 flex items-center justify-center flex-shrink-0",
               isDark 
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 : isAdmin

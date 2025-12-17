@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export function useUnreadMessages(orderId: string | null) {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  // Unique ID per hook instance to avoid channel name collisions
+  const instanceIdRef = useRef<string>(`${Math.random().toString(36).substring(2, 9)}`);
 
   useEffect(() => {
     if (!orderId || !user) {
@@ -94,8 +96,9 @@ export function useUnreadMessages(orderId: string | null) {
     loadUnreadCount();
 
     // Subscribe to new messages and read receipts
+    // Use unique channel name per hook instance to avoid cleanup conflicts
     const channel = supabase
-      .channel(`unread-messages:${orderId}`)
+      .channel(`unread-messages:${orderId}:${instanceIdRef.current}`)
       .on(
         'postgres_changes',
         {

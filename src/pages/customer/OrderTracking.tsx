@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/icon-button";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import { getOrderById, cancelOrder, hasOrderIssue } from "@/db/api";
 import { useOrderRealtime, useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +30,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   // Use prop if provided, otherwise try orderId param, then deliveryId param
   const orderId = orderIdProp || params.orderId || params.deliveryId;
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -36,6 +39,28 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [hasIssue, setHasIssue] = useState(false);
+  
+  // Check if we should restore fullscreen mode (e.g., returning from chat)
+  const [isMapFullscreen, setIsMapFullscreen] = useState(() => {
+    const state = location.state as { restoreFullscreen?: boolean } | null;
+    return state?.restoreFullscreen ?? false;
+  });
+  
+  // Track viewport height for computing sheet inset
+  const [viewportH, setViewportH] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight : 800
+  );
+
+  useEffect(() => {
+    const onResize = () => setViewportH(window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // In half-screen mode the bottom sheet covers ~50vh.
+  // Add breathing room so map UI sits above the sheet edge.
+  const halfSheetPx = useMemo(() => Math.round(viewportH * 0.5), [viewportH]);
+  const uiBottomInset = isMapFullscreen ? 0 : halfSheetPx;
 
   // Use React Query as the single source of truth for order data
   const { data: order, isLoading: loading, dataUpdatedAt } = useQuery<OrderWithDetails | null>({
@@ -295,9 +320,11 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
   };
 
   const handleMessage = () => {
-    // Scroll to messages in expanded sheet or expand sheet
-    setSheetExpanded(true);
-    // Focus will be handled by chat component
+    if (!orderId) return;
+    // Navigate to chat with state indicating where we came from
+    navigate(`/customer/chat/${orderId}`, { 
+      state: { fromFullscreen: isMapFullscreen } 
+    });
   };
 
   const handleCallSupport = () => {
@@ -409,35 +436,43 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-[#F5F5F7]">
-      {/* Back Button - Fixed Top Left - Circular */}
-      {/* Standardized spacing: px-6 (24px) for consistent alignment */}
-      <div className="absolute top-6 left-6 z-30">
-        <IconButton
-          onClick={() => navigate("/customer/home")}
-          variant="default"
-          size="lg"
-          className="bg-white/95 backdrop-blur"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </IconButton>
-      </div>
+      {/* Back Button - Fixed Top Left - Only visible in half-screen mode */}
+      {/* In fullscreen, user uses the shrink button to return */}
+      {!isMapFullscreen && (
+        <div className="absolute top-6 left-6 z-30">
+          <IconButton
+            onClick={() => navigate("/customer/home")}
+            variant="default"
+            size="lg"
+            className="bg-white/95 backdrop-blur shadow-lg"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </IconButton>
+        </div>
+      )}
 
-      {/* Map Background - Fixed viewport, always visible (50% of viewport height) */}
-      <div className="absolute inset-x-0 top-0 h-[50vh] z-0">
+      {/* Map Background - Always full screen, "half screen" is just the sheet covering bottom */}
+      <div className={cn("absolute inset-0", isMapFullscreen ? "z-[100]" : "z-0")}>
         {mapLocations ? (
           <RunnerDirectionsMap
             origin={mapLocations.origin}
             destination={mapLocations.destination}
             title={mapLocations.title}
             height="100%"
-            bottomPadding={0}
+            bottomPadding={24}
+            uiBottomInset={uiBottomInset}
             interactive={true}
-            hideOpenInMaps
             showRecenterButton
             showLayerSwitcher
+            showFullscreenToggle
             originAvatarUrl={order?.runner?.avatar_url}
             destinationAvatarUrl={profile?.avatar_url}
+            pinCode={order?.otp_code || undefined}
+            isFullscreen={isMapFullscreen}
+            onFullscreenToggle={() => setIsMapFullscreen(v => !v)}
+            onMessage={handleMessage}
+            orderId={orderId}
           />
         ) : (
           <CustomerOrderMap
@@ -453,8 +488,10 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         )}
       </div>
 
-      {/* Gradient Overlay for Readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 z-10 pointer-events-none" />
+      {/* Gradient Overlay for Readability - hidden in fullscreen */}
+      {!isMapFullscreen && (
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 z-10 pointer-events-none" />
+      )}
 
       {/* Completion Rating Modal - Only show if no issue was reported */}
       {!hasIssue && (
@@ -471,20 +508,38 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         />
       )}
 
-      {/* Bottom Sheet - Always scrollable, max 50vh so map stays visible */}
-      <ActiveDeliverySheet
-        order={order}
-        isExpanded={false}
-        onToggleExpand={() => {}}
-        onCancel={handleCancel}
-        onReorder={handleReorder}
-        onMessage={handleMessage}
-        onCallSupport={handleCallSupport}
-        onOrderUpdate={(updatedOrder) => {
-          // Update React Query cache when ActiveDeliverySheet notifies of changes
-          queryClient.setQueryData(['order', orderId], updatedOrder);
+      {/* Bottom Sheet Container - Slides down/up when toggling fullscreen */}
+      {/* ActiveDeliverySheet has its own absolute positioning (top-[50vh] bottom-0) */}
+      {/* Wrapper is pointer-events-none so clicks pass through to map; sheet handles its own events */}
+      <motion.div
+        className="absolute inset-0 z-20 pointer-events-none"
+        initial={false}
+        animate={{
+          y: isMapFullscreen ? "50vh" : 0,
         }}
-      />
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+          mass: 0.8,
+        }}
+        style={{
+          willChange: "transform",
+        }}
+      >
+        <ActiveDeliverySheet
+          order={order}
+          isExpanded={false}
+          onToggleExpand={() => {}}
+          onCancel={handleCancel}
+          onReorder={handleReorder}
+          onMessage={handleMessage}
+          onCallSupport={handleCallSupport}
+          onOrderUpdate={(updatedOrder) => {
+            queryClient.setQueryData(["order", orderId], updatedOrder);
+          }}
+        />
+      </motion.div>
     </div>
   );
 }

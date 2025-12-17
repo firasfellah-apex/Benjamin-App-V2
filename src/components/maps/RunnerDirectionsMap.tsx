@@ -9,13 +9,16 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getEnv } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import { BENJAMIN_COLORS } from '@/lib/mapboxTheme';
-import { Layers, X, Focus, Pyramid, Diamond } from 'lucide-react';
+import { Layers, X, Focus, Box, Diamond, Expand, Shrink, Timer, Route } from 'lucide-react';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { IconButton } from '@/components/ui/icon-button';
+import { ChatIcon } from '@/components/ui/ChatIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Layer preview images
@@ -29,7 +32,7 @@ export type MapStyleType = '3d' | 'standard' | 'satellite';
 const MAP_STYLES: Record<MapStyleType, { url: string; label: string; is3D: boolean; zoom: number }> = {
   '3d': {
     url: 'mapbox://styles/mapbox/dark-v11',
-    label: '3D',
+    label: 'Dark (3D)',
     is3D: true,
     zoom: 15, // Higher zoom to see 3D buildings
   },
@@ -113,8 +116,6 @@ interface RunnerDirectionsMapProps {
   bottomPadding?: number;
   /** Whether the map is interactive (default: true for runner, false for customer) */
   interactive?: boolean;
-  /** Whether to hide the "Open in Maps" button (default: false) */
-  hideOpenInMaps?: boolean;
   /** Avatar URL for the origin marker */
   originAvatarUrl?: string | null;
   /** Avatar URL for the destination marker */
@@ -123,6 +124,22 @@ interface RunnerDirectionsMapProps {
   showRecenterButton?: boolean;
   /** Whether to show the layer switcher button (default: false) */
   showLayerSwitcher?: boolean;
+  /** Whether to show the fullscreen toggle button (default: false) */
+  showFullscreenToggle?: boolean;
+  /** PIN code to display in fullscreen mode */
+  pinCode?: string;
+  /** Whether map is in fullscreen mode (controlled by parent) */
+  isFullscreen?: boolean;
+  /** Callback when fullscreen toggle is clicked */
+  onFullscreenToggle?: () => void;
+  /** Additional bottom inset (px) to keep camera + UI above overlays (bottom sheet) */
+  uiBottomInset?: number;
+  /** Additional top inset (px) to keep camera + UI clear of top overlays */
+  uiTopInset?: number;
+  /** Callback when chat button is clicked (only shown in fullscreen mode) */
+  onMessage?: () => void;
+  /** Order ID for unread message count (only used in fullscreen mode) */
+  orderId?: string;
 }
 
 // Dummy locations for testing (Miami area)
@@ -179,13 +196,23 @@ export function RunnerDirectionsMap({
   className,
   height = '400px',
   bottomPadding = 50,
+  uiBottomInset = 0,
+  uiTopInset = 0,
   interactive = true,
-  hideOpenInMaps = false,
   originAvatarUrl,
   destinationAvatarUrl,
   showRecenterButton = false,
   showLayerSwitcher = false,
+  showFullscreenToggle = false,
+  pinCode,
+  isFullscreen: isFullscreenProp = false,
+  onFullscreenToggle,
+  onMessage,
+  orderId,
 }: RunnerDirectionsMapProps) {
+  // Get unread message count for fullscreen chat button
+  // Always query when orderId exists so badge is ready when entering fullscreen
+  const unreadCount = useUnreadMessages(orderId || null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -206,8 +233,42 @@ export function RunnerDirectionsMap({
   const routeBoundsRef = useRef<mapboxgl.LngLatBounds | null>(null);
   const routeGeometryRef = useRef<any>(null);
   
+  // Resize handling (prevents flicker/blank canvas on fullscreen transitions)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const resizeRafRef = useRef<number | null>(null);
+  const resizeDebounceRef = useRef<number | null>(null);
+  
   // Pitch toggle state (for 3D mode only) - default is flat (0°)
   const [isTilted, setIsTilted] = useState(false);
+  const isTiltedRef = useRef(false);
+  
+  // Fullscreen state - controlled by parent if callback provided, otherwise internal
+  const [isFullscreenInternal, setIsFullscreenInternal] = useState(false);
+  const isFullscreen = onFullscreenToggle ? isFullscreenProp : isFullscreenInternal;
+  const isFullscreenRef = useRef(isFullscreen);
+  
+  // Refs for latest inset values (avoid stale closures in callbacks)
+  const uiBottomInsetRef = useRef(uiBottomInset);
+  const uiTopInsetRef = useRef(uiTopInset);
+  const bottomPaddingRef = useRef(bottomPadding);
+  // Remember the last known non-fullscreen bottom inset so fullscreen -> half can refit correctly
+  // even before the parent prop update lands (prevents 3D/pitch mis-centering).
+  const lastNonFullscreenBottomInsetRef = useRef<number>(uiBottomInset || 0);
+  
+  // Keep refs in sync with props/state
+  useEffect(() => { isFullscreenRef.current = isFullscreen; }, [isFullscreen]);
+  useEffect(() => {
+    uiBottomInsetRef.current = uiBottomInset;
+    // Capture the last known non-fullscreen inset for reliable refits during fullscreen toggles.
+    if (uiBottomInset > 0) {
+      lastNonFullscreenBottomInsetRef.current = uiBottomInset;
+    }
+  }, [uiBottomInset]);
+  useEffect(() => { uiTopInsetRef.current = uiTopInset; }, [uiTopInset]);
+  useEffect(() => { bottomPaddingRef.current = bottomPadding; }, [bottomPadding]);
+  
+  // Auto-recenter throttling for runner movement
+  const lastAutoCenterRef = useRef<{ lng: number; lat: number; t: number } | null>(null);
   
   // Static route layer ID to avoid collisions
   const ROUTE_SOURCE_ID = 'runner-route-source';
@@ -275,9 +336,24 @@ export function RunnerDirectionsMap({
         pitch: 0, // Start flat, user can toggle to 45° in 3D mode
         bearing: 0,
         attributionControl: false,
+        fadeDuration: 0, // Disable fade animations to prevent flashing
+      });
+      
+      // Set dark background to prevent blue flash during resize/transitions
+      map.once('style.load', () => {
+        try {
+          if (map.getLayer('background')) {
+            map.setPaintProperty('background', 'background-color', '#1a1a2e');
+          }
+        } catch { /* ignore if no background layer */ }
       });
 
       mapRef.current = map;
+      
+      // Force canvas background to dark (prevents blue flash during resize)
+      try {
+        map.getCanvas().style.backgroundColor = '#1a1a2e';
+      } catch { /* ignore */ }
 
       // Disable interactions for non-interactive maps (customer view)
       if (!interactive) {
@@ -373,7 +449,7 @@ export function RunnerDirectionsMap({
               type: 'line',
               source: ROUTE_SOURCE_ID,
               layout: { 'line-join': 'round', 'line-cap': 'round' },
-              paint: { 'line-color': BENJAMIN_COLORS.emeraldGreen, 'line-width': 5, 'line-opacity': 0.85 },
+              paint: { 'line-color': '#13F287', 'line-width': 5, 'line-opacity': 0.85 },
             });
           } catch (e) {
             console.error('[RunnerDirectionsMap] Failed to re-add route:', e);
@@ -390,15 +466,16 @@ export function RunnerDirectionsMap({
           markersRef.current = [];
 
           try {
+            // Runner marker - no popup (user requested)
             const originEl = createAvatarMarkerElement(originAvatarUrl, BENJAMIN_COLORS.emeraldGreen);
             const originMarker = new mapboxgl.Marker({ element: originEl })
               .setLngLat([origin.lng, origin.lat])
-              .setPopup(new mapboxgl.Popup().setText(origin.address || 'Origin'))
               .addTo(currentMap);
             markersRef.current.push(originMarker);
           } catch { /* ignore */ }
 
           try {
+            // Customer marker - show address popup on click
             const destEl = createAvatarMarkerElement(destinationAvatarUrl, BENJAMIN_COLORS.charcoal);
             const destMarker = new mapboxgl.Marker({ element: destEl })
               .setLngLat([destination.lng, destination.lat])
@@ -495,9 +572,9 @@ export function RunnerDirectionsMap({
               'line-cap': 'round',
             },
             paint: {
-              'line-color': BENJAMIN_COLORS.emeraldGreen, // Benjamin emerald green
+              'line-color': '#13F287', // Benjamin brand green
               'line-width': 5,
-              'line-opacity': 0.75,
+              'line-opacity': 0.85,
             },
           });
 
@@ -516,15 +593,16 @@ export function RunnerDirectionsMap({
           // Store bounds for recenter functionality
           routeBoundsRef.current = bounds;
 
-          // Fit map to show the entire route (tight padding for closer zoom)
-          // Mark as programmatic to avoid triggering recenter button
-          isProgrammaticMoveRef.current = true;
-          map.fitBounds(bounds, {
-            padding: { top: 40, bottom: 80, left: 40, right: 40 },
-            maxZoom: 16,
-            duration: 500,
-          });
-          setTimeout(() => { isProgrammaticMoveRef.current = false; }, 600);
+          // Fit map to show the entire route using the unified fit function
+          // This ensures consistency with recenter and fullscreen toggle
+          const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
+          const tilted = is3D && isTiltedRef.current;
+          
+          // Use getPadding as single source of truth - it includes uiBottomInset in padding
+          const initialPadding = getPadding(isFullscreenRef.current, tilted);
+          
+          // Use unified fit function (no offset - padding handles safe area)
+          fitToBoundsWithPadding(map, bounds, initialPadding, true);
 
           setRouteData(route);
         }
@@ -549,7 +627,7 @@ export function RunnerDirectionsMap({
     } else {
       map.once('load', tryFetchRoute);
     }
-  }, [origin.lat, origin.lng, destination.lat, destination.lng, bottomPadding]);
+  }, [origin.lat, origin.lng, destination.lat, destination.lng, bottomPadding, uiBottomInset, uiTopInset]);
 
   // Add markers - always show markers regardless of route status
   useEffect(() => {
@@ -564,17 +642,17 @@ export function RunnerDirectionsMap({
 
       // Origin marker with avatar
       try {
+        // Runner marker - no popup
         if (!isNaN(origin.lat) && !isNaN(origin.lng)) {
           const originEl = createAvatarMarkerElement(originAvatarUrl, BENJAMIN_COLORS.emeraldGreen);
           const originMarker = new mapboxgl.Marker({ element: originEl })
             .setLngLat([origin.lng, origin.lat])
-            .setPopup(new mapboxgl.Popup().setText(origin.address || 'Origin'))
             .addTo(map);
           markersRef.current.push(originMarker);
         }
       } catch { /* ignore */ }
 
-      // Destination marker with avatar
+      // Customer marker - show address popup on click
       try {
         if (!isNaN(destination.lat) && !isNaN(destination.lng)) {
           const destEl = createAvatarMarkerElement(destinationAvatarUrl, BENJAMIN_COLORS.charcoal);
@@ -619,6 +697,20 @@ export function RunnerDirectionsMap({
       markersRef.current.forEach(m => m.remove());
       markersRef.current = [];
       
+      // Disconnect resize observer and clear timers
+      if (resizeObserverRef.current) {
+        try { resizeObserverRef.current.disconnect(); } catch { /* ignore */ }
+        resizeObserverRef.current = null;
+      }
+      if (resizeRafRef.current) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      if (resizeDebounceRef.current) {
+        window.clearTimeout(resizeDebounceRef.current);
+        resizeDebounceRef.current = null;
+      }
+      
       // Remove map
       if (mapRef.current) {
         mapRef.current.remove();
@@ -627,41 +719,114 @@ export function RunnerDirectionsMap({
     };
   }, []);
 
-  const handleOpenInMaps = () => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const url = isIOS
-      ? `maps://maps.apple.com/?daddr=${destination.lat},${destination.lng}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`;
-    window.open(url, '_blank');
-  };
+  // Haversine distance helper (meters)
+  const distanceMeters = useCallback((a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const R = 6371000; // Earth radius in meters
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLng = Math.sin(dLng / 2);
+    const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }, []);
 
-  // Shared padding for fitBounds - used by recenter and style changes
-  // Tighter padding = more zoomed in while still showing full route
-  const routePadding = { top: 40, bottom: 80, left: 40, right: 40 };
-  
-  const fitToRoute = (map: mapboxgl.Map, animate = true) => {
-    if (!routeBoundsRef.current) return;
-    
-    // Mark as programmatic move to avoid triggering recenter button
-    isProgrammaticMoveRef.current = true;
-    
-    // Determine pitch and bearing based on current mode and tilt state
+  // Single source of truth for padding - uses refs for latest values
+  // When tilted (45° pitch), we need asymmetric padding to compensate for visual shift
+  // Industry-standard approach: represent overlays as padding (safe-area), not offset
+  const getPadding = useCallback(
+    (forFullscreen: boolean, forTilted?: boolean, bottomInsetOverride?: number) => {
+      const topInset = uiTopInsetRef.current;
+      const bottomPad = bottomPaddingRef.current;
+      
+      // Fullscreen should have no sheet inset
+      const uiInsetBottom = forFullscreen
+        ? 0
+        : (typeof bottomInsetOverride === "number"
+            ? bottomInsetOverride
+            : (uiBottomInsetRef.current || 0));
+      
+      // At 45° pitch, the horizon moves up and more ground is visible at bottom
+      // Compensate by adding more top padding and a small bottom bonus
+      const tiltTopBonus = forTilted ? 120 : 0;
+      const tiltBottomBonus = forTilted ? 20 : 0;
+
+      if (forFullscreen) {
+        return { 
+          top: 80 + topInset + tiltTopBonus, 
+          bottom: Math.max(80, 180 + bottomPad + tiltBottomBonus), 
+          left: 120, 
+          right: 80 
+        };
+      }
+      // Half-screen: Push camera up by padding.bottom += uiInsetBottom (safe area)
+      return { 
+        top: 40 + topInset + tiltTopBonus, 
+        bottom: Math.max(40, 40 + bottomPad + uiInsetBottom + tiltBottomBonus), 
+        left: 80, 
+        right: 60 
+      };
+    },
+    []
+  );
+
+  // Unified fit function - ALWAYS computes camera at the target pitch/bearing
+  // This eliminates the "0° first, then 45°" dependency that was causing drift
+  // offset: [x, y] is optional and only used if explicitly provided (not for half-screen)
+  const fitToBoundsWithPadding = useCallback((
+    map: mapboxgl.Map,
+    bounds: mapboxgl.LngLatBounds,
+    padding: { top: number; bottom: number; left: number; right: number },
+    animate: boolean = true,
+    offset?: [number, number]
+  ) => {
     const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
-    const targetPitch = is3D && isTilted ? 45 : 0;
-    const targetBearing = is3D && isTilted ? -17.6 : 0;
-    
-    map.fitBounds(routeBoundsRef.current, { 
-      padding: routePadding, 
+    const tilted = is3D && isTiltedRef.current;
+
+    const pitch = tilted ? 45 : 0;
+    const bearing = tilted ? -17.6 : 0;
+    const duration = animate ? 450 : 0;
+
+    isProgrammaticMoveRef.current = true;
+
+    // Build fit options - only include offset if provided
+    const fitOptions: mapboxgl.FitBoundsOptions = {
+      padding,
       maxZoom: 16,
-      duration: animate ? 500 : 0,
-      pitch: targetPitch,
-      bearing: targetBearing,
-    });
-    // Clear flag after animation completes
-    setTimeout(() => {
+      duration,
+      pitch,
+      bearing,
+      essential: true,
+    };
+    if (offset) {
+      fitOptions.offset = offset;
+    }
+
+    try {
+      map.fitBounds(bounds, fitOptions);
+    } catch {
+      map.fitBounds(bounds, { padding, maxZoom: 16, duration, pitch, bearing });
+    }
+
+    window.setTimeout(() => {
       isProgrammaticMoveRef.current = false;
-    }, animate ? 600 : 100);
-  };
+    }, duration + 220);
+  }, []);
+
+  
+  const fitToRoute = useCallback((map: mapboxgl.Map, animate = true) => {
+    if (!routeBoundsRef.current) return;
+    const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
+    const tilted = is3D && isTiltedRef.current;
+    
+    // Use getPadding which includes uiBottomInset in padding (no offset needed)
+    fitToBoundsWithPadding(
+      map,
+      routeBoundsRef.current,
+      getPadding(isFullscreenRef.current, tilted),
+      animate
+    );
+  }, [fitToBoundsWithPadding, getPadding]);
   
   const handleRecenter = () => {
     const map = mapRef.current;
@@ -685,34 +850,41 @@ export function RunnerDirectionsMap({
       const nextStyle = MAP_STYLES[styleKey];
       
       // Reset tilt when switching away from 3D, keep current tilt when switching to 3D
-      const nextPitch = nextStyle.is3D ? (isTilted ? 45 : 0) : 0;
-      const nextBearing = nextStyle.is3D && isTilted ? -17.6 : 0;
+      const currentTilted = isTiltedRef.current;
+      if (!nextStyle.is3D) {
+        // Reset tilt when leaving 3D
+        setIsTilted(false);
+        isTiltedRef.current = false;
+      }
+      const nextPitch = nextStyle.is3D ? (currentTilted ? 45 : 0) : 0;
+      const nextBearing = nextStyle.is3D && currentTilted ? -17.6 : 0;
       
       try {
         map.setStyle(nextStyle.url);
         
-        // After style loads, fit to route bounds and set pitch/bearing
+        // After style loads, fit to route bounds using unified helper
         map.once('style.load', () => {
-          // Mark as programmatic to avoid triggering recenter button
-          isProgrammaticMoveRef.current = true;
-          
-          // Fit to route first
+          // Ensure the tilt ref matches the next state BEFORE fitting
+          isTiltedRef.current = !!(nextStyle.is3D && currentTilted);
+
+          // Fit to route using the unified helper (computes camera at target pitch directly)
           if (routeBoundsRef.current) {
-            map.fitBounds(routeBoundsRef.current, {
-              padding: routePadding,
-              maxZoom: 16,
-              duration: 0, // Instant fit, then animate pitch/bearing
-            });
+            const willBeTilted = !!(nextStyle.is3D && currentTilted);
+            const padding = getPadding(isFullscreenRef.current, willBeTilted);
+            
+            // No offset - padding includes uiBottomInset for safe area
+            fitToBoundsWithPadding(
+              map,
+              routeBoundsRef.current,
+              padding,
+              true
+            );
+          } else {
+            // No route yet: just set camera orientation cleanly
+            isProgrammaticMoveRef.current = true;
+            map.easeTo({ pitch: nextPitch, bearing: nextBearing, duration: 450 });
+            setTimeout(() => { isProgrammaticMoveRef.current = false; }, 630);
           }
-          // Then animate pitch/bearing
-          map.easeTo({ 
-            pitch: nextPitch,
-            bearing: nextBearing,
-            duration: 500 
-          });
-          
-          // Clear flag after animations complete
-          setTimeout(() => { isProgrammaticMoveRef.current = false; }, 600);
         });
       } catch {
         try {
@@ -733,25 +905,215 @@ export function RunnerDirectionsMap({
     setShowLayerModal(false);
   };
   
-  // Toggle pitch for 3D mode
+  // Toggle pitch for 3D mode - re-fits the route at the new pitch
   const handlePitchToggle = () => {
-    if (!mapRef.current || !MAP_STYLES[currentMapStyle].is3D) return;
-    
-    // Mark as programmatic to avoid triggering recenter button
-    isProgrammaticMoveRef.current = true;
+    const map = mapRef.current;
+    if (!map || !MAP_STYLES[currentMapStyle].is3D) return;
     
     const newTilted = !isTilted;
     setIsTilted(newTilted);
+    isTiltedRef.current = newTilted;
     
-    mapRef.current.easeTo({
-      pitch: newTilted ? 45 : 0,
-      bearing: newTilted ? -17.6 : 0,
-      duration: 500,
-    });
-    
-    // Clear flag after animation
-    setTimeout(() => { isProgrammaticMoveRef.current = false; }, 600);
+    // Re-fit the route at the new pitch (so 45° doesn't depend on prior 0° fit)
+    if (routeBoundsRef.current) {
+      const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
+      const padding = getPadding(isFullscreenRef.current, is3D && newTilted);
+      
+      // No offset - padding includes uiBottomInset for safe area
+      fitToBoundsWithPadding(map, routeBoundsRef.current, padding, true);
+    } else {
+      // No route yet, just animate pitch/bearing
+      isProgrammaticMoveRef.current = true;
+      map.easeTo({
+        pitch: newTilted ? 45 : 0,
+        bearing: newTilted ? -17.6 : 0,
+        duration: 450,
+      });
+      setTimeout(() => { isProgrammaticMoveRef.current = false; }, 630);
+    }
   };
+  
+  // Track if a fullscreen toggle is in progress (prevents auto-refit useEffect from interfering)
+  const isTogglingFullscreenRef = useRef(false);
+
+  // Toggle fullscreen mode - force a clean refit to the correct frame (full vs half)
+  // Fixes 3D (pitch 45) mis-centering by using the *target* bottom inset immediately,
+  // instead of waiting for parent props to update.
+  const handleFullscreenToggle = () => {
+    const map = mapRef.current;
+    const bounds = routeBoundsRef.current;
+    const newIsFullscreen = !isFullscreen;
+
+    // Mark that we're toggling (prevents auto-refit effect from fighting this)
+    isTogglingFullscreenRef.current = true;
+
+    // Update ref immediately so downstream logic reads the new state
+    isFullscreenRef.current = newIsFullscreen;
+
+    // Trigger parent/internal fullscreen state change
+    if (onFullscreenToggle) {
+      onFullscreenToggle();
+    } else {
+      setIsFullscreenInternal(newIsFullscreen);
+    }
+
+    // This is a deliberate mode change, so we always allow auto-refit again
+    setShowRecenter(false);
+    userInteractedRef.current = false;
+
+    if (!map || !bounds) {
+      // Clear toggling flag even if we can't refit
+      window.setTimeout(() => {
+        isTogglingFullscreenRef.current = false;
+      }, 250);
+      return;
+    }
+
+    // Use the *target* bottom inset for the new mode:
+    // - fullscreen => 0
+    // - halfscreen => compute ~50vh directly (in case refs weren't set yet)
+    const targetBottomInset = newIsFullscreen
+      ? 0
+      : (lastNonFullscreenBottomInsetRef.current || uiBottomInsetRef.current || Math.round(window.innerHeight * 0.5));
+
+    // Stop any in-flight animations to prevent fighting
+    try { map.stop(); } catch { /* ignore */ }
+
+    // Compute padding with tilt compensation - pass targetBottomInset as override for immediate correctness
+    const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
+    const tilted = is3D && isTiltedRef.current;
+    const padding = getPadding(newIsFullscreen, tilted, targetBottomInset);
+
+    // Use unified fit helper - computes camera at target pitch directly (no offset - padding handles safe area)
+    fitToBoundsWithPadding(map, bounds, padding, true);
+
+    // Clear toggling flag after animation (fitToBoundsWithPadding handles isProgrammaticMoveRef)
+    window.setTimeout(() => {
+      isTogglingFullscreenRef.current = false;
+    }, 650);
+  };
+  
+  // Auto-refit when fullscreen/insets change (if user hasn't manually interacted)
+  // This is a backup for non-toggle-initiated changes (e.g., window resize)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    // Skip on first render (initial fit handled by route fetch)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    
+    // Skip if handleFullscreenToggle is already handling the refit
+    if (isTogglingFullscreenRef.current) return;
+    
+    const map = mapRef.current;
+    const bounds = routeBoundsRef.current;
+    if (!map || !bounds) return;
+    
+    // If user manually panned/zoomed, don't auto-refit
+    if (userInteractedRef.current) return;
+    
+    // Small delay to let layout settle
+    const timeoutId = setTimeout(() => {
+      // Double-check toggle isn't in progress and user hasn't interacted
+      if (isTogglingFullscreenRef.current) return;
+      if (userInteractedRef.current) return;
+      
+      const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
+      const tilted = is3D && isTiltedRef.current;
+      const padding = getPadding(isFullscreenRef.current, tilted);
+      
+      // No map.resize() - container doesn't change size, only overlays do
+      // No offset - padding includes uiBottomInset for safe area
+      fitToBoundsWithPadding(map, bounds, padding, true);
+    }, 140);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isFullscreen, uiBottomInset, uiTopInset, bottomPadding, currentMapStyle, isTilted, getPadding, fitToBoundsWithPadding]);
+
+  // Dynamic auto-recenter when runner advances (throttled, respects user interaction)
+  useEffect(() => {
+    const map = mapRef.current;
+    const bounds = routeBoundsRef.current;
+    if (!map || !bounds) return;
+    
+    // If user manually panned/zoomed, don't auto-recenter
+    if (userInteractedRef.current) return;
+    
+    const now = Date.now();
+    const last = lastAutoCenterRef.current;
+    
+    // Check if we should auto-recenter
+    const shouldRecenter = (() => {
+      if (!last) return true; // First time
+      
+      // Throttle: at least 5 seconds between auto-recenters
+      if (now - last.t < 5000) return false;
+      
+      // Check if runner moved significantly (> 60 meters)
+      const moved = distanceMeters({ lat: origin.lat, lng: origin.lng }, { lat: last.lat, lng: last.lng });
+      return moved > 60;
+    })();
+    
+    if (shouldRecenter) {
+      lastAutoCenterRef.current = { lat: origin.lat, lng: origin.lng, t: now };
+      const is3D = MAP_STYLES[currentMapStyleRef.current].is3D;
+      const tilted = is3D && isTiltedRef.current;
+      const padding = getPadding(isFullscreenRef.current, tilted);
+      
+      // No offset - padding includes uiBottomInset for safe area
+      fitToBoundsWithPadding(map, bounds, padding, true);
+    }
+  }, [origin.lat, origin.lng, destination.lat, destination.lng, distanceMeters, getPadding, fitToBoundsWithPadding]);
+
+  // Keep Mapbox canvas in sync with container size
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = mapContainerRef.current;
+    if (!map || !container) return;
+
+    // Clean up any prior observer
+    if (resizeObserverRef.current) {
+      try { resizeObserverRef.current.disconnect(); } catch { /* ignore */ }
+      resizeObserverRef.current = null;
+    }
+
+    const ro = new ResizeObserver(() => {
+      // Debounce resize during CSS/layout transitions
+      if (resizeRafRef.current) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      if (resizeDebounceRef.current) {
+        window.clearTimeout(resizeDebounceRef.current);
+        resizeDebounceRef.current = null;
+      }
+
+      resizeDebounceRef.current = window.setTimeout(() => {
+        resizeRafRef.current = requestAnimationFrame(() => {
+          try { map.resize(); } catch { /* ignore */ }
+        });
+      }, 140);
+    });
+
+    ro.observe(container);
+    resizeObserverRef.current = ro;
+
+    return () => {
+      if (resizeRafRef.current) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      if (resizeDebounceRef.current) {
+        window.clearTimeout(resizeDebounceRef.current);
+        resizeDebounceRef.current = null;
+      }
+      if (resizeObserverRef.current) {
+        try { resizeObserverRef.current.disconnect(); } catch { /* ignore */ }
+        resizeObserverRef.current = null;
+      }
+    };
+  }, []);
 
   // Check for missing token
   const { MAPBOX_ACCESS_TOKEN } = getEnv();
@@ -773,8 +1135,14 @@ export function RunnerDirectionsMap({
   }
 
   return (
-    <div className={cn('relative bg-slate-900 overflow-hidden', className)} style={{ height }}>
-      {/* Hide Mapbox controls */}
+    <div 
+      className={cn(
+        'relative bg-slate-900 overflow-hidden',
+        className
+      )} 
+      style={{ height: '100%' }}
+    >
+      {/* Hide Mapbox controls + prevent canvas flash while resizing */}
       <style>{`
         .mapboxgl-ctrl-logo,
         .mapboxgl-ctrl-attrib,
@@ -782,15 +1150,23 @@ export function RunnerDirectionsMap({
         .mapboxgl-ctrl-attrib-inner {
           display: none !important;
         }
+        /* Prevent canvas flash while resizing / toggling fullscreen */
+        .mapboxgl-canvas-container,
+        .mapboxgl-canvas {
+          background: #1a1a2e !important;
+        }
       `}</style>
       
-      {/* Map container - always rendered */}
+      {/* Map container - always rendered with dark background to prevent flash */}
       <div
         ref={(el) => {
           mapContainerRef.current = el;
         }}
         className="w-full h-full"
-        style={{ minHeight: height, height: '100%' }}
+        style={{
+          height: "100%",
+          backgroundColor: "#1a1a2e",
+        }}
       />
       
       {/* Loading overlay */}
@@ -800,36 +1176,61 @@ export function RunnerDirectionsMap({
         </div>
       )}
       
-      {/* Route info panel */}
+      {/* Route info card - bottom left, same level as layer button */}
       {routeData && (
-        <div className={cn(
-          "absolute bottom-6 z-10 bg-[#020817]/90 backdrop-blur-sm px-3 py-2 rounded-lg",
-          hideOpenInMaps ? "left-6" : "left-6 right-6"
-        )}>
-          <div className={cn("flex items-center gap-3", hideOpenInMaps ? "justify-start" : "justify-between")}>
-            <div className="text-xs text-slate-300">
-              <div className="font-medium text-white">
-                {routeData.duration ? `${Math.round(routeData.duration / 60)} min` : 'Route calculated'}
-              </div>
-              <div className="text-slate-400">
-                {routeData.distance ? `${(routeData.distance / 1609.34).toFixed(1)} mi` : ''}
-              </div>
+        <div className="absolute left-6 z-10 transition-all duration-300 ease-out" style={{ bottom: 24 + uiBottomInset }}>
+          <div className="bg-[#1A1A1A]/95 backdrop-blur-sm px-4 py-3 rounded-xl shadow-xl flex flex-col gap-2">
+            {/* ETA with Timer icon */}
+            <div className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-slate-400" />
+              <span className="text-sm font-semibold text-white">
+                {routeData.duration ? `${Math.round(routeData.duration / 60)} min` : '--'}
+              </span>
             </div>
-            {!hideOpenInMaps && (
-              <button
-                onClick={handleOpenInMaps}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
-              >
-                Open in Maps
-              </button>
-            )}
+            
+            {/* Distance with Route icon */}
+            <div className="flex items-center gap-2">
+              <Route className="h-4 w-4 text-slate-400" />
+              <span className="text-sm font-semibold text-white">
+                {routeData.distance ? `${(routeData.distance / 1609.34).toFixed(1)} mi` : '--'}
+              </span>
+            </div>
           </div>
         </div>
       )}
       
-      {/* Recenter button */}
-      {showRecenter && showRecenterButton && (
-        <div className="absolute top-6 right-6 z-10">
+      {/* Floating PIN code - bottom center, only in fullscreen mode */}
+      {isFullscreen && pinCode && (
+        <div className="absolute left-1/2 -translate-x-1/2 z-10 transition-all duration-300 ease-out" style={{ bottom: 24 + uiBottomInset }}>
+          <div className="bg-[#1A1A1A]/95 backdrop-blur-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3">
+            <span className="text-[10px] uppercase tracking-wide text-slate-400">PIN</span>
+            <span className="text-xl font-bold text-[#13F287] font-mono tracking-widest">
+              {pinCode}
+            </span>
+          </div>
+        </div>
+      )}
+      
+      {/* Top right buttons - Fullscreen toggle and Recenter */}
+      <div className="absolute top-6 right-6 z-10 flex flex-col gap-2">
+        {/* Fullscreen toggle */}
+        {showFullscreenToggle && (
+          <IconButton
+            onClick={handleFullscreenToggle}
+            size="lg"
+            className="bg-white/95 backdrop-blur shadow-lg"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? (
+              <Shrink className="h-5 w-5 text-gray-600" />
+            ) : (
+              <Expand className="h-5 w-5 text-gray-600" />
+            )}
+          </IconButton>
+        )}
+        
+        {/* Recenter button - below fullscreen toggle */}
+        {showRecenter && showRecenterButton && (
           <IconButton
             onClick={handleRecenter}
             size="lg"
@@ -838,12 +1239,12 @@ export function RunnerDirectionsMap({
           >
             <Focus className="h-5 w-5 text-gray-600" />
           </IconButton>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Map control buttons (bottom right) */}
       {showLayerSwitcher && (
-        <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2">
+        <div className="absolute right-6 z-10 flex flex-col items-end gap-2 transition-all duration-300 ease-out" style={{ bottom: 24 + uiBottomInset }}>
           {/* Pitch toggle button - only in 3D mode */}
           {MAP_STYLES[currentMapStyle].is3D && (
             <IconButton
@@ -855,41 +1256,62 @@ export function RunnerDirectionsMap({
               {isTilted ? (
                 <Diamond className="h-5 w-5 text-gray-600" />
               ) : (
-                <Pyramid className="h-5 w-5 text-gray-600" />
+                <Box className="h-5 w-5 text-gray-600" />
               )}
             </IconButton>
           )}
           
-          {/* Layer switcher button */}
-          <IconButton
-            onClick={() => setShowLayerModal(true)}
-            size="lg"
-            className="bg-white/95 backdrop-blur shadow-lg"
-            aria-label="Map layers"
-          >
-            <Layers className="h-5 w-5 text-gray-600" />
-          </IconButton>
+          {/* Bottom row: Chat button (fullscreen only) + Layer switcher button */}
+          <div className="flex items-center gap-2">
+            {/* Chat button - only in fullscreen mode */}
+            {isFullscreen && onMessage && (
+              <IconButton
+                onClick={onMessage}
+                size="lg"
+                className="bg-white/95 backdrop-blur shadow-lg relative"
+                aria-label="Message runner"
+              >
+                <ChatIcon hasUnread={unreadCount > 0} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </IconButton>
+            )}
+            
+            {/* Layer switcher button */}
+            <IconButton
+              onClick={() => setShowLayerModal(true)}
+              size="lg"
+              className="bg-white/95 backdrop-blur shadow-lg"
+              aria-label="Map layers"
+            >
+              <Layers className="h-5 w-5 text-gray-600" />
+            </IconButton>
+          </div>
         </div>
       )}
 
-      {/* Layer selector modal */}
-      <AnimatePresence>
-        {showLayerModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 z-20"
-              onClick={() => setShowLayerModal(false)}
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute bottom-0 left-0 right-0 bg-[#1A1A1A] rounded-t-[24px] z-30 p-5 pb-6"
-            >
+      {/* Layer selector modal - rendered via Portal to escape overflow:hidden and z-index stacking */}
+      {createPortal(
+        <AnimatePresence>
+          {showLayerModal && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 z-[9998]"
+                onClick={() => setShowLayerModal(false)}
+              />
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="fixed bottom-0 left-0 right-0 bg-[#1A1A1A] rounded-t-[24px] z-[9999] p-5 pb-6"
+              >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-white">Map layer</h3>
                 <IconButton
@@ -944,7 +1366,9 @@ export function RunnerDirectionsMap({
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 }

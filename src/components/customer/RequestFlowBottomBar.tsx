@@ -168,7 +168,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                             activeOrder.status
                           )
                         : 'Your runner';
-                      return `Your order is on the move! ${runnerName} has your cash and is heading your way.`;
+                      return `${runnerName} has your cash and is heading your way.`;
                     })()
                   : customerStatus.step === 'ARRIVED'
                   ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
