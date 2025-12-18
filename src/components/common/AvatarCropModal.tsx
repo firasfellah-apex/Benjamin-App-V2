@@ -140,7 +140,7 @@ export function AvatarCropModal({
       aria-labelledby="crop-modal-title"
       aria-describedby="crop-modal-description"
     >
-      <div className="relative w-full max-w-2xl mx-4 bg-background rounded-3xl border shadow-lg overflow-hidden">
+      <div className="relative w-full max-w-2xl mx-4 bg-background rounded-xl border shadow-lg overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
@@ -209,19 +209,19 @@ export function AvatarCropModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-3">
             <Button
               variant="outline"
               onClick={onCancel}
               disabled={isProcessing}
-              className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full border-black bg-white text-black hover:bg-slate-50"
+              className="flex-1 h-14 px-6 font-semibold !text-slate-900 hover:!text-slate-900"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isProcessing || !croppedAreaPixels}
-              className="flex-1 h-14 min-h-[56px] px-6 text-[17px] font-semibold rounded-full bg-black text-white hover:bg-black/90 disabled:opacity-50"
+              className="flex-1 h-14 px-6 font-semibold bg-black text-white hover:bg-black/90"
             >
               {isProcessing ? (
                 <span className="flex items-center gap-2">

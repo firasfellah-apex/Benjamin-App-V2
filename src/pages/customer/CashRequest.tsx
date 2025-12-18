@@ -13,7 +13,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "@/lib/icons";
-import { Landmark, MapPin, Pencil, ChevronDown } from "lucide-react";
+import { Landmark, MapPin, Pencil, ChevronDown, CheckCircle2, ArrowRight } from "lucide-react";
+import LottieComponent from 'lottie-react';
+import bankAnimation from '@/assets/animations/bank.json';
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { getIconByName } from "@/components/address/IconPicker";
@@ -1005,22 +1007,44 @@ export default function CashRequest() {
           <div className="pt-3">
           {!hasAnyBank ? (
               // No bank connected - show connect prompt
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-4 py-4 mb-6">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900 mb-1">
-                      Add a bank to continue
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      Connect a bank to verify your identity and place cash requests.
-                    </p>
+              <div className="w-full rounded-xl bg-white px-4 py-4 mb-6">
+                <div className="space-y-4">
+                  {/* Animated bank icon - centered */}
+                  <div className="flex justify-center">
+                    <div className="w-12 h-12 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={bankAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '48px', height: '48px' }}
+                      />
+                    </div>
                   </div>
+                  
+                  {/* Header - centered */}
+                  <div className="flex items-center justify-center">
+                    <span className="text-base font-semibold text-slate-900">Bank Verification</span>
+                  </div>
+                  
+                  {/* Benefit bullets - centered */}
+                  <div className="space-y-2 flex flex-col items-center">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: '#13F287' }} />
+                      <span className="text-sm text-slate-700">Unlock cash requests</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: '#13F287' }} />
+                      <span className="text-sm text-slate-700">Faster refunds & support</span>
+                    </div>
+                  </div>
+                  
                   <Button
                     type="button"
                     onClick={handleBankAccounts}
-                    className="w-full h-14 bg-black text-white hover:bg-black/90"
+                    className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold flex items-center justify-center gap-2"
                   >
-                    Add Bank Account
+                    <span>Continue</span>
+                    <ArrowRight className="h-5 w-5" />
                   </Button>
                 </div>
               </div>

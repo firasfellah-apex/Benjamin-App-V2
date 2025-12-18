@@ -126,6 +126,7 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
 
   const handleQuickMessage = async (message: string) => {
     if (sending) return;
+    // Send message - optimistic update will show it immediately
     await sendMessage(message);
   };
 

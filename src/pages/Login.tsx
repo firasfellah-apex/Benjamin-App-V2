@@ -6,13 +6,12 @@ import { validateInvitationToken, acceptInvitation, getCurrentProfile } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Mail } from "lucide-react";
-import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import { AppleLogo } from "@/components/common/AppleLogo";
 import { GoogleLogo } from "@/components/common/GoogleLogo";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import signUpInIllustration from "@/assets/illustrations/SignUpIn.png";
+import fullLogo from "@/assets/illustrations/FullLogo.png";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -231,105 +230,99 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <div className="flex-1 flex flex-col px-6 pb-8 pt-10">
-        {/* Top: logo / brand */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-8">
-            <BenjaminLogo variant="customer" height={28} />
-          </div>
-          
-          {/* Illustration */}
-          <div className="flex justify-center mb-6">
-            <img 
-              src={signUpInIllustration} 
-              alt="Sign up illustration" 
-              className="w-full max-w-[200px] h-auto"
-            />
-          </div>
+      <div className="flex-1 flex flex-col px-6 pb-8 pt-8">
+        {/* Centered content */}
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="w-full max-w-md">
+            {/* Full Logo - 75% of toggle width, centered with equal spacing above and below */}
+            <div className="flex justify-center mb-8 mt-8">
+              <img 
+                src={fullLogo} 
+                alt="Benjamin" 
+                className="w-3/4 max-w-full"
+              />
+            </div>
+            {/* Sign Up / Log In Toggle - Reusing DeliveryModeSelector style */}
+            <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 mb-6 relative">
+              {/* Sliding background indicator */}
+              <motion.div
+                className="absolute top-1 bottom-1 rounded-full bg-white border border-black z-0"
+                initial={false}
+                animate={{
+                  left: mode === 'signup' ? '4px' : 'calc(50% + 2px)',
+                  width: 'calc(50% - 4px)',
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                }}
+                style={{ height: '52px' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('signup');
+                  resetForm();
+                }}
+                className={cn(
+                  "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 z-10",
+                  mode === 'signup'
+                    ? "text-slate-900"
+                    : "text-slate-900"
+                )}
+                style={{ height: '52px' }}
+              >
+                Sign Up
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('signin');
+                  resetForm();
+                }}
+                className={cn(
+                  "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 z-10",
+                  mode === 'signin'
+                    ? "text-slate-900"
+                    : "text-slate-900"
+                )}
+                style={{ height: '52px' }}
+              >
+                Log In
+              </button>
+            </div>
 
-          {/* Sign Up / Log In Toggle - Reusing DeliveryModeSelector style */}
-          <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 mb-6 relative">
-            {/* Sliding background indicator */}
-            <motion.div
-              className="absolute top-1 bottom-1 rounded-full bg-white border border-black z-0"
-              initial={false}
-              animate={{
-                left: mode === 'signup' ? '4px' : 'calc(50% + 2px)',
-                width: 'calc(50% - 4px)',
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 30,
-              }}
-              style={{ height: '52px' }}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signup');
-                resetForm();
-              }}
-              className={cn(
-                "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 z-10",
-                mode === 'signup'
-                  ? "text-slate-900"
-                  : "text-slate-900"
-              )}
-              style={{ height: '52px' }}
-            >
-              Sign Up
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signin');
-                resetForm();
-              }}
-              className={cn(
-                "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 z-10",
-                mode === 'signin'
-                  ? "text-slate-900"
-                  : "text-slate-900"
-              )}
-              style={{ height: '52px' }}
-            >
-              Log In
-            </button>
-          </div>
+            {/* Welcome message - center aligned */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-semibold text-slate-900 mb-2">
+                {mode === 'signup' ? "Welcome! Let's get you in!" : "Welcome Back!"}
+              </h1>
+              <p className="text-sm text-slate-600">
+                How would you like to continue?
+              </p>
+            </div>
 
-          {/* Welcome message */}
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900 mb-2">
-              {mode === 'signup' ? "Welcome! Let's get you in!" : "Welcome Back!"}
-            </h1>
-            <p className="text-sm text-slate-600">
-              How would you like to continue?
-            </p>
-          </div>
-        </div>
+            {/* Invitation notices */}
+            {invitationToken && invitationValid && (
+              <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                <p className="text-sm font-medium text-emerald-900">You're joining via invitation</p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  Sign in to accept your invitation
+                </p>
+              </div>
+            )}
+            {invitationToken && invitationValid === false && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                <p className="text-sm font-medium text-red-900">Invalid Invitation</p>
+                <p className="text-xs text-red-700 mt-1">
+                  This invitation link is invalid or has expired
+                </p>
+              </div>
+            )}
 
-        {/* Invitation notices */}
-        {invitationToken && invitationValid && (
-          <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-            <p className="text-sm font-medium text-emerald-900">You're joining via invitation</p>
-            <p className="text-xs text-emerald-700 mt-1">
-              Sign in to accept your invitation
-            </p>
-          </div>
-        )}
-        {invitationToken && invitationValid === false && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-            <p className="text-sm font-medium text-red-900">Invalid Invitation</p>
-            <p className="text-xs text-red-700 mt-1">
-              This invitation link is invalid or has expired
-            </p>
-          </div>
-        )}
-
-        {/* Middle: unified auth options */}
-        <div className="flex-1 flex flex-col">
-          <div className="space-y-4 mt-6 relative">
+            {/* Unified auth options */}
+            <div className="space-y-4 relative">
             <AnimatePresence mode="wait">
               {!showEmailForm ? (
                 <motion.div
@@ -481,11 +474,11 @@ export default function Login() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="flex-1 h-[58px] rounded-xl border-slate-200 text-slate-900 hover:bg-slate-50"
+                      className="flex-1 h-[58px] rounded-xl border-slate-200 !text-slate-900 hover:bg-slate-50 hover:!text-slate-900"
                       onClick={resetForm}
                       disabled={loadingProvider === 'email'}
                     >
-                      <span className="text-[15px] font-medium">Cancel</span>
+                      <span className="text-[15px] font-medium !text-slate-900">Cancel</span>
                     </Button>
                     <Button
                       type="submit"
@@ -510,6 +503,7 @@ export default function Login() {
                 </motion.div>
               )}
             </AnimatePresence>
+            </div>
           </div>
         </div>
 

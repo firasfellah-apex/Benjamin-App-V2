@@ -16,7 +16,8 @@ import { saveProfile } from '@/lib/profileMutations';
 import { AvatarCropModal } from '@/components/common/AvatarCropModal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { supabase } from '@/db/supabase';
@@ -289,7 +290,7 @@ export default function OnboardingProfile() {
                     }
                   }}
                   placeholder="First name"
-                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-gradient-to-br focus:from-green-50 focus:to-emerald-50 focus-visible:ring-0"
                   aria-invalid={!!errors.firstName}
                   aria-describedby={errors.firstName ? 'first_name_error' : undefined}
                 />
@@ -315,7 +316,7 @@ export default function OnboardingProfile() {
                     }
                   }}
                   placeholder="Last name"
-                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-gradient-to-br focus:from-green-50 focus:to-emerald-50 focus-visible:ring-0"
                   aria-invalid={!!errors.lastName}
                   aria-describedby={errors.lastName ? 'last_name_error' : undefined}
                 />
@@ -349,7 +350,7 @@ export default function OnboardingProfile() {
                 }
               }}
               placeholder="+1 (555) 123-4567"
-              className="text-base border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 focus:placeholder:opacity-0"
+              className="text-base border-slate-200 placeholder:text-slate-400 placeholder:font-light focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-gradient-to-br focus:from-green-50 focus:to-emerald-50 focus-visible:ring-0 focus:placeholder:opacity-0"
               aria-invalid={!!errors.phone}
               aria-describedby={errors.phone ? 'phone_error' : undefined}
             />
@@ -366,44 +367,25 @@ export default function OnboardingProfile() {
       </main>
 
       {/* Bottom CTA */}
-      <footer className="fixed inset-x-0 bottom-0 z-10">
+      <footer className="fixed bottom-0 left-0 right-0 z-[70]">
         <div className="pointer-events-none bg-gradient-to-t from-white/90 to-transparent h-8" />
-        <div className="backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/90 border-t border-slate-200">
+        <div className="backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/90 border-t border-slate-200/70">
           <div className="mx-auto px-6 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
-            <button
+            <Button
               type="button"
               onClick={handleSave}
               disabled={!isValid || isSaving}
-              className="w-full rounded-full bg-slate-900 text-white font-semibold h-14 shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-2"
+              className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold"
             >
               {isSaving ? (
                 <>
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
+                  <Loader2 className="h-5 w-5 animate-spin" />
                   Saving…
                 </>
               ) : (
-                'Save and continue'
+                'Save and Continue'
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </footer>

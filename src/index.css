@@ -307,6 +307,34 @@ All colors MUST be HSL.
   input[type="number"] {
     -moz-appearance: textfield;
   }
+
+  /* Override browser autofill styles - prevent light blue background */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    box-shadow: 0 0 0 30px white inset !important;
+    /* Use a very long transition to effectively disable the autofill background */
+    transition: background-color 5000s ease-in-out 0s, box-shadow 5000s ease-in-out 0s;
+  }
+
+  /* When autofilled input is focused, maintain white background (gradient will be applied via focus classes) */
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    box-shadow: 0 0 0 30px white inset !important;
+  }
+
+  /* Dark mode autofill override */
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus,
+  .dark input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+  }
 }
 
 /* Benjamin Pulse Animation for New Delivery Cards */

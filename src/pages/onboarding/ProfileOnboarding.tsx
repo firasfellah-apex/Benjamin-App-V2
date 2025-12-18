@@ -136,10 +136,10 @@ export default function ProfileOnboarding() {
 
             <Button
               type="submit"
-              className="w-full rounded-2xl h-12 text-base font-semibold"
+              className="w-full h-12 font-semibold"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Saving...' : 'Save and continue'}
+              {isSubmitting ? 'Saving...' : 'Save and Continue'}
             </Button>
           </form>
         </CardContent>

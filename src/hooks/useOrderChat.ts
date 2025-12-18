@@ -115,8 +115,31 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
         (payload) => {
           const msg = payload.new as OrderMessage;
           setMessages((prev) => {
-            // Avoid duplicates
+            // Avoid duplicates by ID
             if (prev.some((m) => m.id === msg.id)) return prev;
+            
+            // If this is our own message, check if we have an optimistic version
+            // and replace it with the real one
+            if (msg.sender_id === user?.id) {
+              // Find optimistic message with matching body and recent timestamp
+              const optimisticIndex = prev.findIndex(
+                (m) => m.id.startsWith('temp-') && 
+                       m.body === msg.body && 
+                       m.sender_id === msg.sender_id &&
+                       Math.abs(new Date(m.created_at).getTime() - new Date(msg.created_at).getTime()) < 5000
+              );
+              
+              if (optimisticIndex >= 0) {
+                // Replace optimistic message with real one
+                const updated = [...prev];
+                updated[optimisticIndex] = {
+                  ...msg,
+                  is_read: true // Own messages are always "read"
+                };
+                return updated;
+              }
+            }
+            
             // New messages from others are unread by default
             const newMsg: OrderMessage = {
               ...msg,
@@ -149,16 +172,34 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
         return;
       }
 
+      // Create optimistic message immediately for instant UI feedback
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      const optimisticMessage: OrderMessage = {
+        id: tempId,
+        order_id: orderId,
+        sender_id: user.id,
+        sender_role: role,
+        body: text,
+        created_at: new Date().toISOString(),
+        is_read: true, // Own messages are always "read"
+      };
+
+      // Optimistically add message to UI immediately
+      setMessages((prev) => [...prev, optimisticMessage]);
       setSending(true);
+
       try {
-        const { error } = await supabase.from('messages').insert({
+        const { data, error } = await supabase.from('messages').insert({
           order_id: orderId,
           sender_id: user.id,
           sender_role: role,
           body: text,
-        });
+        }).select().single();
 
         if (error) {
+          // Remove optimistic message on error
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          
           // Gracefully handle missing table or permission errors
           if (error.code === '42P01' || error.message?.includes('does not exist')) {
             if (import.meta.env.DEV) {
@@ -172,8 +213,24 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
             console.error('[Chat] send error', error);
           }
           // Don't throw - fail silently for graceful degradation
+        } else if (data) {
+          // Replace optimistic message with real one from database
+          setMessages((prev) => {
+            const filtered = prev.filter((m) => m.id !== tempId);
+            // Check if real message already exists (from realtime subscription)
+            if (filtered.some((m) => m.id === data.id)) {
+              return filtered;
+            }
+            // Add real message
+            return [...filtered, {
+              ...data,
+              is_read: true, // Own messages are always "read"
+            } as OrderMessage];
+          });
         }
       } catch (error) {
+        // Remove optimistic message on error
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
         console.error('[Chat] unexpected error sending message', error);
       } finally {
         setSending(false);
