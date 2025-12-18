@@ -328,7 +328,7 @@ export default function OnboardingProfile() {
               </div>
             </div>
             <p className="text-[11px] text-slate-500">
-              Use the same name as on your bank account to avoid delays.
+              Use the same name as on your bank account to confirm your identity.
             </p>
           </div>
 
@@ -370,7 +370,7 @@ export default function OnboardingProfile() {
       <footer className="fixed bottom-0 left-0 right-0 z-[70]">
         <div className="pointer-events-none bg-gradient-to-t from-white/90 to-transparent h-8" />
         <div className="backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/90 border-t border-slate-200/70">
-          <div className="mx-auto px-6 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
+          <div className="mx-auto px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
             <Button
               type="button"
               onClick={handleSave}

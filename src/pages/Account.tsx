@@ -406,7 +406,7 @@ export default function Account() {
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-500">
-                    Use the same name as on your bank account to avoid delays.
+                    Use the same name as on your bank account to confirm your identity.
                   </p>
                 </div>
 

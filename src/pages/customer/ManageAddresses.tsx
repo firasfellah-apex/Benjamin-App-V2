@@ -329,7 +329,7 @@ export default function ManageAddresses() {
                 "w-full border bg-white overflow-hidden",
                 "transition-all duration-300 ease-in-out",
                 isSelected
-                  ? "border border-black rounded-[24px]"
+                  ? "border-2 border-black rounded-[24px]"
                   : "border border-[#F0F0F0] hover:border-[#E0E0E0] rounded-[24px]"
               )}
               style={{
@@ -359,7 +359,7 @@ export default function ManageAddresses() {
                       : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
                   }}
                 >
-                  <div className="relative w-full h-[260px] rounded-[18px] border border-[#F0F0F0] overflow-hidden bg-slate-50">
+                  <div className="relative w-full h-[260px] rounded-[18px] border border-[#F0F0F0] overflow-hidden bg-slate-50 shadow-none">
                     <CustomerMapViewport selectedAddress={addr} />
                   </div>
                 </div>

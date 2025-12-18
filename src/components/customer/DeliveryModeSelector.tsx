@@ -56,6 +56,21 @@ export function DeliveryModeSelector({
     <div className={cn("space-y-4", className)}>
       {/* Pill-shaped toggle - Same style for both options */}
       <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 relative overflow-visible">
+        {/* Sliding background indicator */}
+        <motion.div
+          className="absolute top-1 bottom-1 rounded-full bg-white border-2 border-black z-0"
+          initial={false}
+          animate={{
+            left: value === "count_confirm" ? '2px' : 'calc(50% + 2px)',
+            width: 'calc(50% - 6px)',
+          }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+          }}
+          style={{ height: '52px' }}
+        />
         {modes.map((mode) => {
           const selected = mode.value === value;
 
@@ -65,10 +80,8 @@ export function DeliveryModeSelector({
               type="button"
               onClick={() => handleModeClick(mode.value)}
               className={cn(
-                "relative flex-1 h-13 rounded-full flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200 z-10",
-                selected
-                  ? "bg-white text-slate-900 border border-black"
-                  : "bg-transparent text-slate-900 border-transparent"
+                "relative flex-1 h-13 rounded-full flex items-center justify-center gap-2 text-sm font-medium transition-all duration-300 ease-in-out z-10",
+                "bg-transparent text-slate-900"
               )}
               style={{ height: '52px' }}
             >

@@ -212,3 +212,4 @@ WHERE user_id = 'your-user-id';
 - Add ability to reorder banks
 - Add bank account metadata (account type, etc.)
 
+
