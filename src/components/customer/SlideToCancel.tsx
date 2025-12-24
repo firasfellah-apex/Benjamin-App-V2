@@ -8,7 +8,7 @@ interface SlideToCancelProps {
   className?: string;
   trackClassName?: string; // Custom styling for the track
   handleClassName?: string; // Custom styling for the handle
-  label?: string; // Custom label text (defaults to "Cancel Order")
+  label?: string; // Custom label text (defaults to "Slide to Cancel Order")
   confirmedLabel?: string;
   isLoading?: boolean; // Loading state after confirmation
   loadingLabel?: string; // Label to show during loading (e.g., "Cancelling...")
@@ -20,7 +20,7 @@ export function SlideToCancel({
   className,
   trackClassName,
   handleClassName,
-  label = "Cancel Order",
+  label = "Slide to Cancel Order",
   confirmedLabel = "Cancelled",
   isLoading = false,
   loadingLabel = "Cancelling...",
@@ -217,13 +217,14 @@ export function SlideToCancel({
                   <ChevronRight
                     key={i}
                     className={cn(
-                      "h-3.5 w-3.5",
+                      "h-3.5 w-3.5 text-white",
                       !isDragging && !isConfirmed && "slide-hint-chevron"
                     )}
-                    style={{
-                      color: '#E84855', // Red arrows instead of black
-                      animationDelay: !isDragging && !isConfirmed ? `${i * 70}ms` : undefined
-                    }}
+                    style={
+                      !isDragging && !isConfirmed
+                        ? { animationDelay: `${i * 70}ms` }
+                        : undefined
+                    }
                   />
                 ))}
               </div>

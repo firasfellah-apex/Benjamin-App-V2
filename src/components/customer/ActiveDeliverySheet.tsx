@@ -903,6 +903,7 @@ export function ActiveDeliverySheet({
               disabled={isCancelling}
               isLoading={isCancelling}
               loadingLabel="Cancelling..."
+              label="Slide to Cancel Order"
             />
           )}
 
