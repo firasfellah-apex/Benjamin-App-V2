@@ -27,6 +27,9 @@ import noAtmIllustration from '@/assets/illustrations/NoATM.png';
 import trustedRunnerIllustration from '@/assets/illustrations/TrustedRunner.png';
 import { Button } from '@/components/ui/button';
 import { useBankAccounts } from '@/hooks/useBankAccounts';
+import LottieComponent from 'lottie-react';
+import bankAnimation from '@/assets/animations/bank.json';
+import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
@@ -475,22 +478,44 @@ export default function CustomerHome() {
       const topPadding = lastCompletedOrder ? '24px' : '24px';
       content.push(
         <div key="bank-prompt" style={{ paddingTop: topPadding }}>
-          <div className="rounded-[24px] border border-[#F0F0F0] bg-white overflow-hidden">
-            {/* Text and button - equal padding all around */}
-            <div className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Connect Your Bank to Order Cash
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Link your bank securely to verify your identity and enable cash delivery straight to your door.
-                </p>
+          <div className="w-full rounded-xl bg-white px-4 py-4">
+            <div className="space-y-4">
+              {/* Animated bank icon - centered */}
+              <div className="flex justify-center">
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <LottieComponent
+                    animationData={bankAnimation}
+                    loop={false}
+                    autoplay={true}
+                    style={{ width: '48px', height: '48px' }}
+                  />
+                </div>
               </div>
+              
+              {/* Header - centered */}
+              <div className="flex items-center justify-center">
+                <span className="text-base font-semibold text-slate-900">Connect Your Bank Account</span>
+              </div>
+              
+              {/* Benefit bullets - centered */}
+              <div className="space-y-2 flex flex-col items-center">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: '#13F287' }} />
+                  <span className="text-sm text-slate-700">Unlock cash requests</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: '#13F287' }} />
+                  <span className="text-sm text-slate-700">Faster refunds & support</span>
+                </div>
+              </div>
+              
               <Button
+                type="button"
                 onClick={() => navigate('/customer/banks')}
-                className="w-full h-14 bg-black text-white hover:bg-black/90"
+                className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold flex items-center justify-center gap-2"
               >
-                Learn More
+                <span>Continue</span>
+                <ArrowRight className="h-5 w-5" />
               </Button>
             </div>
           </div>
@@ -498,11 +523,12 @@ export default function CustomerHome() {
       );
     }
     
-    // Show trust cards list when there's no last delivery and user has bank connected
-    // If no bank connection, the prompt above takes priority
-    if (!lastCompletedOrder && !ordersLoading && hasBankConnection) {
+    // Show trust cards list when there's no last delivery
+    // Show trust cards after bank prompt (if no bank) or standalone (if bank connected)
+    if (!lastCompletedOrder && !ordersLoading && isReady) {
+      const topPadding = !hasBankConnection ? '24px' : '24px';
       content.push(
-        <div key="trust-cards" style={{ paddingTop: '24px' }}>
+        <div key="trust-cards" style={{ paddingTop: topPadding, margin: 0 }}>
           <div className="grid grid-cols-1 gap-3">
             {trustCards.map((card) => (
               <CustomerCard key={card.id} className="overflow-hidden px-0 py-3">

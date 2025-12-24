@@ -5,7 +5,6 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import { Package } from "@/lib/icons";
 import { ChevronRight, Star, UserRound } from "lucide-react";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { useCustomerDeliveries } from "@/features/customer/hooks/useCustomerDeliveries";
@@ -17,6 +16,8 @@ import {
   hasDeliveryRating
 } from "@/lib/orderDisplay";
 import type { CustomerDelivery } from "@/types/delivery";
+import LottieComponent from 'lottie-react';
+import historicalOrdersAnimation from '@/assets/animations/HistoricalOrders.json';
 
 
 /**
@@ -243,18 +244,34 @@ export default function CustomerDeliveriesHistory() {
           ))}
         </div>
       ) : deliveries.length === 0 ? (
-        // Empty state - Standardized spacing: px-6 (24px) horizontal
-        <div className="w-full px-6 py-6">
-          <div className="w-full flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center mb-4">
-              <Package className="w-8 h-8 text-slate-600" />
+        // Empty state - matches bank connection component styling
+        <div className="w-full px-4 py-4">
+          <div className="w-full rounded-xl bg-white px-4 py-4">
+            <div className="space-y-4">
+              {/* Animated orders icon - centered */}
+              <div className="flex justify-center">
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <LottieComponent
+                    animationData={historicalOrdersAnimation}
+                    loop={false}
+                    autoplay={true}
+                    style={{ width: '48px', height: '48px' }}
+                  />
+                </div>
+              </div>
+              
+              {/* Header - centered */}
+              <div className="flex items-center justify-center">
+                <span className="text-base font-semibold text-slate-900">No Orders Yet</span>
+              </div>
+              
+              {/* Subtitle - centered */}
+              <div className="flex items-center justify-center">
+                <p className="text-sm text-slate-700 text-center">
+                  All your historical orders will appear here.
+                </p>
+              </div>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2 text-center">
-              No deliveries yet
-            </h3>
-            <p className="text-sm text-slate-500 text-center max-w-[280px]">
-              Your completed deliveries will appear here.
-            </p>
           </div>
         </div>
       ) : (

@@ -13,9 +13,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "@/lib/icons";
-import { Landmark, MapPin, Pencil, ChevronDown, CheckCircle2, ArrowRight } from "lucide-react";
+import { Landmark, Pencil, ChevronDown, CheckCircle2, ArrowRight } from "lucide-react";
 import LottieComponent from 'lottie-react';
 import bankAnimation from '@/assets/animations/bank.json';
+import addAddressAnimation from '@/assets/animations/AddAddress.json';
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { getIconByName } from "@/components/address/IconPicker";
@@ -808,7 +809,7 @@ export default function CashRequest() {
               className="text-sm font-semibold text-slate-900"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              ${amount.toFixed(0)}
+              ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </motion.span>
           </div>
 
@@ -875,7 +876,7 @@ export default function CashRequest() {
               className="text-sm font-semibold text-slate-900"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              ${pricing?.total.toFixed(2) || '0.00'}
+              ${pricing?.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
             </motion.span>
           </div>
 
@@ -1023,7 +1024,7 @@ export default function CashRequest() {
                   
                   {/* Header - centered */}
                   <div className="flex items-center justify-center">
-                    <span className="text-base font-semibold text-slate-900">Bank Verification</span>
+                    <span className="text-base font-semibold text-slate-900">Connect Your Bank Account</span>
                   </div>
                   
                   {/* Benefit bullets - centered */}
@@ -1367,6 +1368,8 @@ export default function CashRequest() {
               onConfirm={handleSubmit}
               disabled={loading || !selectedAddress || !pricing || !selectedBankAccountId || !deliveryMode}
               label="Slide to Confirm Request"
+              isLoading={loading}
+              loadingLabel="Creating order..."
             />
           </div>
         </div>
@@ -1534,27 +1537,42 @@ export default function CashRequest() {
       <div className="space-y-4 pb-6">
         {/* 0 addresses – empty state */}
         {addresses.length === 0 && (
-          <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-              <MapPin className="w-5 h-5" />
+          <div className="w-full rounded-xl bg-white px-4 py-4">
+            <div className="space-y-4">
+              {/* Animated address icon - centered */}
+              <div className="flex justify-center">
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <LottieComponent
+                    animationData={addAddressAnimation}
+                    loop={false}
+                    autoplay={true}
+                    style={{ width: '48px', height: '48px' }}
+                  />
+                </div>
+              </div>
+              
+              {/* Header - centered */}
+              <div className="flex items-center justify-center">
+                <span className="text-base font-semibold text-slate-900">Add Your First Address</span>
+              </div>
+              
+              {/* Subtitle - centered */}
+              <div className="flex items-center justify-center">
+                <p className="text-sm text-slate-700 text-center">
+                  Save a place where you'd like cash delivered.
+                  <br />
+                  You can add more later.
+                </p>
+              </div>
+              
+              <Button
+                type="button"
+                onClick={handleAddAddress}
+                className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold"
+              >
+                Add Address
+              </Button>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-900">
-                Add Your First Address
-              </p>
-              <p className="text-sm text-slate-500">
-                Save a place where you'd like cash delivered.
-                <br />
-                You can add more later.
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={handleAddAddress}
-              className="w-full h-14"
-            >
-              Add Address
-            </Button>
           </div>
         )}
 

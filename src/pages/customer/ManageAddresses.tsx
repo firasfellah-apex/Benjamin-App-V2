@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Pencil, Trash2, MapPin } from "lucide-react";
+import { X, Pencil, Trash2 } from "lucide-react";
+import LottieComponent from 'lottie-react';
+import addAddressAnimation from '@/assets/animations/AddAddress.json';
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -292,19 +294,33 @@ export default function ManageAddresses() {
   const topContent = useMemo(() => (
     <div className="space-y-3 pb-6">
       {addresses.length === 0 ? (
-        <div className="w-full rounded-xl border border-dashed border-[#F0F0F0] bg-slate-50/60 px-4 py-6 flex flex-col items-center text-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-            <MapPin className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-slate-900">
-              Add Your First Address
-            </p>
-            <p className="text-sm text-slate-500">
-              Save a place where you'd like cash delivered.
-              <br />
-              You can add more later.
-            </p>
+        <div className="w-full rounded-xl bg-white px-4 py-4">
+          <div className="space-y-4">
+            {/* Animated address icon - centered */}
+            <div className="flex justify-center">
+              <div className="w-12 h-12 flex items-center justify-center">
+                <LottieComponent
+                  animationData={addAddressAnimation}
+                  loop={false}
+                  autoplay={true}
+                  style={{ width: '48px', height: '48px' }}
+                />
+              </div>
+            </div>
+            
+            {/* Header - centered */}
+            <div className="flex items-center justify-center">
+              <span className="text-base font-semibold text-slate-900">Add Your First Address</span>
+            </div>
+            
+            {/* Subtitle - centered */}
+            <div className="flex items-center justify-center">
+              <p className="text-sm text-slate-700 text-center">
+                Save a place where you'd like cash delivered.
+                <br />
+                You can add more later.
+              </p>
+            </div>
           </div>
         </div>
       ) : (

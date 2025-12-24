@@ -304,10 +304,8 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
         });
         // Invalidate to ensure fresh data on next fetch
         queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-        // Navigate back to home after a short delay
-        setTimeout(() => {
-          navigate("/customer/home");
-        }, 1500);
+        // Navigate back to home immediately (CustomerOrderDetailPage will also handle this via realtime)
+        navigate("/customer/home", { replace: true });
       } else {
         toast.error(result.message || "Failed to cancel order");
         setIsCancelling(false);
@@ -539,6 +537,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
           onOrderUpdate={(updatedOrder) => {
             queryClient.setQueryData(["order", orderId], updatedOrder);
           }}
+          isCancelling={isCancelling}
         />
       </motion.div>
     </div>

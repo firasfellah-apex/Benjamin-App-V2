@@ -213,3 +213,4 @@ WHERE user_id = 'your-user-id';
 - Add bank account metadata (account type, etc.)
 
 
+

@@ -32,7 +32,8 @@ import countConfirmationIllustration from '@/assets/illustrations/CountConfirmat
 
 // Loader component for runner assignment state
 import LottieComponent from "lottie-react";
-import runnerLoadingAnimationData from "@/assets/animations/runner-loader-green.json";
+import runnerLoadingAnimationData from "@/assets/animations/RunnerLoading.json";
+import { SlideToCancel } from '@/components/customer/SlideToCancel';
 
 interface ActiveDeliverySheetProps {
   order: OrderWithDetails;
@@ -45,6 +46,7 @@ interface ActiveDeliverySheetProps {
   onOrderUpdate?: (order: OrderWithDetails) => void;
   // No longer needed - map has fixed viewport
   onCollapsedHeightChange?: (height: number) => void;
+  isCancelling?: boolean; // Loading state for cancellation
 }
 
 export function ActiveDeliverySheet({
@@ -57,6 +59,7 @@ export function ActiveDeliverySheet({
   onCallSupport,
   onOrderUpdate,
   onCollapsedHeightChange,
+  isCancelling = false,
 }: ActiveDeliverySheetProps) {
   const navigate = useNavigate();
   const [submittingRating, setSubmittingRating] = useState(false);
@@ -704,7 +707,8 @@ export function ActiveDeliverySheet({
       {/* Sheet Content - Always scrollable */}
       <div
         ref={scrollContainerRef}
-        className="px-6 pt-6 w-full overflow-y-auto overflow-x-hidden flex-1 pb-6"
+        className="px-6 pt-6 w-full overflow-y-auto overflow-x-hidden flex-1 min-h-0 pb-6"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="space-y-6">
           {/* 1. Title and Sub Label - Grouped together */}
@@ -892,16 +896,14 @@ export function ActiveDeliverySheet({
             </Button>
           )}
 
-          {/* 9. Cancel Button - Filled Button with Red Text */}
+          {/* 9. Cancel Button - Slide to Cancel */}
           {canCancel && onCancel && (
-            <Button
-              onClick={onCancel}
-              variant="outline"
-              size="default"
-              className="w-full h-[56px] bg-[#F7F7F7] border-0 text-[#E84855] hover:bg-[#F0F0F0] hover:text-[#E84855]"
-            >
-              Cancel Order
-            </Button>
+            <SlideToCancel
+              onConfirm={onCancel}
+              disabled={isCancelling}
+              isLoading={isCancelling}
+              loadingLabel="Cancelling..."
+            />
           )}
 
           {/* 10. Order ID Footer */}

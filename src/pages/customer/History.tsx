@@ -7,13 +7,16 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package } from '@/lib/icons';
+import { ArrowLeft } from '@/lib/icons';
 import { CustomerScreen } from '@/pages/customer/components/CustomerScreen';
 import CustomerCard from '@/pages/customer/components/CustomerCard';
 import { getCustomerOrders } from '@/db/api';
 import type { OrderWithDetails } from '@/types/types';
 import { formatDate } from '@/lib/utils';
 import { OrderListSkeleton } from '@/components/order/OrderListSkeleton';
+import LottieComponent from 'lottie-react';
+import historicalOrdersAnimation from '@/assets/animations/HistoricalOrders.json';
+import { Button } from '@/components/ui/button';
 
 /**
  * Get address label from order
@@ -129,23 +132,41 @@ export default function History() {
           <OrderListSkeleton count={5} />
         </div>
       ) : filteredOrders.length === 0 ? (
-        <div className="w-full px-6 pt-6 pb-6">
-          <div className="w-full flex flex-col items-center justify-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[#F4F7FB] flex items-center justify-center">
-              <Package className="w-8 h-8 text-slate-600" />
+        <div className="w-full px-4 py-4">
+          <div className="w-full rounded-xl bg-white px-4 py-4">
+            <div className="space-y-4">
+              {/* Animated orders icon - centered */}
+              <div className="flex justify-center">
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <LottieComponent
+                    animationData={historicalOrdersAnimation}
+                    loop={false}
+                    autoplay={true}
+                    style={{ width: '48px', height: '48px' }}
+                  />
+                </div>
+              </div>
+              
+              {/* Header - centered */}
+              <div className="flex items-center justify-center">
+                <span className="text-base font-semibold text-slate-900">No deliveries yet</span>
+              </div>
+              
+              {/* Subtitle - centered */}
+              <div className="flex items-center justify-center">
+                <p className="text-sm text-slate-700 text-center">
+                  Your history will appear here after your first completed order.
+                </p>
+              </div>
+              
+              <Button
+                type="button"
+                onClick={() => navigate('/customer/request')}
+                className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold"
+              >
+                Request Cash
+              </Button>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 text-center">
-              No deliveries yet
-            </h3>
-            <p className="text-sm text-slate-500 text-center max-w-[280px]">
-              Your history will appear here after your first completed order.
-            </p>
-            <button
-              onClick={() => navigate('/customer/request')}
-              className="w-full rounded-full bg-black text-white text-base font-semibold active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2 py-4 px-6"
-            >
-              Request Cash
-            </button>
           </div>
         </div>
       ) : (

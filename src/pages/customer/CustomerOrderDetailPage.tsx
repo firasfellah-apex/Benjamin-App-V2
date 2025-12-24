@@ -24,9 +24,9 @@ export default function CustomerOrderDetailPage() {
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Track if order was already completed when we first loaded it
-  // This distinguishes "viewing history" from "order just completed during tracking"
-  const wasAlreadyCompletedRef = useRef<boolean | null>(null);
+  // Track if order was already completed/cancelled when we first loaded it
+  // This distinguishes "viewing history" from "order just completed/cancelled during tracking"
+  const wasAlreadyTerminalRef = useRef<boolean | null>(null);
   const hasNavigatedToHomeRef = useRef(false);
 
   // Load order
@@ -37,10 +37,10 @@ export default function CustomerOrderDetailPage() {
         const data = await getOrderById(orderId);
         setOrder(data);
         
-        // Remember if order was already completed on first load
+        // Remember if order was already terminal (completed or cancelled) on first load
         // If true, user is viewing history. If false, user is tracking active order.
-        if (wasAlreadyCompletedRef.current === null) {
-          wasAlreadyCompletedRef.current = data?.status === 'Completed';
+        if (wasAlreadyTerminalRef.current === null) {
+          wasAlreadyTerminalRef.current = data?.status === 'Completed' || data?.status === 'Cancelled';
         }
       } catch (error) {
         console.error("Error loading order:", error);
@@ -57,11 +57,11 @@ export default function CustomerOrderDetailPage() {
   const handleOrderUpdate = useCallback((updatedOrder: Order) => {
     if (!orderId || !updatedOrder || updatedOrder.id !== orderId) return;
     
-    // If order just completed (was NOT already completed when we loaded),
-    // navigate to home - this means user was tracking and it completed
+    // If order just completed or cancelled (was NOT already terminal when we loaded),
+    // navigate to home immediately - this means user was tracking and it completed/cancelled
     if (
-      updatedOrder.status === 'Completed' && 
-      wasAlreadyCompletedRef.current === false && 
+      (updatedOrder.status === 'Completed' || updatedOrder.status === 'Cancelled') && 
+      wasAlreadyTerminalRef.current === false && 
       !hasNavigatedToHomeRef.current
     ) {
       hasNavigatedToHomeRef.current = true;

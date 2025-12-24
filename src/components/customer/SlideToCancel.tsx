@@ -2,29 +2,29 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Check, ChevronRight, Loader2 } from "lucide-react";
 
-interface SlideToConfirmProps {
+interface SlideToCancelProps {
   onConfirm: () => void;
   disabled?: boolean;
   className?: string;
   trackClassName?: string; // Custom styling for the track
   handleClassName?: string; // Custom styling for the handle
-  label?: string; // Custom label text (defaults to "Slide to Confirm Order")
+  label?: string; // Custom label text (defaults to "Cancel Order")
   confirmedLabel?: string;
   isLoading?: boolean; // Loading state after confirmation
-  loadingLabel?: string; // Label to show during loading (e.g., "Creating order...")
+  loadingLabel?: string; // Label to show during loading (e.g., "Cancelling...")
 }
 
-export function SlideToConfirm({
+export function SlideToCancel({
   onConfirm,
   disabled = false,
   className,
   trackClassName,
   handleClassName,
-  label,
-  confirmedLabel = "Confirmed",
+  label = "Cancel Order",
+  confirmedLabel = "Cancelled",
   isLoading = false,
-  loadingLabel = "Creating order...",
-}: SlideToConfirmProps) {
+  loadingLabel = "Cancelling...",
+}: SlideToCancelProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -52,7 +52,7 @@ export function SlideToConfirm({
   const maxHandleWidth = Math.max(HANDLE_WIDTH, trackWidth - HANDLE_MARGIN * 2);
   const handleWidth = HANDLE_WIDTH + progress * (maxHandleWidth - HANDLE_WIDTH);
 
-  // Right edge of the green pill, measured from the left edge of the track
+  // Right edge of the red pill, measured from the left edge of the track
   const pillRight = HANDLE_MARGIN + handleWidth;
 
   const handlePointerMove = useCallback(
@@ -127,7 +127,7 @@ export function SlideToConfirm({
     ? loadingLabel 
     : isConfirmed 
     ? confirmedLabel 
-    : (label || "Slide to Confirm Order");
+    : label;
 
   return (
     <div className={cn("w-full", className)}>
@@ -152,38 +152,38 @@ export function SlideToConfirm({
           "select-none touch-none",
           disabled && "opacity-60 cursor-not-allowed",
           !disabled && "cursor-pointer",
-          // Default styles if no custom className provided
-          !trackClassName && "rounded-[12px] bg-black",
+          // Default styles: grey background instead of black
+          !trackClassName && "rounded-[12px] bg-[#F7F7F7]",
           trackClassName
         )}
         style={{ height: TRACK_HEIGHT }}
       >
         {/* LABEL LAYERS */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Base layer: white text, full width, centered */}
+          {/* Base layer: red text, full width, centered */}
           <div
             className="flex h-full items-center justify-center"
             style={{ paddingLeft: LABEL_PADDING_LEFT - 6 }}
           >
-            <span className="text-base font-semibold text-white">
+            <span className="text-base font-semibold" style={{ color: '#E84855' }}>
               {labelText}
             </span>
           </div>
 
-          {/* Overlay layer: black text, same position, clipped to pillRight */}
+          {/* Overlay layer: white text, same position, clipped to pillRight */}
           {handleWidth > 0 && (
             <div
               className="absolute top-0 bottom-0 overflow-hidden"
               style={{
                 left: 0,
-                width: pillRight, // everything under the pill becomes black
+                width: pillRight, // everything under the pill becomes white
               }}
             >
               <div
                 className="flex h-full items-center justify-center"
                 style={{ paddingLeft: LABEL_PADDING_LEFT - 6 }}
               >
-                <span className="text-base font-semibold text-black">
+                <span className="text-base font-semibold text-white">
                   {labelText}
                 </span>
               </div>
@@ -191,10 +191,10 @@ export function SlideToConfirm({
           )}
         </div>
 
-        {/* Green Pill Handle - pinned to left, stretches right */}
+        {/* Red Pill Handle - pinned to left, stretches right */}
         <div
           className={cn(
-            "absolute rounded-[9px] bg-[#13F287] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20",
+            "absolute rounded-[9px] flex items-center justify-center font-medium transition-all duration-150 ease-out z-20",
             handleClassName
           )}
           style={{
@@ -202,13 +202,14 @@ export function SlideToConfirm({
             top: `${HANDLE_MARGIN}px`,
             width: handleWidth,
             height: HANDLE_HEIGHT,
+            backgroundColor: '#E84855', // Red instead of green
             transition: isDragging ? "none" : "width 0.2s ease-out",
           }}
         >
           {isConfirmed && showCheckmark && !isLoading ? (
             <Check className="h-4 w-4 text-white" />
           ) : isConfirmed && isLoading ? (
-            <Loader2 className="h-4 w-4 text-black animate-spin" />
+            <Loader2 className="h-4 w-4 text-white animate-spin" />
           ) : (
             !isDragging && (
               <div className="flex items-center gap-[1px]">
@@ -216,14 +217,13 @@ export function SlideToConfirm({
                   <ChevronRight
                     key={i}
                     className={cn(
-                      "h-3.5 w-3.5 text-black",
+                      "h-3.5 w-3.5",
                       !isDragging && !isConfirmed && "slide-hint-chevron"
                     )}
-                    style={
-                      !isDragging && !isConfirmed
-                        ? { animationDelay: `${i * 70}ms` }
-                        : undefined
-                    }
+                    style={{
+                      color: '#E84855', // Red arrows instead of black
+                      animationDelay: !isDragging && !isConfirmed ? `${i * 70}ms` : undefined
+                    }}
                   />
                 ))}
               </div>
@@ -234,3 +234,4 @@ export function SlideToConfirm({
     </div>
   );
 }
+
