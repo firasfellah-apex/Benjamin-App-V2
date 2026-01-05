@@ -59,6 +59,7 @@ export function QuickReorderModal({
     return deliveryStyle === 'COUNTED' ? 'count_confirm' : 'quick_handoff';
   });
   const [loading, setLoading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   const { addresses } = useCustomerAddresses();
   const { bankAccounts, hasAnyBank } = useBankAccounts();
@@ -68,6 +69,37 @@ export function QuickReorderModal({
   const accountSectionRef = useRef<HTMLDivElement>(null);
   const amountSectionRef = useRef<HTMLDivElement>(null);
   const deliverySectionRef = useRef<HTMLDivElement>(null);
+
+  // Track closing state for pointer events
+  useEffect(() => {
+    if (open) {
+      setIsClosing(false);
+    } else {
+      // When open becomes false, immediately disable pointer events
+      setIsClosing(true);
+    }
+  }, [open]);
+
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      // Restore scrolling immediately when modal closes
+      document.body.style.overflow = "";
+    }
+    
+    // Always restore scrolling on unmount
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  // Handler that sets closing state immediately
+  const handleClose = () => {
+    setIsClosing(true);
+    onOpenChange(false);
+  };
 
   // Reset and auto-populate all fields when modal opens
   useEffect(() => {
@@ -111,26 +143,34 @@ export function QuickReorderModal({
   const toggleSection = (section: Exclude<OpenSection, null>) => {
     setOpenSection((prev) => {
       const newSection = prev === section ? null : section;
-      
-      // Scroll to section when opening
-      if (newSection === section) {
-        setTimeout(() => {
+      return newSection;
+    });
+  };
+
+  // Scroll to section after animation completes (using requestAnimationFrame to wait for layout)
+  useEffect(() => {
+    if (!openSection) return;
+
+    // Wait for animation to complete (0.42s duration + buffer)
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
           const refs = {
             address: addressSectionRef,
             account: accountSectionRef,
             amount: amountSectionRef,
             delivery: deliverySectionRef,
           };
-          const ref = refs[section];
-          if (ref.current) {
-            ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+          const ref = refs[openSection];
+          if (ref?.current) {
+            ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
           }
-        }, 100);
-      }
-      
-      return newSection;
-    });
-  };
+        });
+      });
+    }, 450); // Slightly after animation duration (420ms)
+
+    return () => clearTimeout(timeoutId);
+  }, [openSection]);
 
   const selectedAddress = addresses.find(a => a.id === selectedAddressId);
   const selectedBankAccount = bankAccounts.find(b => b.id === selectedBankAccountId);
@@ -295,7 +335,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "address";
 
     return (
-      <div ref={addressSectionRef}>
+      <motion.div ref={addressSectionRef} layout>
         <SectionHeader
           label="Address"
           section="address"
@@ -308,29 +348,19 @@ export function QuickReorderModal({
           ) : null}
         </SectionHeader>
 
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[1000px] opacity-100" 
-              : "max-h-0 opacity-0"
-          )}
-          style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            willChange: "max-height, opacity",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4 space-y-3"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
-              pointerEvents: isOpen ? "auto" : "none", // Prevent interaction when collapsed
-            }}
-          >
-            {addresses.map((addr) => {
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="address-content"
+              layout
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="pt-2 pb-4 space-y-3">
+                {addresses.map((addr) => {
                   const IconComponent = getIconByName(addr.icon || "Home");
                   const isSelected = addr.id === selectedAddressId;
 
@@ -370,9 +400,11 @@ export function QuickReorderModal({
                 >
                   Add Another Address
                 </button>
-          </div>
-        </div>
-      </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     );
   };
 
@@ -381,7 +413,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "account";
 
     return (
-      <div ref={accountSectionRef}>
+      <motion.div ref={accountSectionRef} layout>
         <SectionHeader
           label="Account"
           section="account"
@@ -416,29 +448,19 @@ export function QuickReorderModal({
           ) : null}
         </SectionHeader>
 
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[1000px] opacity-100" 
-              : "max-h-0 opacity-0"
-          )}
-          style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            willChange: "max-height, opacity",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4 space-y-3"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
-              pointerEvents: isOpen ? "auto" : "none", // Prevent interaction when collapsed
-            }}
-          >
-            {!hasAnyBank ? (
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="account-content"
+              layout
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="pt-2 pb-4 space-y-3">
+                {!hasAnyBank ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-slate-600 mb-3">No bank accounts connected</p>
                     <button
@@ -509,9 +531,11 @@ export function QuickReorderModal({
                     </button>
                   </>
                 )}
-          </div>
-        </div>
-      </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     );
   };
 
@@ -520,7 +544,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "amount";
 
     return (
-      <div ref={amountSectionRef}>
+      <motion.div ref={amountSectionRef} layout>
         <SectionHeader
           label="Amount"
           section="amount"
@@ -536,28 +560,19 @@ export function QuickReorderModal({
           </>
         </SectionHeader>
 
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[1000px] opacity-100" 
-              : "max-h-0 opacity-0"
-          )}
-          style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            willChange: "max-height, opacity",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4 space-y-4"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
-            }}
-          >
-            <CashAmountInput
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="amount-content"
+              layout
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="pt-2 pb-4 space-y-4">
+                <CashAmountInput
                   value={amount}
                   onChange={handleAmountChange}
                   min={100}
@@ -581,9 +596,11 @@ export function QuickReorderModal({
                     </div>
                   </div>
                 )}
-          </div>
-        </div>
-      </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     );
   };
 
@@ -592,7 +609,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "delivery";
 
     return (
-      <div ref={deliverySectionRef}>
+      <motion.div ref={deliverySectionRef} layout>
         <SectionHeader
           label="Delivery Style"
           section="delivery"
@@ -600,34 +617,27 @@ export function QuickReorderModal({
           {deliveryMode === "count_confirm" ? "Counted" : "Discreet"}
         </SectionHeader>
 
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[1000px] opacity-100" 
-              : "max-h-0 opacity-0"
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="delivery-content"
+              layout
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="pt-2 pb-4">
+                <DeliveryModeSelector
+                  value={deliveryMode}
+                  onChange={handleDeliveryModeChange}
+                />
+              </div>
+            </motion.div>
           )}
-          style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            willChange: "max-height, opacity",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
-            }}
-          >
-            <DeliveryModeSelector
-              value={deliveryMode}
-              onChange={handleDeliveryModeChange}
-            />
-          </div>
-        </div>
-      </div>
+        </AnimatePresence>
+      </motion.div>
     );
   };
 
@@ -641,40 +651,58 @@ export function QuickReorderModal({
         <>
           {/* Backdrop */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80]"
-            onClick={() => onOpenChange(false)}
+            key="backdrop"
+            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(8px)" }}
+            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 bg-black/40 z-[80]"
+            onClick={handleClose}
+            style={{ pointerEvents: !isClosing && open ? "auto" : "none" }}
           />
 
-          {/* Modal Container */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none p-4"
+          {/* Modal Container - Bottom Sheet */}
+          <div 
+            key="modal-container" 
+            className="fixed inset-0 z-[90] flex items-end justify-center px-4 pt-8 pb-[max(16px,env(safe-area-inset-bottom))]"
+            style={{ pointerEvents: !isClosing ? "none" : "none" }}
           >
-            {/* Modal Content - Floating */}
+            {/* Modal Content - Bottom Sheet */}
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col pointer-events-auto max-h-[90vh] overflow-hidden"
+              key="modal-content"
+              drag={!isClosing ? "y" : false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={0.12}
+              dragMomentum={false}
+              onDragEnd={(_, info) => {
+                const closeThreshold = 120;
+                const velocityThreshold = 800;
+                if (info.offset.y > closeThreshold || info.velocity.y > velocityThreshold) {
+                  handleClose();
+                }
+              }}
+              initial={{ y: 18, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 18, opacity: 0 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+              style={{ pointerEvents: !isClosing ? "auto" : "none" }}
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Drag Handle */}
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="h-1 w-12 rounded-full bg-black/10" />
+              </div>
+              
               {/* Header */}
-              <div className="flex-shrink-0 px-6 pt-6 pb-4 flex items-center justify-between">
+              <div className="flex-shrink-0 px-6 pb-4 flex items-center justify-between">
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">Quick Reorder</h2>
                   <p className="text-sm text-gray-600 mt-0.5">Confirm everything looks right.</p>
                 </div>
                 <IconButton
                   type="button"
-                  onClick={() => onOpenChange(false)}
+                  onClick={handleClose}
                   variant="default"
                   size="lg"
                   className="flex-shrink-0"
@@ -712,7 +740,7 @@ export function QuickReorderModal({
                 />
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>,
