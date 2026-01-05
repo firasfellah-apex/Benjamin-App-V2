@@ -1,9 +1,8 @@
-import { motion } from "framer-motion";
 import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import Lottie, { type LottieRefCurrentProps } from "lottie-react";
-import speedAnimation from "@/assets/animations/speed.json";
-import countedAnimation from "@/assets/animations/counted.json";
+import discreetAnimation from "@/assets/animations/discreet.json";
+import countedAnimation from "@/assets/animations/counted2.json";
 export type DeliveryMode = "quick_handoff" | "count_confirm";
 
 interface DeliveryModeSelectorProps {
@@ -16,16 +15,16 @@ const modes = [
   {
     value: "count_confirm" as DeliveryMode,
     title: "Counted",
-    mainTitle: "Count the cash with the runner during hand-off.",
-    subtitle: "Recommended for first deliveries.",
+    description: "Count the cash with the runner present",
+    recommendation: "Recommended for first and/or large orders.",
     animationData: countedAnimation,
   },
   {
     value: "quick_handoff" as DeliveryMode,
-    title: "Speed",
-    mainTitle: "Quick, discreet hand-off — no counting.",
-    subtitle: "Best for repeat deliveries.",
-    animationData: speedAnimation,
+    title: "Discreet",
+    description: "Quick, private hand-off — no on-site counting.",
+    recommendation: "Best for discreet orders, and repeat customers.",
+    animationData: discreetAnimation,
   },
 ];
 
@@ -37,105 +36,94 @@ export function DeliveryModeSelector({
   const speedLottieRef = useRef<LottieRefCurrentProps>(null);
   const countedLottieRef = useRef<LottieRefCurrentProps>(null);
 
-  const handleModeClick = (modeValue: DeliveryMode) => {
-    // Play animation for the clicked mode - reset to beginning and play
-    // Do this before updating state to ensure refs are still available
-    if (modeValue === "quick_handoff" && speedLottieRef.current) {
+  // Play animation when a mode becomes selected
+  useEffect(() => {
+    if (value === "quick_handoff" && speedLottieRef.current) {
       speedLottieRef.current.stop();
       speedLottieRef.current.goToAndPlay(0);
-    } else if (modeValue === "count_confirm" && countedLottieRef.current) {
+    } else if (value === "count_confirm" && countedLottieRef.current) {
       countedLottieRef.current.stop();
       countedLottieRef.current.goToAndPlay(0);
     }
-    
-    // Update the selected value
+  }, [value]);
+
+  const handleModeClick = (modeValue: DeliveryMode) => {
+    // Update the selected value (animation will play via useEffect)
     onChange(modeValue);
   };
 
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Pill-shaped toggle - Same style for both options */}
-      <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 relative overflow-visible">
-        {/* Sliding background indicator */}
-        <motion.div
-          className="absolute top-1 bottom-1 rounded-full bg-white border-2 border-black z-0"
-          initial={false}
-          animate={{
-            left: value === "count_confirm" ? '2px' : 'calc(50% + 2px)',
-            width: 'calc(50% - 6px)',
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 30,
-          }}
-          style={{ height: '52px' }}
-        />
-        {modes.map((mode) => {
-          const selected = mode.value === value;
+    <div className={cn("flex gap-3", className)}>
+      {modes.map((mode) => {
+        const selected = mode.value === value;
 
-          return (
-            <button
-              key={mode.value}
-              type="button"
-              onClick={() => handleModeClick(mode.value)}
-              className={cn(
-                "relative flex-1 h-13 rounded-full flex items-center justify-center gap-2 text-sm font-medium transition-all duration-300 ease-in-out z-10",
-                "bg-transparent text-slate-900"
-              )}
-              style={{ height: '52px' }}
-            >
-              <div className="h-5 w-5 flex items-center justify-center">
+        return (
+          <button
+            key={mode.value}
+            type="button"
+            onClick={() => handleModeClick(mode.value)}
+            className={cn(
+              "flex-1 rounded-xl bg-white p-4 text-left transition-all duration-300 ease-in-out",
+              "hover:opacity-95 active:opacity-90",
+              "flex flex-col items-start",
+              selected
+                ? "border-2 border-black"
+                : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
+            )}
+          >
+            {/* Icon - top left */}
+            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center mb-2">
                 <Lottie
                   lottieRef={mode.value === "quick_handoff" ? speedLottieRef : countedLottieRef}
                   animationData={mode.animationData}
                   loop={false}
-                  autoplay={false}
-                  style={{ width: '20px', height: '20px' }}
+                  autoplay={selected}
+                  style={{ width: '24px', height: '24px' }}
                   onDataReady={() => {
                     // Show first frame when animation data is ready
                     const ref = mode.value === "quick_handoff" ? speedLottieRef.current : countedLottieRef.current;
                     if (ref) {
-                      ref.goToAndStop(0, true);
+                      if (selected) {
+                        ref.goToAndPlay(0);
+                      } else {
+                        ref.goToAndStop(0, true);
+                      }
+                    }
+                  }}
+                  onComplete={() => {
+                    // For discreet animation, keep it at the last frame when complete
+                    if (mode.value === "quick_handoff" && speedLottieRef.current) {
+                      // Get the animation instance and stop at the last frame
+                      const animData = mode.animationData;
+                      // Lottie animations typically have op (out point) and ip (in point)
+                      // Use op - 1 to get the last frame, or use a very high number
+                      const lastFrame = animData.op || 999;
+                      speedLottieRef.current.goToAndStop(lastFrame - 1, true);
                     }
                   }}
                 />
-              </div>
-              <span>{mode.title}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Description for selected mode - iOS-style expand/collapse */}
-      <motion.div
-        initial={false}
-        animate={{
-          height: value ? "auto" : 0,
-          opacity: value ? 1 : 0,
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 30,
-          mass: 0.5,
-        }}
-        style={{ overflow: "hidden" }}
-      >
-        {value && (() => {
-          const selectedMode = modes.find(m => m.value === value);
-          return (
-            <div className="pt-3 pb-3 text-center">
-              <p className="text-sm font-semibold text-slate-900 leading-relaxed">
-                {selectedMode?.mainTitle}
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 min-w-0 w-full">
+              {/* Title */}
+              <h3 className="text-base font-semibold text-slate-900 mb-2">
+                {mode.title}
+              </h3>
+              
+              {/* Description */}
+              <p className="text-sm text-slate-900 leading-relaxed mb-1">
+                {mode.description}
               </p>
-              <p className="text-sm text-slate-600 leading-relaxed mt-1">
-                {selectedMode?.subtitle}
+              
+              {/* Recommendation */}
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {mode.recommendation}
               </p>
             </div>
-          );
-        })()}
-      </motion.div>
+          </button>
+        );
+      })}
     </div>
   );
 }

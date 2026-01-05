@@ -12,8 +12,11 @@ import { RequestFlowBottomBar } from "@/components/customer/RequestFlowBottomBar
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
 import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
+import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
+import { Lock } from "lucide-react";
 
 interface CompletedOrderDetailProps {
   order: OrderWithDetails;
@@ -35,6 +38,8 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const { addresses } = useCustomerAddresses();
+  const { bankAccounts } = useBankAccounts();
+  const { hasActiveOrder } = useActiveCustomerOrder();
   const [submittingRating, setSubmittingRating] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
@@ -63,12 +68,18 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
 
   // Handle reorder
   const handleReorder = () => {
+    // Block reorder if there's an active order
+    if (hasActiveOrder) {
+      return;
+    }
+    
     // Run reorder eligibility check (only when onReorder is not provided - i.e., default reorder logic)
     if (!onReorder) {
       const result = validateReorderEligibility({
         profile: profile || null,
         addresses: addresses || [],
         previousOrder: order,
+        bankAccounts: bankAccounts || [],
       });
       
       if (!result.ok) {
@@ -147,6 +158,9 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
           onPrimary={handleReorder}
           primaryLabel="Reorder"
           useFixedPosition={true}
+          primaryDisabled={hasActiveOrder}
+          primaryIcon={hasActiveOrder ? <Lock className="w-4 h-4" style={{ color: '#6B7280' }} /> : undefined}
+          primaryTooltip={hasActiveOrder ? "Cannot make a new order when one is already in motion. Please wait for your current order to complete." : undefined}
         />
       }
     >

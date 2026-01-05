@@ -1284,13 +1284,13 @@ export default function CashRequest() {
       id: "page-2",
       content: (
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Counted vs Speed</h2>
+          <h2 className="text-2xl font-semibold text-slate-900">Counted vs Discreet</h2>
           <div className="space-y-3 text-left">
             <p className="text-base text-slate-600 leading-relaxed">
               <span className="font-semibold text-slate-900">Counted:</span> Count together before confirming
             </p>
             <p className="text-base text-slate-600 leading-relaxed">
-              <span className="font-semibold text-slate-900">Speed:</span> Quick hand-off, no counting
+              <span className="font-semibold text-slate-900">Discreet:</span> Quick hand-off, no counting
             </p>
           </div>
         </div>

@@ -160,7 +160,7 @@ export async function getCustomerFacingStatusWithArrival(
       return {
         label: 'Runner Arrived',
         step: 'ARRIVED',
-        description: 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+        description: 'Please meet up and share your verification code to receive your cash.'
       };
     } else {
       return {

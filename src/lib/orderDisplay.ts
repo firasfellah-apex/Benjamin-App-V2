@@ -19,9 +19,14 @@ export function formatOrderTitle(order: OrderWithDetails): string {
       ? `$${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
       : "$0";
 
-  // Try address label first
+  // Try address label first from snapshot
   const snapshot = order.address_snapshot as any;
-  const label = snapshot?.label?.trim();
+  let label: string | undefined;
+  
+  // Check if snapshot exists and has a label
+  if (snapshot && typeof snapshot === 'object') {
+    label = snapshot.label?.trim() || undefined;
+  }
 
   const rawLine1 =
     snapshot?.line1 ||
@@ -38,7 +43,8 @@ export function formatOrderTitle(order: OrderWithDetails): string {
     .replace(/\bSouthwest\b/gi, "SW")
     .replace(/\bSoutheast\b/gi, "SE");
 
-  const destination = label || line1 || "your address";
+  // Use label if available, otherwise fall back to line1
+  const destination = (label && label.length > 0) ? label : (line1 || "your address");
 
   return `${formattedAmount} ordered to ${destination}`;
 }

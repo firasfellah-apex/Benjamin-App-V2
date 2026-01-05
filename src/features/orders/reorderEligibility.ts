@@ -19,6 +19,7 @@ export interface ReorderEligibilityOptions {
   profile: Profile | null;
   addresses: CustomerAddress[];
   previousOrder: OrderWithDetails;
+  bankAccounts?: Array<{ id: string }>; // Bank accounts from bank_accounts table
 }
 
 /**
@@ -35,10 +36,11 @@ export interface ReorderEligibilityOptions {
 export function validateReorderEligibility(
   options: ReorderEligibilityOptions
 ): ReorderEligibilityResult {
-  const { profile, addresses, previousOrder } = options;
+  const { profile, addresses, previousOrder, bankAccounts = [] } = options;
 
   // Hard check 1: Customer must have a linked bank account
-  const hasLinkedBank = !!profile?.plaid_item_id;
+  // Check bank_accounts table (new approach) or fallback to plaid_item_id (legacy)
+  const hasLinkedBank = bankAccounts.length > 0 || !!profile?.plaid_item_id;
   if (!hasLinkedBank) {
     return {
       ok: false,
@@ -70,16 +72,19 @@ export function validateReorderEligibility(
     };
   }
 
-  // Hard check 3: Order must not be cancelled or flagged
-  const orderNotCancelledOrFlagged = 
-    previousOrder.status !== 'Cancelled' && 
-    !previousOrder.cancelled_at &&
-    // Check for any flags (e.g., reported issues, fraud flags, etc.)
-    // For now, we only check cancellation status
-    // Add more flag checks here if needed in the future
-    true;
+  // Hard check 3: Order must not be flagged for fraud or other serious issues
+  // NOTE: We allow cancelled orders to be reordered from since we're creating a NEW order,
+  // not reusing the cancelled one. Cancellation is a normal part of the flow.
+  // Only block if the order has been flagged for fraud or other serious issues.
+  // For now, we don't have fraud flags in the order data, so we allow all orders.
+  // In the future, you could add checks like:
+  // - previousOrder.fraud_flag
+  // - previousOrder.reported_for_fraud
+  // - previousOrder.blocked_by_admin
+  // etc.
+  const orderNotFlagged = true; // All orders are allowed for now
 
-  if (!orderNotCancelledOrFlagged) {
+  if (!orderNotFlagged) {
     return {
       ok: false,
       reason: 'blocked_order',

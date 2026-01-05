@@ -9,6 +9,7 @@ import { shouldShowCustomerOtpToCustomer } from "@/lib/revealRunnerView";
 import { OtpDisplay } from "@/components/customer/OtpDisplay";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
 import { supabase } from "@/db/supabase";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Mode =
   | "home"           // Home: single "Request Cash"
@@ -24,6 +25,8 @@ interface RequestFlowBottomBarProps {
   primaryDisabled?: boolean;  // disable primary button
   useFixedPosition?: boolean; // if false, uses relative positioning for flex layouts
   primaryLabel?: string;      // optional custom label (overrides mode-based label)
+  primaryIcon?: React.ReactNode; // optional icon to show inside primary button
+  primaryTooltip?: string;    // optional tooltip message to show when button is disabled
   termsContent?: React.ReactNode; // optional terms text/content to show above buttons
   useSliderButton?: boolean;   // if true, use slider button instead of regular button (amount page only)
   activeOrder?: OrderWithDetails | null; // Active order for progress display
@@ -38,11 +41,14 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
   primaryDisabled = false,
   useFixedPosition = true, // default to fixed for backward compatibility
   primaryLabel: customPrimaryLabel,
+  primaryIcon,
+  primaryTooltip,
   termsContent,
   useSliderButton = false, // default to false to keep current behavior
   activeOrder = null,
 }) => {
   const [customerStatus, setCustomerStatus] = useState<CustomerFacingStatus | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Get customer status - same logic as ActiveDeliverySheet
   useEffect(() => {
@@ -170,7 +176,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                       return `${runnerName} has your cash and is heading your way.`;
                     })()
                   : customerStatus.step === 'ARRIVED'
-                  ? 'Your runner has arrived. Please meet up and share your verification code to receive your cash.'
+                  ? 'Please meet up and share your verification code to receive your cash.'
                   : customerStatus.description}
               </p>
             </div>
@@ -223,50 +229,117 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
       <div className={cn("flex w-full gap-3 items-center justify-center")}>
         <AnimatePresence mode="wait" initial={false}>
           {isSingleMode ? (
-            <motion.button
-              key="single"
-              layoutId={`ts-cta-${mode}`}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ 
-                opacity: 1,
-                scale: 1,
-                backgroundColor: (isLoading || primaryDisabled) ? '#D1D5DB' : '#000000'
-              }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ 
-                duration: 0.3, 
-                ease: [0.34, 1.56, 0.64, 1],
-                backgroundColor: { duration: 0.2 },
-                layout: { 
-                  duration: 0.4,
-                  ease: [0.34, 1.56, 0.64, 1]
-                }
-              }}
-              type="button"
-              onClick={onPrimary}
-              disabled={isLoading || primaryDisabled}
-              className={cn(
-                "w-full rounded-xl py-4 px-6",
-                "text-base font-semibold",
-                "flex items-center justify-center",
-                "transition-colors duration-200",
-                (isLoading || primaryDisabled) 
-                  ? "text-gray-500 cursor-not-allowed" 
-                  : "text-white"
-              )}
-            >
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={primaryLabel}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
+            primaryDisabled && primaryTooltip ? (
+              <Tooltip key="single-tooltip" open={showTooltip} onOpenChange={setShowTooltip}>
+                <TooltipTrigger asChild>
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowTooltip(true);
+                    }}
+                    className="w-full cursor-pointer"
+                  >
+                    <motion.button
+                      layoutId={`ts-cta-${mode}`}
+                      initial={{ opacity: 0, scale: 0.92 }}
+                      animate={{ 
+                        opacity: 1,
+                        scale: 1,
+                        backgroundColor: '#D1D5DB'
+                      }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{ 
+                        duration: 0.3, 
+                        ease: [0.34, 1.56, 0.64, 1],
+                        backgroundColor: { duration: 0.2 },
+                        layout: { 
+                          duration: 0.4,
+                          ease: [0.34, 1.56, 0.64, 1]
+                        }
+                      }}
+                      type="button"
+                      disabled={true}
+                      className={cn(
+                        "w-full rounded-xl py-4 px-6",
+                        "text-base font-semibold",
+                        "flex items-center justify-center",
+                        "transition-colors duration-200",
+                        "cursor-not-allowed"
+                      )}
+                      style={{ color: '#6B7280' }}
+                    >
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={primaryLabel}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex items-center gap-2"
+                      >
+                        {isLoading ? "Processing..." : primaryLabel}
+                        {primaryIcon}
+                      </motion.span>
+                    </AnimatePresence>
+                  </motion.button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
                 >
-                  {isLoading ? "Processing..." : primaryLabel}
-                </motion.span>
-              </AnimatePresence>
-            </motion.button>
+                  <p className="leading-relaxed">{primaryTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <motion.button
+                key="single"
+                layoutId={`ts-cta-${mode}`}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ 
+                  opacity: 1,
+                  scale: 1,
+                  backgroundColor: (isLoading || primaryDisabled) ? '#D1D5DB' : '#000000'
+                }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ 
+                  duration: 0.3, 
+                  ease: [0.34, 1.56, 0.64, 1],
+                  backgroundColor: { duration: 0.2 },
+                  layout: { 
+                    duration: 0.4,
+                    ease: [0.34, 1.56, 0.64, 1]
+                  }
+                }}
+                type="button"
+                onClick={onPrimary}
+                disabled={isLoading || primaryDisabled}
+                className={cn(
+                  "w-full rounded-xl py-4 px-6",
+                  "text-base font-semibold",
+                  "flex items-center justify-center",
+                  "transition-colors duration-200",
+                  (isLoading || primaryDisabled) 
+                    ? "text-gray-500 cursor-not-allowed" 
+                    : "text-white"
+                )}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={primaryLabel}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center gap-2"
+                  >
+                    {isLoading ? "Processing..." : primaryLabel}
+                    {primaryIcon}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
+            )
           ) : (
             <motion.div
               key={`dual-${mode}`}
@@ -377,8 +450,10 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
                       transition={{ duration: 0.15 }}
+                      className="flex items-center gap-2"
                     >
                       {isLoading ? "Processing..." : primaryLabel}
+                      {primaryIcon}
                     </motion.span>
                   </AnimatePresence>
                 </motion.button>

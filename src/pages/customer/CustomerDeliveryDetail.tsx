@@ -24,8 +24,12 @@ import type { OrderWithDetails } from "@/types/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
+import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
 import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
+import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
+import { Lock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**
  * Build timeline events from delivery data
@@ -106,6 +110,8 @@ export default function CustomerDeliveryDetail() {
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const { addresses } = useCustomerAddresses();
+  const { bankAccounts } = useBankAccounts();
+  const { hasActiveOrder } = useActiveCustomerOrder();
   
   // Try to get delivery from location state first (for instant render)
   const [delivery, setDelivery] = useState<CustomerDelivery | null>(
@@ -117,6 +123,7 @@ export default function CustomerDeliveryDetail() {
   const [showReportIssueSheet, setShowReportIssueSheet] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
 
   // If not in state, find from deliveries list
@@ -212,6 +219,11 @@ export default function CustomerDeliveryDetail() {
   const handleReorder = useCallback(() => {
     if (isNavigating) return; // Prevent double-clicks
     
+    // Block reorder if there's an active order
+    if (hasActiveOrder) {
+      return;
+    }
+    
     if (!order) {
       toast.error("Order data not available for reorder");
       return;
@@ -222,6 +234,7 @@ export default function CustomerDeliveryDetail() {
       profile: profile || null,
       addresses: addresses || [],
       previousOrder: order,
+      bankAccounts: bankAccounts || [],
     });
     
     if (!result.ok) {
@@ -247,7 +260,7 @@ export default function CustomerDeliveryDetail() {
     setBottomSlot(null);
     
     navigate(`/customer/request?${params.toString()}`);
-  }, [order, navigate, isNavigating, setBottomSlot, profile, addresses]);
+  }, [order, navigate, isNavigating, setBottomSlot, profile, addresses, hasActiveOrder]);
   
   const handleStartNewRequest = useCallback(() => {
     // Navigate to normal order flow (no reorder params)
@@ -272,14 +285,47 @@ export default function CustomerDeliveryDetail() {
         <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           {/* Primary CTA */}
           <div className="flex w-full gap-3 items-center justify-center mb-2">
-            <Button
-              type="button"
-              onClick={handleReorder}
-              disabled={!order || loadingOrder || isNavigating}
-              className="w-full h-14"
-            >
-              {loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}
-            </Button>
+            {hasActiveOrder ? (
+              <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
+                <TooltipTrigger asChild>
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowTooltip(true);
+                    }}
+                    className="w-full cursor-pointer"
+                  >
+                    <Button
+                      type="button"
+                      disabled={true}
+                      className="w-full h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
+                    >
+                      <span>{loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}</span>
+                      <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                >
+                  <p className="leading-relaxed">
+                    Cannot make a new order when one is already in motion. Please wait for your current order to complete.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleReorder}
+                disabled={!order || loadingOrder || isNavigating}
+                className="w-full h-14 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <span>{loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}</span>
+              </Button>
+            )}
           </div>
           
           {/* Secondary Action: Report Problem */}

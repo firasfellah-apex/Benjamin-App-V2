@@ -726,7 +726,7 @@ export function ActiveDeliverySheet({
                     return `${runnerName} has your cash and is heading your way.`;
                   })()
                 : customerStatus.step === 'ARRIVED'
-                ? 'Your runner has arrived. Please meet up and share your verification PIN to receive your cash.'
+                ? 'Please meet up and share your verification PIN to receive your cash.'
                 : getExpandedStatusCopy(localOrder.status)}
             </p>
           </div>
@@ -995,7 +995,9 @@ export function ActiveDeliverySheet({
                   How did the count go?
                 </h3>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Count your cash with the runner. If anything&apos;s off, we&apos;ll handle it.
+                  Count your cash with the runner.
+                  <br />
+                  If anything&apos;s off, we&apos;ll handle it.
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1.5">
                   You&apos;ll have about 3 minutes to flag any issue for this delivery.

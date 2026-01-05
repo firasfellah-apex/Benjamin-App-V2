@@ -1,7 +1,7 @@
 /**
  * Delivery Style Utility Functions
  * 
- * Provides labels, hints, and instructions for delivery style (Counted vs Speed)
+ * Provides labels, hints, and instructions for delivery style (Counted vs Discreet)
  * used throughout the runner app to communicate handoff expectations.
  */
 
@@ -52,8 +52,8 @@ export function getDeliveryStyleCopy(style: DeliveryStyle) {
   }
   return {
     key: 'SPEED',
-    label: 'Speed handoff',
-    shortLabel: 'Speed',
+    label: 'Discreet handoff',
+    shortLabel: 'Discreet',
     description: 'Fast, discreet handoff – no counting required on the spot.'
   };
 }
@@ -81,7 +81,7 @@ export function getDeliveryStyleShortHint(style: DeliveryStyle): string {
 export function getDeliveryStyleChipLabel(style: DeliveryStyle): string {
   return style === 'COUNTED' 
     ? 'Counted · let them count in front of you'
-    : 'Speed · quick handoff after the PIN';
+    : 'Discreet · quick handoff after the PIN';
 }
 
 /**
@@ -94,7 +94,7 @@ export function getArrivalInstruction(style: DeliveryStyle): string {
     return 'This customer chose a Counted handoff.\n\nAfter you enter the PIN, stay with the customer while they count the cash in front of you. Do not leave until they confirm everything is correct.';
   }
   
-  return 'This customer chose a Speed handoff.\n\nAfter you enter the PIN, hand the cash to the customer and you may depart. They will count the cash later on their own.';
+  return 'This customer chose a Discreet handoff.\n\nAfter you enter the PIN, hand the cash to the customer and you may depart. They will count the cash later on their own.';
 }
 
 /**

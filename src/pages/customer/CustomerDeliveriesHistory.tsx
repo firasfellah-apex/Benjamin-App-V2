@@ -5,15 +5,13 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Star, UserRound } from "lucide-react";
 import { CustomerScreen } from "@/pages/customer/components/CustomerScreen";
 import { useCustomerDeliveries } from "@/features/customer/hooks/useCustomerDeliveries";
 import { Skeleton } from "@/components/common/Skeleton";
 import { 
   formatDeliveryTitle, 
   formatDeliveryListTimestamp, 
-  isDeliveryDelivered,
-  hasDeliveryRating
+  isDeliveryDelivered
 } from "@/lib/orderDisplay";
 import type { CustomerDelivery } from "@/types/delivery";
 import LottieComponent from 'lottie-react';
@@ -110,73 +108,33 @@ function DeliveryRowSkeleton() {
  * Delivery Row Component
  */
 function DeliveryRow({ delivery, onClick }: { delivery: CustomerDelivery; onClick: () => void }) {
-  const isDelivered = isDeliveryDelivered(delivery);
-  const isRated = hasDeliveryRating(delivery);
-  const canRate = isDelivered && !isRated;
-
   const handleRowClick = () => {
-    onClick();
-  };
-
-  const handleRateClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     onClick();
   };
 
   return (
     <div
       onClick={handleRowClick}
-      className="flex items-start justify-between gap-3 py-3 px-1 rounded-2xl active:bg-neutral-50 cursor-pointer"
+      className="w-full rounded-xl bg-white border border-[#F0F0F0] p-4 active:opacity-95 cursor-pointer transition-all"
     >
-      {/* Left side: text stack only (avatar is now inside the rating chip) */}
-      <div className="flex flex-col min-w-0 flex-1">
-        {/* Primary line */}
-        <span className="text-sm font-semibold text-slate-900 truncate">
-          {getDeliveryPrimaryLabel(delivery)}
-        </span>
+      <div className="flex items-start justify-between gap-3">
+        {/* Left side: text stack */}
+        <div className="flex flex-col min-w-0 flex-1">
+          {/* Primary line */}
+          <span className="text-sm font-semibold text-slate-900 truncate">
+            {getDeliveryPrimaryLabel(delivery)}
+          </span>
 
-        {/* Secondary line: just time (status is in the pill) */}
-        <span className="mt-0.5 text-xs text-slate-500">
-          {formatDeliveryListTimestamp(delivery)}
-        </span>
+          {/* Secondary line: just time */}
+          <span className="mt-0.5 text-xs text-slate-500">
+            {formatDeliveryListTimestamp(delivery)}
+          </span>
+        </div>
 
-        {/* Rating / rate affordance */}
-        {isDelivered && (
-          <div className="mt-1">
-            {isRated && delivery.customerRating ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span>{delivery.customerRating.toFixed(1)} · Your rating</span>
-              </span>
-            ) : canRate ? (
-              <button
-                type="button"
-                onClick={handleRateClick}
-                className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
-              >
-                {/* Small runner avatar inside the chip */}
-                <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center border border-amber-100 overflow-hidden flex-shrink-0">
-                  {delivery.runner && (delivery.runner.avatarUrl || (delivery.runner as any)?.avatar_url) ? (
-                    <img
-                      src={delivery.runner.avatarUrl || (delivery.runner as any)?.avatar_url}
-                      alt={(delivery.runner as any)?.first_name || delivery.runner.displayName?.split(" ")[0] || "Runner"}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <UserRound className="w-3 h-3 text-amber-500" />
-                  )}
-                </div>
-                <span>Rate runner</span>
-              </button>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {/* Right side: status pill + chevron, aligned with primary title line */}
-      <div className="flex items-center gap-2 flex-shrink-0 pl-2 self-start">
-        <DeliveryStatusBadge delivery={delivery} />
-        <ChevronRight className="w-4 h-4 text-slate-300" />
+        {/* Right side: status pill only */}
+        <div className="flex items-center flex-shrink-0 pl-2 self-start">
+          <DeliveryStatusBadge delivery={delivery} />
+        </div>
       </div>
     </div>
   );
@@ -286,14 +244,13 @@ export default function CustomerDeliveriesHistory() {
                   <h3 className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
                     Today
                   </h3>
-                  <div>
-                    {today.map((delivery, index) => (
-                      <div key={delivery.id} className={index > 0 ? "mt-3" : ""}>
-                        <DeliveryRow
-                          delivery={delivery}
-                          onClick={() => handleDeliveryClick(delivery)}
-                        />
-                      </div>
+                  <div className="space-y-3">
+                    {today.map((delivery) => (
+                      <DeliveryRow
+                        key={delivery.id}
+                        delivery={delivery}
+                        onClick={() => handleDeliveryClick(delivery)}
+                      />
                     ))}
                   </div>
                 </section>
@@ -304,14 +261,13 @@ export default function CustomerDeliveriesHistory() {
                   <h3 className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
                     Earlier
                   </h3>
-                  <div>
-                    {earlier.map((delivery, index) => (
-                      <div key={delivery.id} className={index > 0 ? "mt-3" : ""}>
-                        <DeliveryRow
-                          delivery={delivery}
-                          onClick={() => handleDeliveryClick(delivery)}
-                        />
-                      </div>
+                  <div className="space-y-3">
+                    {earlier.map((delivery) => (
+                      <DeliveryRow
+                        key={delivery.id}
+                        delivery={delivery}
+                        onClick={() => handleDeliveryClick(delivery)}
+                      />
                     ))}
                   </div>
                 </section>
