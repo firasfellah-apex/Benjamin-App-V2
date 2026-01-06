@@ -59,7 +59,6 @@ export function QuickReorderModal({
     return deliveryStyle === 'COUNTED' ? 'count_confirm' : 'quick_handoff';
   });
   const [loading, setLoading] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
 
   const { addresses } = useCustomerAddresses();
   const { bankAccounts, hasAnyBank } = useBankAccounts();
@@ -70,48 +69,40 @@ export function QuickReorderModal({
   const amountSectionRef = useRef<HTMLDivElement>(null);
   const deliverySectionRef = useRef<HTMLDivElement>(null);
 
-  // Track closing state for pointer events
+  // Prevent background scroll when modal is open - bulletproof with defensive resets
   useEffect(() => {
-    if (open) {
-      setIsClosing(false);
-    } else {
-      // When open becomes false, immediately disable pointer events
-      setIsClosing(true);
-    }
-  }, [open]);
+    const body = document.body;
 
-  // Prevent background scroll when modal is open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      // Restore scrolling immediately when modal closes
-      document.body.style.overflow = "";
-    }
-    
-    // Always restore scrolling on unmount
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+    // Defensive reset in case a previous modal left this broken
+    body.style.pointerEvents = "";
 
-  // Handler that sets closing state immediately
-  const handleClose = () => {
-    setIsClosing(true);
-    onOpenChange(false);
-  };
-
-  // Reset and auto-populate all fields when modal opens
-  useEffect(() => {
     if (!open) {
-      // Reset state when modal closes
-      setSelectedAddressId(null);
-      setSelectedBankAccountId(null);
-      setOpenSection(null);
+      body.style.overflow = "";
       return;
     }
 
-    // Reset amount and delivery mode from order when modal opens
+    const prevOverflow = body.style.overflow;
+    body.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.pointerEvents = "";
+    };
+  }, [open]);
+
+  // Handler that closes the modal
+  const handleClose = () => {
+    onOpenChange(false);
+  };
+
+  // Reset and auto-populate fields when modal opens
+  useEffect(() => {
+    if (!open) return;
+
+    // Opening: reset/auto-populate fields
+    setSelectedAddressId(null);
+    setSelectedBankAccountId(null);
+    setOpenSection(null);
     setAmount(order.requested_amount || 200);
     const deliveryStyle = resolveDeliveryStyleFromOrder(order);
     setDeliveryMode(deliveryStyle === 'COUNTED' ? 'count_confirm' : 'quick_handoff');
@@ -167,7 +158,7 @@ export function QuickReorderModal({
           }
         });
       });
-    }, 450); // Slightly after animation duration (420ms)
+    }, 340); // Slightly after animation duration (320ms)
 
     return () => clearTimeout(timeoutId);
   }, [openSection]);
@@ -258,7 +249,7 @@ export function QuickReorderModal({
         }
 
         toast.success(strings.toasts.orderPlaced);
-        onOpenChange(false);
+        handleClose();
         navigate(`/customer/deliveries/${newOrder.id}`);
       }
     } catch (error: any) {
@@ -271,6 +262,11 @@ export function QuickReorderModal({
   };
 
   const canConfirm = selectedAddressId && selectedBankAccountId && pricing;
+
+  // Shared animation constants
+  const ACCORDION_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+  const ACCORDION_DURATION = 0.32;
+  const ACCORDION_Y = 10;
 
   // Collapsed section header component
   const SectionHeader = ({
@@ -288,12 +284,11 @@ export function QuickReorderModal({
     const hasValue = children !== null;
 
     return (
-      <button
-        type="button"
+      <div
         onClick={() => toggleSection(section)}
-        className="w-full flex items-center justify-between py-3 text-left"
+        className="w-full flex items-center justify-between py-3 cursor-pointer"
       >
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 text-left">
           <div className="text-sm font-medium text-slate-900">{label}:</div>
           {!hasValue && (
             <div className="mt-0.5 text-sm text-slate-400">{emptyState || `Choose ${label.toLowerCase()}`}</div>
@@ -302,7 +297,7 @@ export function QuickReorderModal({
         <div className="flex items-center gap-3 flex-shrink-0">
           {hasValue && (
             <div className={cn(
-              "text-sm text-slate-600",
+              "text-sm font-semibold text-slate-900",
               section === "account" ? "" : "text-right whitespace-nowrap"
             )}>
               {children}
@@ -320,13 +315,13 @@ export function QuickReorderModal({
           >
             <motion.div
               animate={{ rotate: isOpen ? 180 : 0 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
             >
               <ChevronDown className="w-5 h-5 text-slate-900" />
             </motion.div>
           </IconButton>
         </div>
-      </button>
+      </div>
     );
   };
 
@@ -335,7 +330,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "address";
 
     return (
-      <motion.div ref={addressSectionRef} layout>
+      <div ref={addressSectionRef}>
         <SectionHeader
           label="Address"
           section="address"
@@ -348,15 +343,14 @@ export function QuickReorderModal({
           ) : null}
         </SectionHeader>
 
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="wait">
           {isOpen && (
             <motion.div
               key="address-content"
-              layout
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              animate={{ height: "auto", opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
               style={{ overflow: "hidden" }}
             >
               <div className="pt-2 pb-4 space-y-3">
@@ -390,21 +384,11 @@ export function QuickReorderModal({
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => {
-                    // TODO: Open add address modal
-                    onOpenChange(false);
-                  }}
-                  className="w-full text-center text-sm font-medium text-slate-900 py-2"
-                >
-                  Add Another Address
-                </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     );
   };
 
@@ -413,7 +397,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "account";
 
     return (
-      <motion.div ref={accountSectionRef} layout>
+      <div ref={accountSectionRef}>
         <SectionHeader
           label="Account"
           section="account"
@@ -435,7 +419,7 @@ export function QuickReorderModal({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold text-slate-900 truncate">
+                <h3 className="text-sm font-semibold text-slate-900 truncate">
                   {selectedBankAccount.bank_institution_name || "Bank Account"}
                 </h3>
                 {selectedBankAccount.bank_last4 && (
@@ -448,15 +432,14 @@ export function QuickReorderModal({
           ) : null}
         </SectionHeader>
 
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="wait">
           {isOpen && (
             <motion.div
               key="account-content"
-              layout
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              animate={{ height: "auto", opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
               style={{ overflow: "hidden" }}
             >
               <div className="pt-2 pb-4 space-y-3">
@@ -511,31 +494,16 @@ export function QuickReorderModal({
                               **** {bank.bank_last4}
                             </p>
                           </div>
-                          {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center flex-shrink-0">
-                              <div className="h-2 w-2 rounded-full bg-white" />
-                            </div>
-                          )}
                         </button>
                       );
                     })}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // TODO: Open add bank account flow
-                        onOpenChange(false);
-                      }}
-                      className="w-full text-center text-sm font-medium text-slate-900 py-2"
-                    >
-                      Add Bank Account
-                    </button>
                   </>
                 )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     );
   };
 
@@ -544,31 +512,31 @@ export function QuickReorderModal({
     const isOpen = openSection === "amount";
 
     return (
-      <motion.div ref={amountSectionRef} layout>
+      <div ref={amountSectionRef}>
         <SectionHeader
           label="Amount"
           section="amount"
         >
-          <>
-            <span className="font-semibold">${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+          <span className="inline-flex items-baseline gap-2">
+            <span className="text-slate-900 font-semibold">
+              ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            </span>
             {pricing && (
-              <span className="text-slate-500">
-                {" • You'll pay $"}
-                {pricing.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className="text-xs font-medium text-slate-500">
+                • You'll pay ${pricing.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             )}
-          </>
+          </span>
         </SectionHeader>
 
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="wait">
           {isOpen && (
             <motion.div
               key="amount-content"
-              layout
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              animate={{ height: "auto", opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
               style={{ overflow: "hidden" }}
             >
               <div className="pt-2 pb-4 space-y-4">
@@ -600,7 +568,7 @@ export function QuickReorderModal({
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     );
   };
 
@@ -609,7 +577,7 @@ export function QuickReorderModal({
     const isOpen = openSection === "delivery";
 
     return (
-      <motion.div ref={deliverySectionRef} layout>
+      <div ref={deliverySectionRef}>
         <SectionHeader
           label="Delivery Style"
           section="delivery"
@@ -617,15 +585,14 @@ export function QuickReorderModal({
           {deliveryMode === "count_confirm" ? "Counted" : "Discreet"}
         </SectionHeader>
 
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="wait">
           {isOpen && (
             <motion.div
               key="delivery-content"
-              layout
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              animate={{ height: "auto", opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
+              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
               style={{ overflow: "hidden" }}
             >
               <div className="pt-2 pb-4">
@@ -637,113 +604,79 @@ export function QuickReorderModal({
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     );
   };
 
-  if (typeof document === "undefined") {
+  if (typeof document === "undefined" || !open) {
     return null;
   }
 
   return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            animate={{ opacity: 1, backdropFilter: "blur(8px)" }}
-            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 bg-black/40 z-[80]"
-            onClick={handleClose}
-            style={{ pointerEvents: !isClosing && open ? "auto" : "none" }}
-          />
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/40 z-[80]"
+        onClick={handleClose}
+      />
 
-          {/* Modal Container - Bottom Sheet */}
-          <div 
-            key="modal-container" 
-            className="fixed inset-0 z-[90] flex items-end justify-center px-4 pt-8 pb-[max(16px,env(safe-area-inset-bottom))]"
-            style={{ pointerEvents: !isClosing ? "none" : "none" }}
-          >
-            {/* Modal Content - Bottom Sheet */}
-            <motion.div
-              key="modal-content"
-              drag={!isClosing ? "y" : false}
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={0.12}
-              dragMomentum={false}
-              onDragEnd={(_, info) => {
-                const closeThreshold = 120;
-                const velocityThreshold = 800;
-                if (info.offset.y > closeThreshold || info.velocity.y > velocityThreshold) {
-                  handleClose();
-                }
-              }}
-              initial={{ y: 18, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 18, opacity: 0 }}
-              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-              style={{ pointerEvents: !isClosing ? "auto" : "none" }}
-              onClick={(e) => e.stopPropagation()}
+      {/* Modal Container */}
+      <div className="fixed inset-0 z-[90] flex items-end justify-center">
+        <div
+          className="relative w-full bg-white rounded-t-[28px] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex-shrink-0 px-6 pt-6 pb-4 flex items-center justify-between">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900">Quick Reorder</h2>
+              <p className="text-sm text-gray-600 mt-0.5">Confirm everything looks right.</p>
+            </div>
+
+            <IconButton
+              type="button"
+              onClick={handleClose}
+              variant="default"
+              size="lg"
+              className="flex-shrink-0"
+              aria-label="Close"
             >
-              {/* Drag Handle */}
-              <div className="flex justify-center pt-3 pb-2">
-                <div className="h-1 w-12 rounded-full bg-black/10" />
-              </div>
-              
-              {/* Header */}
-              <div className="flex-shrink-0 px-6 pb-4 flex items-center justify-between">
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-gray-900">Quick Reorder</h2>
-                  <p className="text-sm text-gray-600 mt-0.5">Confirm everything looks right.</p>
-                </div>
-                <IconButton
-                  type="button"
-                  onClick={handleClose}
-                  variant="default"
-                  size="lg"
-                  className="flex-shrink-0"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5 text-slate-900" />
-                </IconButton>
-              </div>
-              {/* Divider below header */}
-              <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
-
-              {/* Scrollable Content */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-                <div className="space-y-1">
-                  <AddressSection />
-                  <div className="h-[1px] bg-[#F7F7F7] my-2" />
-                  <AccountSection />
-                  <div className="h-[1px] bg-[#F7F7F7] my-2" />
-                  <AmountSection />
-                  <div className="h-[1px] bg-[#F7F7F7] my-2" />
-                  <DeliverySection />
-                </div>
-              </div>
-
-              {/* Divider above footer */}
-              <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
-              {/* Sticky Footer with CTA */}
-              <div className="flex-shrink-0 bg-white px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-                <SlideToConfirm
-                  onConfirm={handleConfirm}
-                  disabled={!canConfirm || loading}
-                  label="Slide to Confirm"
-                  isLoading={loading}
-                  loadingLabel="Creating order..."
-                />
-              </div>
-            </motion.div>
+              <X className="h-5 w-5 text-slate-900" />
+            </IconButton>
           </div>
-        </>
-      )}
-    </AnimatePresence>,
+
+          {/* Divider */}
+          <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+
+          {/* Scrollable Content */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <div className="space-y-1">
+              <AddressSection />
+              <div className="h-[1px] bg-[#F7F7F7] my-2" />
+              <AccountSection />
+              <div className="h-[1px] bg-[#F7F7F7] my-2" />
+              <AmountSection />
+              <div className="h-[1px] bg-[#F7F7F7] my-2" />
+              <DeliverySection />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+
+          {/* Footer */}
+          <div className="flex-shrink-0 bg-white px-6 pt-5 pb-[max(16px,env(safe-area-inset-bottom))]">
+            <SlideToConfirm
+              onConfirm={handleConfirm}
+              disabled={!canConfirm || loading}
+              label="Slide to Confirm"
+              isLoading={loading}
+              loadingLabel="Creating order..."
+            />
+          </div>
+        </div>
+      </div>
+    </>,
     document.body
   );
 }
