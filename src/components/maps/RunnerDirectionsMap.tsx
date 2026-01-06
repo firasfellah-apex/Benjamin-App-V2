@@ -297,12 +297,12 @@ export function RunnerDirectionsMap({
         initializationAttemptedRef.current = false;
       }
     }
-
-      if (initializationAttemptedRef.current) return;
-      if (!mapContainerRef.current) return;
-      if (!mapContainerRef.current.parentNode) return;
-      initializationAttemptedRef.current = true;
-
+    
+    if (initializationAttemptedRef.current) return;
+    if (!mapContainerRef.current) return;
+    if (!mapContainerRef.current.parentNode) return;
+    initializationAttemptedRef.current = true;
+    
     const { MAPBOX_ACCESS_TOKEN } = getEnv();
     if (!MAPBOX_ACCESS_TOKEN) {
       console.error('[RunnerDirectionsMap] Missing MAPBOX_ACCESS_TOKEN');
@@ -321,7 +321,7 @@ export function RunnerDirectionsMap({
       setTimeout(() => initializeMap(), 100);
       return;
     }
-    
+
     try {
       const centerLng = destination.lng;
       const centerLat = destination.lat;
@@ -349,7 +349,7 @@ export function RunnerDirectionsMap({
       });
 
       mapRef.current = map;
-      
+
       // Force canvas background to dark (prevents blue flash during resize)
       try {
         map.getCanvas().style.backgroundColor = '#1a1a2e';
@@ -438,7 +438,7 @@ export function RunnerDirectionsMap({
             try {
               if (currentMap.getSource(ROUTE_SOURCE_ID)) currentMap.removeSource(ROUTE_SOURCE_ID);
             } catch { /* source might not exist */ }
-            
+        
             // Add route source and layer
             currentMap.addSource(ROUTE_SOURCE_ID, {
               type: 'geojson',
@@ -453,14 +453,14 @@ export function RunnerDirectionsMap({
             });
           } catch (e) {
             console.error('[RunnerDirectionsMap] Failed to re-add route:', e);
-          }
-        }, 100);
+            }
+          }, 100);
 
         // Re-add markers after style loads
         setTimeout(() => {
           const currentMap = mapRef.current;
           if (!currentMap || !origin || !destination) return;
-          
+
           // Clear existing markers
           markersRef.current.forEach(m => { try { m.remove(); } catch { /* ignore */ } });
           markersRef.current = [];
@@ -537,7 +537,7 @@ export function RunnerDirectionsMap({
         if (!response.ok) {
           throw new Error(`Directions API error: ${response.status}`);
         }
-
+        
         const data = await response.json();
 
         if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
@@ -600,7 +600,7 @@ export function RunnerDirectionsMap({
           
           // Use getPadding as single source of truth - it includes uiBottomInset in padding
           const initialPadding = getPadding(isFullscreenRef.current, tilted);
-          
+
           // Use unified fit function (no offset - padding handles safe area)
           fitToBoundsWithPadding(map, bounds, initialPadding, true);
 
@@ -614,8 +614,8 @@ export function RunnerDirectionsMap({
     // Wait for map to be ready before fetching route
     const tryFetchRoute = () => {
       if (map.isStyleLoaded()) {
-        fetchRoute();
-      } else {
+      fetchRoute();
+    } else {
         // If style not loaded, wait for it
         map.once('style.load', fetchRoute);
       }
@@ -634,7 +634,7 @@ export function RunnerDirectionsMap({
     const map = mapRef.current;
     // Only check if map exists and is ready - Mapbox will queue work if not ready
     if (!map) return;
-
+    
     const addMarkers = () => {
       // Clear existing markers
       markersRef.current.forEach(m => { try { m.remove(); } catch { /* ignore */ } });
@@ -664,7 +664,7 @@ export function RunnerDirectionsMap({
         }
       } catch { /* ignore */ }
     };
-
+    
     // Wait for map to be fully loaded before adding markers
     if (!map.loaded()) {
       const loadHandler = () => {
@@ -674,17 +674,17 @@ export function RunnerDirectionsMap({
       map.on('load', loadHandler);
       return;
     }
-
+    
     // Map is loaded, add markers immediately
     addMarkers();
-
+    
     // Also listen for style.load to re-add markers if style changes
     const styleLoadHandler = () => {
       // Wait a bit for style to fully render
       setTimeout(addMarkers, 100);
     };
     map.on('style.load', styleLoadHandler);
-
+    
     return () => {
       map.off('style.load', styleLoadHandler);
     };
@@ -827,7 +827,7 @@ export function RunnerDirectionsMap({
       animate
     );
   }, [fitToBoundsWithPadding, getPadding]);
-  
+
   const handleRecenter = () => {
     const map = mapRef.current;
     if (!map || !routeBoundsRef.current) return;
@@ -1134,7 +1134,7 @@ export function RunnerDirectionsMap({
     );
   }
 
-  return (
+    return (
     <div 
       className={cn(
         'relative bg-slate-900 overflow-hidden',
@@ -1186,7 +1186,7 @@ export function RunnerDirectionsMap({
               <span className="text-sm font-semibold text-white">
                 {routeData.duration ? `${Math.round(routeData.duration / 60)} min` : '--'}
               </span>
-            </div>
+              </div>
             
             {/* Distance with Route icon */}
             <div className="flex items-center gap-2">
@@ -1194,8 +1194,8 @@ export function RunnerDirectionsMap({
               <span className="text-sm font-semibold text-white">
                 {routeData.distance ? `${(routeData.distance / 1609.34).toFixed(1)} mi` : '--'}
               </span>
+              </div>
             </div>
-          </div>
         </div>
       )}
       
@@ -1230,7 +1230,7 @@ export function RunnerDirectionsMap({
         )}
         
         {/* Recenter button - below fullscreen toggle */}
-        {showRecenter && showRecenterButton && (
+      {showRecenter && showRecenterButton && (
           <IconButton
             onClick={handleRecenter}
             size="lg"
@@ -1239,7 +1239,7 @@ export function RunnerDirectionsMap({
           >
             <Focus className="h-5 w-5 text-gray-600" />
           </IconButton>
-        )}
+      )}
       </div>
 
       {/* Map control buttons (bottom right) */}
@@ -1281,37 +1281,37 @@ export function RunnerDirectionsMap({
             )}
             
             {/* Layer switcher button */}
-            <IconButton
-              onClick={() => setShowLayerModal(true)}
-              size="lg"
-              className="bg-white/95 backdrop-blur shadow-lg"
-              aria-label="Map layers"
-            >
-              <Layers className="h-5 w-5 text-gray-600" />
-            </IconButton>
+          <IconButton
+            onClick={() => setShowLayerModal(true)}
+            size="lg"
+            className="bg-white/95 backdrop-blur shadow-lg"
+            aria-label="Map layers"
+          >
+            <Layers className="h-5 w-5 text-gray-600" />
+          </IconButton>
           </div>
         </div>
       )}
 
       {/* Layer selector modal - rendered via Portal to escape overflow:hidden and z-index stacking */}
       {createPortal(
-        <AnimatePresence>
-          {showLayerModal && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+      <AnimatePresence>
+        {showLayerModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/60 z-[9998]"
-                onClick={() => setShowLayerModal(false)}
-              />
-              <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={() => setShowLayerModal(false)}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 className="fixed bottom-0 left-0 right-0 bg-[#1A1A1A] rounded-t-[24px] z-[9999] p-5 pb-6"
-              >
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-white">Map layer</h3>
                 <IconButton

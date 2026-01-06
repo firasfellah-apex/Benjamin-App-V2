@@ -252,7 +252,7 @@ export default function CashAmountInput({
             style={{ 
               height: "44px",
               top: "-17px",
-              margin: 0,
+              margin: 0, 
               padding: 0,
               pointerEvents: "none" 
             }}

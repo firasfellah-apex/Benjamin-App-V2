@@ -311,15 +311,15 @@ export default function ManageAddresses() {
             {/* Header - centered */}
             <div className="flex items-center justify-center">
               <span className="text-base font-semibold text-slate-900">Add Your First Address</span>
-            </div>
+          </div>
             
             {/* Subtitle - centered */}
             <div className="flex items-center justify-center">
               <p className="text-sm text-slate-700 text-center">
-                Save a place where you'd like cash delivered.
-                <br />
-                You can add more later.
-              </p>
+              Save a place where you'd like cash delivered.
+              <br />
+              You can add more later.
+            </p>
             </div>
           </div>
         </div>

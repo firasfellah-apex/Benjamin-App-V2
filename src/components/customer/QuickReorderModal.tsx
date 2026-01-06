@@ -1,7 +1,6 @@
 /**
  * QuickReorderModal Component
- * 
- * Accordion-style modal for quick reordering with:
+ * * Accordion-style modal for quick reordering with:
  * - Single-open-section accordion
  * - Reuses existing selection components
  * - Sticky "Slide to Confirm" CTA
@@ -9,7 +8,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // Removed LayoutGroup
 import { X, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
@@ -40,6 +39,25 @@ interface QuickReorderModalProps {
   order: OrderWithDetails;
 }
 
+// 1. Define specific, sleek animation constants
+const ACCORDION_VARIANTS = {
+  collapsed: { 
+    height: 0, 
+    opacity: 0,
+    transition: { 
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }, // Standard Material/iOS ease
+      opacity: { duration: 0.2 } // Fade out faster than collapse
+    }
+  },
+  open: { 
+    height: "auto", 
+    opacity: 1,
+    transition: { 
+      height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+      opacity: { duration: 0.4, delay: 0.1 } // Delay fade in slightly
+    }
+  }
+};
 
 export function QuickReorderModal({
   open,
@@ -68,40 +86,30 @@ export function QuickReorderModal({
   const amountSectionRef = useRef<HTMLDivElement>(null);
   const deliverySectionRef = useRef<HTMLDivElement>(null);
   
-  // Scroll container ref for scrollable content
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Prevent background scroll when modal is open - bulletproof with defensive resets
+  // Prevent background scroll
   useEffect(() => {
     const body = document.body;
-
-    // Defensive reset in case a previous modal left this broken
     body.style.pointerEvents = "";
-
     if (!open) {
       body.style.overflow = "";
       return;
     }
-
     const prevOverflow = body.style.overflow;
     body.style.overflow = "hidden";
-
     return () => {
       body.style.overflow = prevOverflow;
       body.style.pointerEvents = "";
     };
   }, [open]);
 
-  // Handler that closes the modal
   const handleClose = () => {
     onOpenChange(false);
   };
 
-  // Reset and auto-populate fields when modal opens
   useEffect(() => {
     if (!open) return;
-
-    // Opening: reset/auto-populate fields
     setSelectedAddressId(null);
     setSelectedBankAccountId(null);
     setOpenSection(null);
@@ -110,10 +118,8 @@ export function QuickReorderModal({
     setDeliveryMode(deliveryStyle === 'COUNTED' ? 'count_confirm' : 'quick_handoff');
   }, [open, order.id, order.requested_amount]);
 
-  // Auto-select address from order when addresses are loaded
   useEffect(() => {
     if (!open || addresses.length === 0) return;
-
     if (order.address_id) {
       const addressExists = addresses.some(a => a.id === order.address_id);
       if (addressExists) {
@@ -121,46 +127,38 @@ export function QuickReorderModal({
         return;
       }
     }
-    
-    // If order's address doesn't exist or no address_id, use first available
     setSelectedAddressId(addresses[0].id);
   }, [open, order.address_id, addresses]);
 
-  // Auto-select first available bank account when banks are loaded
   useEffect(() => {
     if (!open || !hasAnyBank || bankAccounts.length === 0) return;
-    
     setSelectedBankAccountId(bankAccounts[0].id);
   }, [open, hasAnyBank, bankAccounts]);
 
   const toggleSection = (section: Exclude<OpenSection, null>) => {
-    setOpenSection((prev) => {
-      const newSection = prev === section ? null : section;
-      return newSection;
-    });
+    setOpenSection((prev) => (prev === section ? null : section));
   };
 
-  // Scroll to section after animation completes (using requestAnimationFrame to wait for layout)
+  // Scroll logic
   useEffect(() => {
     if (!openSection) return;
 
-    // Wait for animation to complete (0.55s max-height + 0.45s opacity with 0.1s delay = ~0.65s total)
+    // Reduced timeout to match new animation speed
     const timeoutId = setTimeout(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const refs = {
-            address: addressSectionRef,
-            account: accountSectionRef,
-            amount: amountSectionRef,
-            delivery: deliverySectionRef,
-          };
-          const ref = refs[openSection];
-          if (ref?.current) {
-            ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          }
-        });
+        const refs = {
+          address: addressSectionRef,
+          account: accountSectionRef,
+          amount: amountSectionRef,
+          delivery: deliverySectionRef,
+        };
+        const ref = refs[openSection];
+        // Use 'nearest' to prevent jarring jumps if the element is already visible
+        if (ref?.current) {
+          ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
       });
-    }, 700); // Slightly after animation duration (650ms + buffer)
+    }, 360); 
 
     return () => clearTimeout(timeoutId);
   }, [openSection]);
@@ -168,7 +166,6 @@ export function QuickReorderModal({
   const selectedAddress = addresses.find(a => a.id === selectedAddressId);
   const selectedBankAccount = bankAccounts.find(b => b.id === selectedBankAccountId);
 
-  // Calculate pricing
   const pricing = useMemo(() => {
     if (!selectedAddress) return null;
     return calculatePricing({
@@ -182,20 +179,17 @@ export function QuickReorderModal({
 
   const handleAddressSelect = (address: CustomerAddress) => {
     setSelectedAddressId(address.id);
-    setOpenSection(null); // Auto-collapse
+    setOpenSection(null);
   };
 
   const handleBankAccountSelect = (bankId: string) => {
     setSelectedBankAccountId(bankId);
-    setOpenSection(null); // Auto-collapse
+    setOpenSection(null);
   };
 
   const handleAmountChange = (newAmount: number) => {
     setAmount(newAmount);
-
-    const amount_range =
-      newAmount >= 500 ? "high" : newAmount >= 300 ? "medium" : "low";
-
+    const amount_range = newAmount >= 500 ? "high" : newAmount >= 300 ? "medium" : "low";
     track("cash_amount_changed", {
       amount: newAmount,
       amount_range,
@@ -205,7 +199,7 @@ export function QuickReorderModal({
 
   const handleDeliveryModeChange = (mode: DeliveryMode) => {
     setDeliveryMode(mode);
-    setOpenSection(null); // Auto-collapse
+    setOpenSection(null);
   };
 
   const handleConfirm = async () => {
@@ -220,7 +214,6 @@ export function QuickReorderModal({
       return;
     }
 
-    // Validate daily limit
     if (profile && profile.daily_usage + pricing.total > profile.daily_limit) {
       toast.error(`${strings.customer.dailyLimitExceeded} $${(profile.daily_limit - profile.daily_usage).toFixed(2)}`);
       return;
@@ -231,7 +224,6 @@ export function QuickReorderModal({
       const deliveryNotes = selectedAddress.delivery_notes || "";
       const deliveryStyle = deliveryMode === 'count_confirm' ? 'COUNTED' as const : 'SPEED' as const;
 
-      // Track order submission
       track('order_submitted', {
         amount: amount,
         total_cost: pricing.total,
@@ -251,13 +243,11 @@ export function QuickReorderModal({
       );
 
       if (newOrder) {
-        // Invalidate profile cache to update daily_usage immediately
         clearProfileCache();
         if (profile?.id) {
           await queryClient.invalidateQueries({ queryKey: ['profile', profile.id] });
           await queryClient.refetchQueries({ queryKey: ['profile', profile.id] });
         }
-
         toast.success(strings.toasts.orderPlaced);
         handleClose();
         navigate(`/customer/deliveries/${newOrder.id}`);
@@ -273,11 +263,7 @@ export function QuickReorderModal({
 
   const canConfirm = selectedAddressId && selectedBankAccountId && pricing;
 
-  // Shared animation constants
-  const ACCORDION_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-  const ACCORDION_DURATION = 0.32;
-
-  // Collapsed section header component
+  // 2. Simplified Section Header (Removed 'layout' prop)
   const SectionHeader = ({
     label,
     section,
@@ -295,7 +281,7 @@ export function QuickReorderModal({
     return (
       <div
         onClick={() => toggleSection(section)}
-        className="w-full flex items-center justify-between py-3 cursor-pointer"
+        className="w-full flex items-center justify-between py-3 cursor-pointer group select-none"
       >
         <div className="flex-1 min-w-0 text-left">
           <div className="text-sm font-medium text-slate-900">{label}:</div>
@@ -306,7 +292,9 @@ export function QuickReorderModal({
         <div className="flex items-center gap-3 flex-shrink-0">
           {hasValue && (
             <div className={cn(
-              "text-sm font-semibold text-slate-900",
+              "text-sm font-semibold text-slate-900 transition-opacity duration-200",
+              // Optional: fade out the summary slightly when open to focus on content
+              isOpen ? "opacity-50" : "opacity-100",
               section === "account" ? "" : "text-right whitespace-nowrap"
             )}>
               {children}
@@ -322,9 +310,10 @@ export function QuickReorderModal({
             }}
             aria-label={isOpen ? "Collapse" : "Expand"}
           >
+            {/* 3. Smooth Chevron Rotation */}
             <motion.div
               animate={{ rotate: isOpen ? 180 : 0 }}
-              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
+              transition={{ duration: 0.3, ease: "circOut" }}
             >
               <ChevronDown className="w-5 h-5 text-slate-900" />
             </motion.div>
@@ -334,59 +323,42 @@ export function QuickReorderModal({
     );
   };
 
-  // Address section
+  // 4. Address Section
   const AddressSection = () => {
     const isOpen = openSection === "address";
-
     return (
       <div ref={addressSectionRef}>
-        <SectionHeader
-          label="Address"
-          section="address"
-          emptyState="Add address"
-        >
+        <SectionHeader label="Address" section="address" emptyState="Add address">
           {selectedAddress ? (
             <span className="font-semibold">
               {selectedAddress.label || getAddressPrimaryLine(selectedAddress) || "Home"}
             </span>
           ) : null}
         </SectionHeader>
-
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[500px] opacity-100" 
-              : "max-h-0 opacity-0"
-          )}
-          style={{
-            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxSizing: "border-box",
-            willChange: "max-height",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4 space-y-3"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s" // Fade in 100ms after expansion starts
-                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out with slower transition
-              pointerEvents: isOpen ? "auto" : "none",
-              boxSizing: "border-box",
-            }}
-          >
+        
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="address-content"
+              variants={ACCORDION_VARIANTS}
+              initial="collapsed"
+              animate="open"
+              exit="collapsed"
+              className="overflow-hidden"
+              // transform: translateZ(0) forces GPU acceleration for smoother frames
+              style={{ transform: "translateZ(0)" }} 
+            >
+              <div className="pt-2 pb-4 space-y-3">
                 {addresses.map((addr) => {
                   const IconComponent = getIconByName(addr.icon || "Home");
                   const isSelected = addr.id === selectedAddressId;
-
                   return (
                     <button
                       key={addr.id}
                       type="button"
                       onClick={() => handleAddressSelect(addr)}
                       className={cn(
-                        "w-full rounded-xl bg-white p-4 text-left border transition-all",
+                        "w-full rounded-xl bg-white p-4 text-left border transition-colors duration-200",
                         isSelected
                           ? "border-2 border-black"
                           : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
@@ -406,23 +378,20 @@ export function QuickReorderModal({
                     </button>
                   );
                 })}
-          </div>
-        </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   };
 
-  // Account section
+  // 5. Account Section
   const AccountSection = () => {
     const isOpen = openSection === "account";
-
     return (
       <div ref={accountSectionRef}>
-        <SectionHeader
-          label="Account"
-          section="account"
-          emptyState="Connect a bank account"
-        >
+        <SectionHeader label="Account" section="account" emptyState="Connect a bank account">
           {selectedBankAccount ? (
             <div className="flex items-center gap-3">
               {selectedBankAccount.bank_institution_logo_url ? (
@@ -443,49 +412,32 @@ export function QuickReorderModal({
                   {selectedBankAccount.bank_institution_name || "Bank Account"}
                 </h3>
                 {selectedBankAccount.bank_last4 && (
-                  <p className="text-sm text-slate-600">
-                    **** {selectedBankAccount.bank_last4}
-                  </p>
+                  <p className="text-sm text-slate-600">**** {selectedBankAccount.bank_last4}</p>
                 )}
               </div>
             </div>
           ) : null}
         </SectionHeader>
-
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[500px] opacity-100" 
-              : "max-h-0 opacity-0"
-          )}
-          style={{
-            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxSizing: "border-box",
-            willChange: "max-height",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4 space-y-3"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s" // Fade in 100ms after expansion starts
-                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out with slower transition
-              pointerEvents: isOpen ? "auto" : "none",
-              boxSizing: "border-box",
-            }}
-          >
+        
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="account-content"
+              variants={ACCORDION_VARIANTS}
+              initial="collapsed"
+              animate="open"
+              exit="collapsed"
+              className="overflow-hidden"
+              style={{ transform: "translateZ(0)" }}
+            >
+              <div className="pt-2 pb-4 space-y-3">
                 {!hasAnyBank ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-slate-600 mb-3">No bank accounts connected</p>
                     <button
                       type="button"
-                      onClick={() => {
-                        // TODO: Open bank connection flow
-                        onOpenChange(false);
-                      }}
-                      className="text-sm font-medium text-slate-900"
+                      onClick={() => onOpenChange(false)}
+                      className="text-sm font-medium text-slate-900 underline"
                     >
                       Add Bank Account
                     </button>
@@ -500,7 +452,7 @@ export function QuickReorderModal({
                           type="button"
                           onClick={() => handleBankAccountSelect(bank.id)}
                           className={cn(
-                            "w-full rounded-xl bg-white p-4 text-left border transition-all flex items-center gap-3",
+                            "w-full rounded-xl bg-white p-4 text-left border transition-colors duration-200 flex items-center gap-3",
                             isSelected
                               ? "border-2 border-black"
                               : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
@@ -523,40 +475,30 @@ export function QuickReorderModal({
                             <h3 className="text-base font-semibold text-slate-900 truncate">
                               {bank.bank_institution_name || "Bank Account"}
                             </h3>
-                            <p className="text-sm text-slate-600">
-                              **** {bank.bank_last4}
-                            </p>
+                            <p className="text-sm text-slate-600">**** {bank.bank_last4}</p>
                           </div>
                         </button>
                       );
                     })}
                   </>
                 )}
-          </div>
-        </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   };
 
-  // Amount section
+  // 6. Amount Section
   const AmountSection = () => {
     const isOpen = openSection === "amount";
     const [isEditing, setIsEditing] = useState(false);
     const [inputValue, setInputValue] = useState(String(amount));
 
-    // Sync input with amount when not editing
     useEffect(() => {
-      if (!isEditing) {
-        setInputValue(String(amount));
-      }
+      if (!isEditing) setInputValue(String(amount));
     }, [amount, isEditing]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value.replace(/,/g, "");
-      if (/^\d*$/.test(raw)) {
-        setInputValue(raw);
-      }
-    };
 
     const handleInputBlur = () => {
       const num = Number(inputValue.replace(/,/g, ""));
@@ -567,7 +509,6 @@ export function QuickReorderModal({
         setInputValue(String(1000));
         handleAmountChange(1000);
       } else {
-        // Round to nearest 20
         const rounded = Math.round(num / 20) * 20;
         const clamped = Math.min(1000, Math.max(100, rounded));
         setInputValue(String(clamped));
@@ -576,26 +517,16 @@ export function QuickReorderModal({
       setIsEditing(false);
     };
 
-    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handleInputBlur();
-      }
-    };
-
     const handleQuickPick = (amt: number) => {
       handleAmountChange(amt);
       setInputValue(String(amt));
       setIsEditing(false);
-      setOpenSection(null); // Auto-collapse
+      setOpenSection(null);
     };
 
     return (
       <div ref={amountSectionRef}>
-        <SectionHeader
-          label="Amount"
-          section="amount"
-        >
+        <SectionHeader label="Amount" section="amount">
           <span className="inline-flex items-baseline gap-2">
             <span className="text-slate-900 font-semibold">
               ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
@@ -607,40 +538,22 @@ export function QuickReorderModal({
             )}
           </span>
         </SectionHeader>
-
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[500px] opacity-100" 
-              : "max-h-0 opacity-0"
-          )}
-          style={{
-            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxSizing: "border-box",
-            willChange: "max-height",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4 space-y-4"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s"
-                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
-              pointerEvents: isOpen ? "auto" : "none",
-              boxSizing: "border-box",
-            }}
-          >
-            {/* Large Amount Input */}
-            <div>
-              <div
-                className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center"
-                style={{ height: '96px', borderRadius: '12px' }}
-              >
-                {!isEditing ? (
-                  <div
-                    onClick={() => {
+        
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="amount-content"
+              variants={ACCORDION_VARIANTS}
+              initial="collapsed"
+              animate="open"
+              exit="collapsed"
+              className="overflow-hidden"
+              style={{ transform: "translateZ(0)" }}
+            >
+              <div className="pt-2 pb-4 space-y-4">
+                <div
+                  onClick={() => {
+                    if (!isEditing) {
                       setIsEditing(true);
                       setInputValue(String(amount));
                       setTimeout(() => {
@@ -648,118 +561,97 @@ export function QuickReorderModal({
                         input?.focus();
                         input?.select();
                       }, 0);
-                    }}
-                    className="cursor-text hover:opacity-80 transition-opacity"
-                  >
+                    }
+                  }}
+                  className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center cursor-text hover:opacity-80 transition-opacity"
+                  style={{ height: '96px', borderRadius: '12px' }}
+                >
+                  {!isEditing ? (
                     <p className="text-4xl font-semibold text-slate-900">
                       ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                     </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-1">
-                    <span className="text-4xl font-semibold text-slate-900">$</span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={inputValue.replace(/,/g, "")}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      onKeyDown={handleInputKeyDown}
-                      className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
-                      style={{ maxWidth: '200px' }}
-                      aria-label="Cash amount"
-                      autoFocus
-                    />
+                  ) : (
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-4xl font-semibold text-slate-900">$</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={inputValue.replace(/,/g, "")}
+                        onChange={(e) => setInputValue(e.target.value.replace(/,/g, ""))}
+                        onBlur={handleInputBlur}
+                        onKeyDown={(e) => e.key === "Enter" && handleInputBlur()}
+                        className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
+                        style={{ maxWidth: '200px' }}
+                        aria-label="Cash amount"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  {[100, 200, 500, 1000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => handleQuickPick(amt)}
+                      className={cn(
+                        "flex-1 h-11 rounded-full text-sm font-medium text-slate-900 flex items-center justify-center transition-colors touch-manipulation",
+                        amount === amt ? "border-2 border-black bg-white" : "border-0 bg-[#F7F7F7]"
+                      )}
+                    >
+                      ${amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+
+                {pricing && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">You'll Get</span>
+                      <span className="font-semibold text-slate-900">${amount.toLocaleString("en-US")}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">You'll Pay</span>
+                      <span className="font-semibold text-slate-900">${pricing.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Quick Amount Pills */}
-            <div className="flex gap-3">
-              {[100, 200, 500, 1000].map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => handleQuickPick(amt)}
-                  className={cn(
-                    "flex-1 h-11 rounded-full text-sm font-medium text-slate-900 flex items-center justify-center transition-colors touch-manipulation",
-                    amount === amt
-                      ? "border-2 border-black bg-white"
-                      : "border-0 bg-[#F7F7F7]"
-                  )}
-                >
-                  ${amt.toLocaleString()}
-                </button>
-              ))}
-            </div>
-
-            {pricing && (
-              <div className="space-y-2 pt-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">You'll Get</span>
-                  <span className="font-semibold text-slate-900">
-                    ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">You'll Pay</span>
-                  <span className="font-semibold text-slate-900">
-                    ${pricing.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   };
 
-  // Delivery style section
+  // 7. Delivery Section
   const DeliverySection = () => {
     const isOpen = openSection === "delivery";
-
     return (
       <div ref={deliverySectionRef}>
-        <SectionHeader
-          label="Delivery Style"
-          section="delivery"
-        >
+        <SectionHeader label="Delivery Style" section="delivery">
           {deliveryMode === "count_confirm" ? "Counted" : "Discreet"}
         </SectionHeader>
-
-        <div
-          className={cn(
-            "overflow-hidden relative",
-            isOpen 
-              ? "max-h-[500px] opacity-100" 
-              : "max-h-0 opacity-0"
+        
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="delivery-content"
+              variants={ACCORDION_VARIANTS}
+              initial="collapsed"
+              animate="open"
+              exit="collapsed"
+              className="overflow-hidden"
+              style={{ transform: "translateZ(0)" }}
+            >
+              <div className="pt-2 pb-4">
+                <DeliveryModeSelector value={deliveryMode} onChange={handleDeliveryModeChange} />
+              </div>
+            </motion.div>
           )}
-          style={{
-            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxSizing: "border-box",
-            willChange: "max-height",
-          }}
-        >
-          <div 
-            className="pt-2 pb-4"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen
-                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s" // Fade in 100ms after expansion starts
-                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out with slower transition
-              pointerEvents: isOpen ? "auto" : "none",
-              boxSizing: "border-box",
-            }}
-          >
-                <DeliveryModeSelector
-                  value={deliveryMode}
-                  onChange={handleDeliveryModeChange}
-                />
-          </div>
-        </div>
+        </AnimatePresence>
       </div>
     );
   };
@@ -772,7 +664,6 @@ export function QuickReorderModal({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -781,76 +672,61 @@ export function QuickReorderModal({
             className="fixed inset-0 bg-black/40 z-[80]"
           />
 
-          {/* Modal Container */}
           <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none">
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{
-                type: 'spring',
-                stiffness: 300,
-                damping: 30,
-              }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="relative w-full bg-white rounded-t-[28px] shadow-2xl flex flex-col max-h-[98vh] overflow-hidden pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             >
-          {/* Header */}
-          <div className="flex-shrink-0 px-6 pt-6 pb-4 flex items-center justify-between">
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">Quick Reorder</h2>
-              <p className="text-sm text-gray-600 mt-0.5">Confirm everything looks right.</p>
-            </div>
+              {/* Header */}
+              <div className="flex-shrink-0 px-6 pt-6 pb-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-gray-900">Quick Reorder</h2>
+                  <p className="text-sm text-gray-600 mt-0.5">Confirm everything looks right.</p>
+                </div>
+                <IconButton type="button" onClick={handleClose} variant="default" size="lg" className="flex-shrink-0" aria-label="Close">
+                  <X className="h-5 w-5 text-slate-900" />
+                </IconButton>
+              </div>
 
-            <IconButton
-              type="button"
-              onClick={handleClose}
-              variant="default"
-              size="lg"
-              className="flex-shrink-0"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5 text-slate-900" />
-            </IconButton>
-          </div>
+              <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
 
-          {/* Divider */}
-          <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+              {/* Scrollable Content */}
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 min-h-0 overflow-y-auto px-6 py-4"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction: 'pan-y',
+                  overscrollBehavior: 'none',
+                }}
+              >
+                {/* 8. Removed Global LayoutGroup */}
+                <div className="space-y-1">
+                  <AddressSection />
+                  <div className="h-[1px] bg-[#F7F7F7] my-2" />
+                  <AccountSection />
+                  <div className="h-[1px] bg-[#F7F7F7] my-2" />
+                  <AmountSection />
+                  <div className="h-[1px] bg-[#F7F7F7] my-2" />
+                  <DeliverySection />
+                </div>
+              </div>
 
-          {/* Scrollable Content */}
-          <div
-            ref={scrollContainerRef}
-            className="flex-1 min-h-0 overflow-y-auto px-6 py-4"
-            style={{
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-y',
-              overscrollBehavior: 'none',
-            }}
-          >
-            <div className="space-y-1">
-              <AddressSection />
-              <div className="h-[1px] bg-[#F7F7F7] my-2" />
-              <AccountSection />
-              <div className="h-[1px] bg-[#F7F7F7] my-2" />
-              <AmountSection />
-              <div className="h-[1px] bg-[#F7F7F7] my-2" />
-              <DeliverySection />
-            </div>
-          </div>
+              <div className="border-t border-slate-200/70" />
 
-          {/* Divider */}
-          <div className="border-t border-slate-200/70" />
-
-          {/* Footer */}
-          <div className="flex-shrink-0 bg-white px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-            <SlideToConfirm
-              onConfirm={handleConfirm}
-              disabled={!canConfirm || loading}
-              label="Slide to Confirm"
-              isLoading={loading}
-              loadingLabel="Creating order..."
-            />
-          </div>
+              <div className="flex-shrink-0 bg-white px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+                <SlideToConfirm
+                  onConfirm={handleConfirm}
+                  disabled={!canConfirm || loading}
+                  label="Slide to Confirm"
+                  isLoading={loading}
+                  loadingLabel="Creating order..."
+                />
+              </div>
             </motion.div>
           </div>
         </>
@@ -859,5 +735,3 @@ export function QuickReorderModal({
     document.body
   );
 }
-
-

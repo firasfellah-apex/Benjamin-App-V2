@@ -108,18 +108,18 @@ export function CompletionRatingModal({
 
           {/* Modal Container */}
           <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none" style={{ zIndex: 1000 }}>
-            {/* Slide-up Modal - slides down on exit */}
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{
-                type: 'spring',
-                stiffness: 300,
-                damping: 30,
-              }}
+          {/* Slide-up Modal - slides down on exit */}
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{
+              type: 'spring',
+              stiffness: 300,
+              damping: 30,
+            }}
               className="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto pointer-events-auto"
-            >
+          >
             {/* Close Button */}
             <div className="absolute top-4 right-4 z-10">
               <IconButton
@@ -266,7 +266,7 @@ export function CompletionRatingModal({
                 </div>
               </div>
             </div>
-            </motion.div>
+          </motion.div>
           </div>
         </>
       )}

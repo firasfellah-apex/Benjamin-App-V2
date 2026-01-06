@@ -82,19 +82,19 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
     }
     
     // Default reorder logic - run eligibility check
-    const result = validateReorderEligibility({
-      profile: profile || null,
-      addresses: addresses || [],
-      previousOrder: order,
+      const result = validateReorderEligibility({
+        profile: profile || null,
+        addresses: addresses || [],
+        previousOrder: order,
       bankAccounts: bankAccounts || [],
-    });
-    
-    if (!result.ok) {
-      // Show blocked modal
-      setEligibilityResult(result);
-      setShowBlockedModal(true);
-      return;
-    }
+      });
+      
+      if (!result.ok) {
+        // Show blocked modal
+        setEligibilityResult(result);
+        setShowBlockedModal(true);
+        return;
+      }
     
     // All checks passed - show Quick Reorder modal
     setShowQuickReorderModal(true);
@@ -371,7 +371,7 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
           onOpenChange={setShowQuickReorderModal}
           order={order}
         />
-
+        
         {/* Reorder Blocked Modal */}
         {eligibilityResult && (
           <ReorderBlockedModal

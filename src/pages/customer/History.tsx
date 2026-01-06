@@ -150,21 +150,21 @@ export default function History() {
               {/* Header - centered */}
               <div className="flex items-center justify-center">
                 <span className="text-base font-semibold text-slate-900">No deliveries yet</span>
-              </div>
+            </div>
               
               {/* Subtitle - centered */}
               <div className="flex items-center justify-center">
                 <p className="text-sm text-slate-700 text-center">
-                  Your history will appear here after your first completed order.
-                </p>
+              Your history will appear here after your first completed order.
+            </p>
               </div>
               
               <Button
                 type="button"
-                onClick={() => navigate('/customer/request')}
+              onClick={() => navigate('/customer/request')}
                 className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold"
-              >
-                Request Cash
+            >
+              Request Cash
               </Button>
             </div>
           </div>

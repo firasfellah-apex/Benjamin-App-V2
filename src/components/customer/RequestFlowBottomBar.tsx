@@ -294,52 +294,52 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <motion.button
-                key="single"
-                layoutId={`ts-cta-${mode}`}
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ 
-                  opacity: 1,
-                  scale: 1,
-                  backgroundColor: (isLoading || primaryDisabled) ? '#D1D5DB' : '#000000'
-                }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ 
-                  duration: 0.3, 
-                  ease: [0.34, 1.56, 0.64, 1],
-                  backgroundColor: { duration: 0.2 },
-                  layout: { 
-                    duration: 0.4,
-                    ease: [0.34, 1.56, 0.64, 1]
-                  }
-                }}
-                type="button"
-                onClick={onPrimary}
-                disabled={isLoading || primaryDisabled}
-                className={cn(
-                  "w-full rounded-xl py-4 px-6",
-                  "text-base font-semibold",
-                  "flex items-center justify-center",
-                  "transition-colors duration-200",
-                  (isLoading || primaryDisabled) 
-                    ? "text-gray-500 cursor-not-allowed" 
-                    : "text-white"
-                )}
-              >
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={primaryLabel}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15 }}
+            <motion.button
+              key="single"
+              layoutId={`ts-cta-${mode}`}
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ 
+                opacity: 1,
+                scale: 1,
+                backgroundColor: (isLoading || primaryDisabled) ? '#D1D5DB' : '#000000'
+              }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ 
+                duration: 0.3, 
+                ease: [0.34, 1.56, 0.64, 1],
+                backgroundColor: { duration: 0.2 },
+                layout: { 
+                  duration: 0.4,
+                  ease: [0.34, 1.56, 0.64, 1]
+                }
+              }}
+              type="button"
+              onClick={onPrimary}
+              disabled={isLoading || primaryDisabled}
+              className={cn(
+                "w-full rounded-xl py-4 px-6",
+                "text-base font-semibold",
+                "flex items-center justify-center",
+                "transition-colors duration-200",
+                (isLoading || primaryDisabled) 
+                  ? "text-gray-500 cursor-not-allowed" 
+                  : "text-white"
+              )}
+            >
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={primaryLabel}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
                     className="flex items-center gap-2"
-                  >
-                    {isLoading ? "Processing..." : primaryLabel}
+                >
+                  {isLoading ? "Processing..." : primaryLabel}
                     {primaryIcon}
-                  </motion.span>
-                </AnimatePresence>
-              </motion.button>
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
             )
           ) : (
             <motion.div

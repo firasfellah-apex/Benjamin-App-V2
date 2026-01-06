@@ -119,21 +119,21 @@ function DeliveryRow({ delivery, onClick }: { delivery: CustomerDelivery; onClic
     >
       <div className="flex items-start justify-between gap-3">
         {/* Left side: text stack */}
-        <div className="flex flex-col min-w-0 flex-1">
-          {/* Primary line */}
-          <span className="text-sm font-semibold text-slate-900 truncate">
-            {getDeliveryPrimaryLabel(delivery)}
-          </span>
+      <div className="flex flex-col min-w-0 flex-1">
+        {/* Primary line */}
+        <span className="text-sm font-semibold text-slate-900 truncate">
+          {getDeliveryPrimaryLabel(delivery)}
+        </span>
 
           {/* Secondary line: just time */}
-          <span className="mt-0.5 text-xs text-slate-500">
-            {formatDeliveryListTimestamp(delivery)}
-          </span>
-        </div>
+        <span className="mt-0.5 text-xs text-slate-500">
+          {formatDeliveryListTimestamp(delivery)}
+        </span>
+      </div>
 
         {/* Right side: status pill only */}
         <div className="flex items-center flex-shrink-0 pl-2 self-start">
-          <DeliveryStatusBadge delivery={delivery} />
+        <DeliveryStatusBadge delivery={delivery} />
         </div>
       </div>
     </div>
@@ -246,11 +246,11 @@ export default function CustomerDeliveriesHistory() {
                   </h3>
                   <div className="space-y-3">
                     {today.map((delivery) => (
-                      <DeliveryRow
+                        <DeliveryRow
                         key={delivery.id}
-                        delivery={delivery}
-                        onClick={() => handleDeliveryClick(delivery)}
-                      />
+                          delivery={delivery}
+                          onClick={() => handleDeliveryClick(delivery)}
+                        />
                     ))}
                   </div>
                 </section>
@@ -263,11 +263,11 @@ export default function CustomerDeliveriesHistory() {
                   </h3>
                   <div className="space-y-3">
                     {earlier.map((delivery) => (
-                      <DeliveryRow
+                        <DeliveryRow
                         key={delivery.id}
-                        delivery={delivery}
-                        onClick={() => handleDeliveryClick(delivery)}
-                      />
+                          delivery={delivery}
+                          onClick={() => handleDeliveryClick(delivery)}
+                        />
                     ))}
                   </div>
                 </section>

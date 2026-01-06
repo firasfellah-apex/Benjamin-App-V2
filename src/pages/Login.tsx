@@ -368,153 +368,153 @@ export default function Login() {
           <div className="w-full max-w-md">
             {/* Full Logo - 75% of toggle width, centered with equal spacing above and below */}
             <div className="flex justify-center mb-[84px]">
-              <img 
+            <img 
                 src={fullLogo} 
                 alt="Benjamin" 
                 className="w-3/4 max-w-full"
-              />
-            </div>
-            {/* Sign Up / Log In Toggle - Reusing DeliveryModeSelector style */}
-            <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 mb-6 relative">
-              {/* Sliding background indicator */}
-              <motion.div
+            />
+          </div>
+          {/* Sign Up / Log In Toggle - Reusing DeliveryModeSelector style */}
+          <div className="rounded-3xl border border-slate-100 bg-[#F7F7F7] p-1 flex gap-2 mb-6 relative">
+            {/* Sliding background indicator */}
+            <motion.div
                 className="absolute top-1 bottom-1 rounded-full bg-white border-2 border-black z-0"
-                initial={false}
-                animate={{
+              initial={false}
+              animate={{
                   left: mode === 'signup' ? '2px' : 'calc(50% + 2px)',
                   width: 'calc(50% - 6px)',
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 30,
-                }}
-                style={{ height: '52px' }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('signup');
-                  resetForm();
-                }}
-                className={cn(
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+              }}
+              style={{ height: '52px' }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signup');
+                resetForm();
+              }}
+              className={cn(
                   "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300 ease-in-out z-10",
-                  mode === 'signup'
-                    ? "text-slate-900"
-                    : "text-slate-900"
-                )}
-                style={{ height: '52px' }}
-              >
-                Sign Up
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('signin');
-                  resetForm();
-                }}
-                className={cn(
+                mode === 'signup'
+                  ? "text-slate-900"
+                  : "text-slate-900"
+              )}
+              style={{ height: '52px' }}
+            >
+              Sign Up
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                resetForm();
+              }}
+              className={cn(
                   "relative flex-1 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300 ease-in-out z-10",
-                  mode === 'signin'
-                    ? "text-slate-900"
-                    : "text-slate-900"
-                )}
-                style={{ height: '52px' }}
-              >
-                Log In
-              </button>
-            </div>
+                mode === 'signin'
+                  ? "text-slate-900"
+                  : "text-slate-900"
+              )}
+              style={{ height: '52px' }}
+            >
+              Log In
+            </button>
+          </div>
 
             {/* Welcome message - center aligned */}
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-semibold text-slate-900 mb-2">
-                {mode === 'signup' ? "Welcome! Let's get you in!" : "Welcome Back!"}
-              </h1>
-              <p className="text-sm text-slate-600">
-                How would you like to continue?
-              </p>
-            </div>
+            <h1 className="text-2xl font-semibold text-slate-900 mb-2">
+              {mode === 'signup' ? "Welcome! Let's get you in!" : "Welcome Back!"}
+            </h1>
+            <p className="text-sm text-slate-600">
+              How would you like to continue?
+            </p>
           </div>
+        </div>
         </div>
 
         {/* Scrollable content area - form expands here */}
         <div className="flex-1 flex flex-col items-center overflow-y-auto min-h-0">
           <div className="w-full max-w-md">
 
-            {/* Invitation notices */}
-            {invitationToken && invitationValid && (
-              <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                <p className="text-sm font-medium text-emerald-900">You're joining via invitation</p>
-                <p className="text-xs text-emerald-700 mt-1">
-                  Sign in to accept your invitation
-                </p>
-              </div>
-            )}
-            {invitationToken && invitationValid === false && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                <p className="text-sm font-medium text-red-900">Invalid Invitation</p>
-                <p className="text-xs text-red-700 mt-1">
-                  This invitation link is invalid or has expired
-                </p>
-              </div>
-            )}
+        {/* Invitation notices */}
+        {invitationToken && invitationValid && (
+          <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+            <p className="text-sm font-medium text-emerald-900">You're joining via invitation</p>
+            <p className="text-xs text-emerald-700 mt-1">
+              Sign in to accept your invitation
+            </p>
+          </div>
+        )}
+        {invitationToken && invitationValid === false && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+            <p className="text-sm font-medium text-red-900">Invalid Invitation</p>
+            <p className="text-xs text-red-700 mt-1">
+              This invitation link is invalid or has expired
+            </p>
+          </div>
+        )}
 
             {/* Unified auth options */}
             <div className="space-y-4 relative">
               {/* Social buttons - always rendered, fade out when email form is shown */}
-              <motion.div
+                <motion.div
                 initial={false}
                 animate={{
                   opacity: showEmailForm ? 0 : 1,
                   height: showEmailForm ? 0 : 'auto',
                   marginBottom: showEmailForm ? 0 : undefined,
                 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
                 className="space-y-4 overflow-hidden"
-              >
-                {/* Google button */}
-                <Button
-                  type="button"
-                  className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  onClick={handleGoogleSignIn}
-                  disabled={!!loadingProvider}
                 >
-                  {loadingProvider === 'google' ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <GoogleLogo size={20} />
-                  )}
-                  <span className="text-[15px] font-medium">Continue with Google</span>
-                </Button>
+                  {/* Google button */}
+                  <Button
+                    type="button"
+                    className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+                    onClick={handleGoogleSignIn}
+                    disabled={!!loadingProvider}
+                  >
+                    {loadingProvider === 'google' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <GoogleLogo size={20} />
+                    )}
+                    <span className="text-[15px] font-medium">Continue with Google</span>
+                  </Button>
 
-                {/* Apple button */}
-                <Button
-                  type="button"
-                  className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  onClick={handleAppleSignIn}
-                  disabled={!!loadingProvider}
-                >
-                  {loadingProvider === 'apple' ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <AppleLogo size={20} className="text-white" />
-                  )}
-                  <span className="text-[15px] font-medium">Continue with Apple</span>
-                </Button>
+                  {/* Apple button */}
+                  <Button
+                    type="button"
+                    className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+                    onClick={handleAppleSignIn}
+                    disabled={!!loadingProvider}
+                  >
+                    {loadingProvider === 'apple' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <AppleLogo size={20} className="text-white" />
+                    )}
+                    <span className="text-[15px] font-medium">Continue with Apple</span>
+                  </Button>
 
-                {/* Email button */}
-                <Button
-                  type="button"
-                  className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  onClick={() => {
-                    setShowEmailForm(true);
-                    setFormError(null);
-                  }}
-                  disabled={!!loadingProvider}
-                >
-                  <Mail className="h-5 w-5" />
-                  <span className="text-[15px] font-medium">Continue with Email</span>
-                </Button>
+                  {/* Email button */}
+                  <Button
+                    type="button"
+                    className="w-full h-[58px] rounded-xl bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
+                    onClick={() => {
+                      setShowEmailForm(true);
+                      setFormError(null);
+                    }}
+                    disabled={!!loadingProvider}
+                  >
+                    <Mail className="h-5 w-5" />
+                    <span className="text-[15px] font-medium">Continue with Email</span>
+                  </Button>
               </motion.div>
 
               {/* Email form - slides down from below */}
@@ -717,89 +717,89 @@ export default function Login() {
                               </Button>
                             </div>
                           </form>
-                        </motion.div>
-                      ) : (
+                </motion.div>
+              ) : (
                         /* Regular login/signup form */
-                        <motion.div
+                <motion.div
                           key="login-signup"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.3, ease: "easeInOut" }}
-                        >
-                          <form
-                            onSubmit={isSignup ? handleEmailSignUp : handleEmailSignIn}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                >
+                  <form
+                    onSubmit={isSignup ? handleEmailSignUp : handleEmailSignIn}
                             className="space-y-4 pt-4"
-                          >
-                            {formError && (
-                              <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-                                <p className="text-xs text-red-600">{formError}</p>
-                              </div>
-                            )}
+                  >
+                  {formError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <p className="text-xs text-red-600">{formError}</p>
+                    </div>
+                  )}
 
-                            {/* First name and Last name - only for signup */}
-                            {isSignup && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                  id="first_name"
-                                  type="text"
-                                  placeholder="First name"
-                                  value={firstName}
-                                  onChange={(e) => {
-                                    setFirstName(e.target.value);
-                                    setFormError(null);
-                                  }}
-                                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
-                                  disabled={loadingProvider === 'email'}
-                                />
-                                <Input
-                                  id="last_name"
-                                  type="text"
-                                  placeholder="Last name"
-                                  value={lastName}
-                                  onChange={(e) => {
-                                    setLastName(e.target.value);
-                                    setFormError(null);
-                                  }}
-                                  className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
-                                  disabled={loadingProvider === 'email'}
-                                />
-                              </div>
-                            )}
+                  {/* First name and Last name - only for signup */}
+                  {isSignup && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        id="first_name"
+                        type="text"
+                        placeholder="First name"
+                        value={firstName}
+                        onChange={(e) => {
+                          setFirstName(e.target.value);
+                          setFormError(null);
+                        }}
+                        className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                        disabled={loadingProvider === 'email'}
+                      />
+                      <Input
+                        id="last_name"
+                        type="text"
+                        placeholder="Last name"
+                        value={lastName}
+                        onChange={(e) => {
+                          setLastName(e.target.value);
+                          setFormError(null);
+                        }}
+                        className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                        disabled={loadingProvider === 'email'}
+                      />
+                    </div>
+                  )}
 
-                            <Input
-                              id="email"
-                              type="email"
-                              inputMode="email"
-                              autoComplete="email"
-                              placeholder="Email"
-                              value={email}
-                              onChange={(e) => {
-                                setEmail(e.target.value);
-                                setFormError(null);
-                              }}
-                              className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
-                              required
-                              disabled={loadingProvider === 'email'}
-                            />
+                  <Input
+                    id="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setFormError(null);
+                    }}
+                    className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0"
+                    required
+                    disabled={loadingProvider === 'email'}
+                  />
 
-                            <div className="space-y-2">
+                  <div className="space-y-2">
                               <div className="relative">
-                                <Input
-                                  id="password"
+                    <Input
+                      id="password"
                                   type={showPassword ? "text" : "password"}
-                                  autoComplete={isSignup ? 'new-password' : 'current-password'}
-                                  placeholder="Password"
-                                  value={password}
-                                  onChange={(e) => {
-                                    setPassword(e.target.value);
-                                    setFormError(null);
-                                  }}
+                      autoComplete={isSignup ? 'new-password' : 'current-password'}
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setFormError(null);
+                      }}
                                   className="text-base border-slate-200 focus:border-[#22C55E] focus-visible:border-[#22C55E] focus:bg-green-50 focus-visible:ring-0 pr-10"
-                                  required
-                                  minLength={isSignup ? 8 : undefined}
-                                  disabled={loadingProvider === 'email'}
-                                />
+                      required
+                      minLength={isSignup ? 8 : undefined}
+                      disabled={loadingProvider === 'email'}
+                    />
                                 <button
                                   type="button"
                                   onClick={() => setShowPassword(!showPassword)}
@@ -813,56 +813,56 @@ export default function Login() {
                                   )}
                                 </button>
                               </div>
-                              {/* Forgot password link - only for signin */}
-                              {!isSignup && (
-                                <div className="text-right">
-                                  <button
-                                    type="button"
+                    {/* Forgot password link - only for signin */}
+                    {!isSignup && (
+                      <div className="text-right">
+                        <button
+                          type="button"
                                     onClick={() => {
                                       setShowForgotPassword(true);
                                       setFormError(null);
                                     }}
                                     className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
-                                  >
-                                    Forgot password?
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                            <div className="flex gap-3">
-                              <Button
-                                type="button"
-                                variant="outline"
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
                                 className="flex-1 h-[58px] rounded-xl border-slate-200 !text-slate-900 hover:bg-slate-50 hover:!text-slate-900"
-                                onClick={resetForm}
-                                disabled={loadingProvider === 'email'}
-                              >
+                      onClick={resetForm}
+                      disabled={loadingProvider === 'email'}
+                    >
                                 <span className="text-[15px] font-medium !text-slate-900">Cancel</span>
-                              </Button>
-                              <Button
-                                type="submit"
-                                disabled={loadingProvider === 'email'}
-                                className="flex-1 h-[58px] rounded-xl bg-black text-white hover:bg-black/90"
-                              >
-                                {loadingProvider === 'email' ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                    <span className="text-[15px] font-medium">
-                                      {isSignup ? 'Creating account…' : 'Signing in…'}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="text-[15px] font-medium">
-                                    {isSignup ? 'Create Account' : 'Log In'}
-                                  </span>
-                                )}
-                              </Button>
-                            </div>
-                          </form>
-                        </motion.div>
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loadingProvider === 'email'}
+                      className="flex-1 h-[58px] rounded-xl bg-black text-white hover:bg-black/90"
+                    >
+                      {loadingProvider === 'email' ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-[15px] font-medium">
+                            {isSignup ? 'Creating account…' : 'Signing in…'}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[15px] font-medium">
+                          {isSignup ? 'Create Account' : 'Log In'}
+                        </span>
                       )}
-                    </AnimatePresence>
+                    </Button>
+                  </div>
+                </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -873,8 +873,8 @@ export default function Login() {
         {/* Bottom: terms copy */}
         <div className="flex-shrink-0 mt-4">
           <p className="text-[11px] text-center text-slate-400 leading-snug">
-            By continuing, you agree to Benjamin's <span className="underline">Terms</span> and <span className="underline">Privacy Policy</span>.
-          </p>
+          By continuing, you agree to Benjamin's <span className="underline">Terms</span> and <span className="underline">Privacy Policy</span>.
+        </p>
         </div>
       </div>
     </div>

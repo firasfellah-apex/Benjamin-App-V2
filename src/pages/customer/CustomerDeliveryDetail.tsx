@@ -302,14 +302,14 @@ export default function CustomerDeliveryDetail() {
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <Button
-                type="button"
-                onClick={handleReorder}
+            <Button
+              type="button"
+              onClick={handleReorder}
                 disabled={!order || loadingOrder}
                 className="w-full h-14 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+            >
                 <span>{loadingOrder ? "Loading..." : "Reorder"}</span>
-              </Button>
+            </Button>
             )}
           </div>
           

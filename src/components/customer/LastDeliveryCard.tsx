@@ -197,13 +197,13 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={handleReorder}
+                <Button
+                  type="button"
+                  onClick={handleReorder}
                     className="flex-1 h-14 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  >
+                >
                     <span>Reorder</span>
-                  </Button>
+                </Button>
                 )}
               </>
             ) : hasIssue && !isRated ? (
@@ -244,13 +244,13 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={handleReorder}
+                <Button
+                  type="button"
+                  onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  >
+                >
                     <span>Reorder</span>
-                  </Button>
+                </Button>
                 )}
               </>
             ) : isRated && order.runner_rating ? (
@@ -302,13 +302,13 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={handleReorder}
+                <Button
+                  type="button"
+                  onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  >
+                >
                     <span>Reorder</span>
-                  </Button>
+                </Button>
                 )}
               </>
             ) : isCancelled ? (
@@ -349,13 +349,13 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={handleReorder}
+                <Button
+                  type="button"
+                  onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  >
+                >
                     <span>Reorder</span>
-                  </Button>
+                </Button>
                 )}
               </>
             ) : (
@@ -396,13 +396,13 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={handleReorder}
+                <Button
+                  type="button"
+                  onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
-                  >
+                >
                     <span>Reorder</span>
-                  </Button>
+                </Button>
                 )}
               </>
             )}

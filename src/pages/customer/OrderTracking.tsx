@@ -437,17 +437,17 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
       {/* Back Button - Fixed Top Left - Only visible in half-screen mode */}
       {/* In fullscreen, user uses the shrink button to return */}
       {!isMapFullscreen && (
-        <div className="absolute top-6 left-6 z-30">
-          <IconButton
-            onClick={() => navigate("/customer/home")}
-            variant="default"
-            size="lg"
+      <div className="absolute top-6 left-6 z-30">
+        <IconButton
+          onClick={() => navigate("/customer/home")}
+          variant="default"
+          size="lg"
             className="bg-white/95 backdrop-blur shadow-lg"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </IconButton>
-        </div>
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
+        </IconButton>
+      </div>
       )}
 
       {/* Map Background - Always full screen, "half screen" is just the sheet covering bottom */}
@@ -489,7 +489,7 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
 
       {/* Gradient Overlay for Readability - hidden in fullscreen */}
       {!isMapFullscreen && (
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 z-10 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 z-10 pointer-events-none" />
       )}
 
       {/* Completion Rating Modal - Only show if no issue was reported */}
@@ -526,19 +526,19 @@ export default function OrderTracking({ orderId: orderIdProp }: OrderTrackingPro
           willChange: "transform",
         }}
       >
-        <ActiveDeliverySheet
-          order={order}
-          isExpanded={false}
-          onToggleExpand={() => {}}
-          onCancel={handleCancel}
-          onReorder={handleReorder}
-          onMessage={handleMessage}
-          onCallSupport={handleCallSupport}
-          onOrderUpdate={(updatedOrder) => {
+      <ActiveDeliverySheet
+        order={order}
+        isExpanded={false}
+        onToggleExpand={() => {}}
+        onCancel={handleCancel}
+        onReorder={handleReorder}
+        onMessage={handleMessage}
+        onCallSupport={handleCallSupport}
+        onOrderUpdate={(updatedOrder) => {
             queryClient.setQueryData(["order", orderId], updatedOrder);
-          }}
+        }}
           isCancelling={isCancelling}
-        />
+      />
       </motion.div>
     </div>
   );

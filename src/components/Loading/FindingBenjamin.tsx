@@ -267,7 +267,7 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
         if (used + dist1 + dist2 <= TOTAL) {
           push({ x: midX, y: midY });
           push(centerPt);
-        } else {
+    } else {
           // Direct approach if budget is tight
           push(centerPt);
         }
@@ -293,7 +293,7 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
   const containerClasses = isFullscreen 
     ? "absolute inset-0 w-full h-full overflow-hidden"
     : "absolute top-0 left-0 right-0 w-full h-[50vh] overflow-hidden";
-  
+
   return (
     <div className={containerClasses} style={{ backgroundColor: MAP_BG }}>
       {/* Subtle vignette / depth like a real map canvas */}
@@ -321,17 +321,17 @@ export const FindingBenjamin: React.FC<FindingBenjaminProps> = ({ isFullscreen =
             const edgeAlpha = 0.03 + r * 0.05;   // 0.03–0.08
             
             return (
-              <div
-                key={i}
-                className="rounded-[4px]"
-                style={{
+            <div
+              key={i}
+              className="rounded-[4px]"
+              style={{
                   backgroundColor: buildingColor,
                   opacity: tileOpacity,
                   border: `1px solid rgba(255,255,255,${edgeAlpha})`,
                   boxShadow:
                     "inset 0 -1px 0 rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
-                }}
-              />
+              }}
+            />
             );
           })}
         </div>

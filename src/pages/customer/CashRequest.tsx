@@ -1019,7 +1019,7 @@ export default function CashRequest() {
                         autoplay={true}
                         style={{ width: '48px', height: '48px' }}
                       />
-                    </div>
+                  </div>
                   </div>
                   
                   {/* Header - centered */}
@@ -1548,7 +1548,7 @@ export default function CashRequest() {
                     autoplay={true}
                     style={{ width: '48px', height: '48px' }}
                   />
-                </div>
+            </div>
               </div>
               
               {/* Header - centered */}
@@ -1559,19 +1559,19 @@ export default function CashRequest() {
               {/* Subtitle - centered */}
               <div className="flex items-center justify-center">
                 <p className="text-sm text-slate-700 text-center">
-                  Save a place where you'd like cash delivered.
-                  <br />
-                  You can add more later.
-                </p>
-              </div>
+                Save a place where you'd like cash delivered.
+                <br />
+                You can add more later.
+              </p>
+            </div>
               
-              <Button
-                type="button"
-                onClick={handleAddAddress}
+            <Button
+              type="button"
+              onClick={handleAddAddress}
                 className="w-full h-14 bg-black text-white hover:bg-black/90 font-semibold"
-              >
-                Add Address
-              </Button>
+            >
+              Add Address
+            </Button>
             </div>
           </div>
         )}

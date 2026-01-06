@@ -46,7 +46,7 @@ export function DeliveryModeSelector({
       countedLottieRef.current.goToAndPlay(0);
     }
   }, [value]);
-
+    
   const handleModeClick = (modeValue: DeliveryMode) => {
     // Update the selected value (animation will play via useEffect)
     onChange(modeValue);
@@ -54,23 +54,23 @@ export function DeliveryModeSelector({
 
   return (
     <div className={cn("flex gap-3", className)}>
-      {modes.map((mode) => {
-        const selected = mode.value === value;
+        {modes.map((mode) => {
+          const selected = mode.value === value;
 
-        return (
-          <button
-            key={mode.value}
-            type="button"
-            onClick={() => handleModeClick(mode.value)}
-            className={cn(
+          return (
+            <button
+              key={mode.value}
+              type="button"
+              onClick={() => handleModeClick(mode.value)}
+              className={cn(
               "flex-1 rounded-xl bg-white p-4 text-left transition-all duration-300 ease-in-out",
               "hover:opacity-95 active:opacity-90",
               "flex flex-col items-start",
-              selected
+                selected
                 ? "border-2 border-black"
                 : "border border-[#F0F0F0] hover:border-[#E0E0E0]"
-            )}
-          >
+              )}
+            >
             {/* Icon - top left */}
             <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center mb-2">
                 <Lottie
@@ -86,7 +86,7 @@ export function DeliveryModeSelector({
                       if (selected) {
                         ref.goToAndPlay(0);
                       } else {
-                        ref.goToAndStop(0, true);
+                      ref.goToAndStop(0, true);
                       }
                     }
                   }}
@@ -102,7 +102,7 @@ export function DeliveryModeSelector({
                     }
                   }}
                 />
-            </div>
+              </div>
             
             {/* Content */}
             <div className="flex-1 min-w-0 w-full">
@@ -122,7 +122,7 @@ export function DeliveryModeSelector({
               </p>
             </div>
           </button>
-        );
+          );
       })}
     </div>
   );
