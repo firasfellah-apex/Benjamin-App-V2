@@ -158,7 +158,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <Button
                   type="button"
                   onClick={handleRateClick}
-                  className="flex-1 h-14 items-center justify-center gap-2 bg-yellow-400 text-base font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150"
+                  className="flex-1 h-14 items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-400 active:bg-yellow-400 text-base font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] transition-all duration-150"
                   style={{ color: '#D97708' }}
                 >
                   <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>

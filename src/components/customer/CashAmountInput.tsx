@@ -11,6 +11,8 @@ interface CashAmountInputProps {
   className?: string;
   hideAmountDisplay?: boolean;
   onEditClick?: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 export default function CashAmountInput({
@@ -22,13 +24,21 @@ export default function CashAmountInput({
   className,
   hideAmountDisplay = false,
   onEditClick,
+  onDragStart,
+  onDragEnd,
 }: CashAmountInputProps) {
   const [input, setInput] = useState<string>(String(value));
   const [error, setError] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  
   const inputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  
+  // Refs for drag state to avoid dependency issues
+  const draggingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
 
   // Sync input with value prop when not editing
   useEffect(() => {
@@ -37,6 +47,15 @@ export default function CashAmountInput({
       setError("");
     }
   }, [value, isEditing]);
+
+  // Reset drag refs on unmount
+  useEffect(() => {
+    return () => {
+      draggingRef.current = false;
+      activePointerIdRef.current = null;
+      onDragEnd?.();
+    };
+  }, []);
 
   // Format number with commas
   const formatWithCommas = (num: number | string): string => {
@@ -117,13 +136,14 @@ export default function CashAmountInput({
     }
   };
 
-  // Handle slider change
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const num = Number(e.target.value);
-    setInput(String(num));
-    onChange(num);
-    setError("");
-    setIsEditing(false);
+  // Handle display click to edit
+  const handleDisplayClick = () => {
+    setIsEditing(true);
+    setInput(String(value));
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
   };
 
   // Handle quick pick
@@ -135,25 +155,26 @@ export default function CashAmountInput({
     setIsEditing(false);
   };
 
-  // Handle display click to edit
-  const handleDisplayClick = () => {
-    setIsEditing(true);
-    setInput(String(value));
-    setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 0);
+  // Convert pointer X position to snapped value
+  // Note: We use the ref directly inside handlers to avoid dependency chain issues
+  const calculateValueFromX = (clientX: number) => {
+    const el = trackRef.current;
+    if (!el) return min;
+
+    const rect = el.getBoundingClientRect();
+    const t = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const raw = min + t * (max - min);
+    const snapped = Math.round(raw / step) * step;
+    return Math.min(max, Math.max(min, snapped));
   };
 
-  // Calculate thumb position
+  // Calculate thumb position for visual
   const thumbPosition = ((value - min) / (max - min)) * 100;
-
-  // Quick pick amounts
   const quickPicks = [100, 200, 500, 1000].filter(amt => amt >= min && amt <= max);
 
   return (
     <div className={cn("w-full", className)}>
-      {/* TOP AMOUNT CONTAINER - Large centered amount in soft card */}
+      {/* TOP AMOUNT CONTAINER */}
       {!hideAmountDisplay && (
         <div className="mb-8">
           {!isEditing ? (
@@ -188,17 +209,16 @@ export default function CashAmountInput({
         </div>
       )}
 
-      {/* SLIDER - Thick green track + black knob */}
+      {/* SLIDER CONTAINER */}
       <div className="mb-6 pt-3">
-        {/* Visual track container - 10px height */}
-        <div className="relative w-full" style={{ height: '10px' }}>
-          {/* Background track - unfilled portion */}
+        <div ref={trackRef} className="relative w-full" style={{ height: '10px' }}>
+          {/* Background track */}
           <div 
             className="absolute left-0 right-0 h-full rounded-full"
             style={{ background: '#F7F7F7' }}
           />
           
-          {/* Filled portion - green */}
+          {/* Filled portion */}
           <motion.div 
             className="absolute left-0 h-full rounded-full pointer-events-none"
             style={{ 
@@ -206,16 +226,14 @@ export default function CashAmountInput({
               height: '10px'
             }}
             initial={false}
-            animate={{ 
-              width: `${thumbPosition}%`
-            }}
+            animate={{ width: `${thumbPosition}%` }}
             transition={{ 
               duration: isDragging ? 0 : 0.2, 
               ease: "easeOut" 
             }}
           />
 
-          {/* Slider input - Expanded touch area (44px) for easier activation, visually centered on 10px track */}
+          {/* Range Input - Visible for thumb, but pointer events handled by overlay */}
           <input
             ref={sliderRef}
             type="range"
@@ -223,33 +241,101 @@ export default function CashAmountInput({
             max={max}
             step={step}
             value={value}
-            onChange={handleSliderChange}
-            onMouseDown={() => setIsDragging(true)}
-            onMouseUp={() => setIsDragging(false)}
-            onMouseLeave={() => setIsDragging(false)}
-            onTouchStart={() => setIsDragging(true)}
-            onTouchEnd={() => setIsDragging(false)}
-            disabled={isEditing}
-            className="absolute left-0 right-0 w-full appearance-none cursor-pointer bg-transparent z-10 slider-cash-amount"
-            style={{ 
-              height: '44px',
-              top: '-17px', // Center 44px touch area vertically on 10px visual track
-              touchAction: 'none',
-              margin: 0, 
-              padding: 0,
+            onChange={(e) => {
+               // Only for keyboard/screen reader interaction
+               const v = Number(e.target.value);
+               setInput(String(v));
+               onChange(v);
             }}
-            aria-label="Cash amount slider"
+            disabled={isEditing}
+            className="absolute left-0 right-0 w-full appearance-none bg-transparent z-10 slider-cash-amount"
+            style={{ 
+              height: "44px",
+              top: "-17px",
+              margin: 0,
+              padding: 0,
+              pointerEvents: "none" 
+            }}
+          />
+
+          {/* INTERACTIVE OVERLAY 
+            Using Pointer Events with setPointerCapture to guarantee drag continuity 
+          */}
+          <div
+            className="absolute left-0 right-0 z-20"
+            style={{
+              height: "44px",
+              top: "-17px",
+              touchAction: "none", // Critical: prevents browser scroll while dragging
+              cursor: "pointer"
+            }}
+            onPointerDown={(e) => {
+              if (isEditing) return;
+              
+              onDragStart?.();
+              // 1. Stop browser defaults (scrolling/text selection)
+              e.preventDefault();
+              
+              // 2. Capture the pointer. This makes the element receive events 
+              //    even if the finger/mouse leaves the element bounds.
+              (e.target as Element).setPointerCapture(e.pointerId);
+
+              // 3. Set State
+              draggingRef.current = true;
+              activePointerIdRef.current = e.pointerId;
+              setIsDragging(true);
+
+              // 4. Update Value immediately
+              const next = calculateValueFromX(e.clientX);
+              if (next !== value) {
+                setInput(String(next));
+                onChange(next);
+              }
+              setError("");
+            }}
+            onPointerMove={(e) => {
+              if (!draggingRef.current) return;
+              if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
+
+              e.preventDefault();
+
+              const next = calculateValueFromX(e.clientX);
+              // Only update if changed to avoid unnecessary renders
+              if (next !== value) {
+                setInput(String(next));
+                onChange(next);
+              }
+            }}
+            onPointerUp={(e) => {
+              if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
+              
+              draggingRef.current = false;
+              activePointerIdRef.current = null;
+              onDragEnd?.();
+              setIsDragging(false);
+              
+              // Release capture
+              try {
+                (e.target as Element).releasePointerCapture(e.pointerId);
+              } catch {}
+            }}
+            onPointerCancel={() => {
+               draggingRef.current = false;
+               activePointerIdRef.current = null;
+               onDragEnd?.();
+               setIsDragging(false);
+            }}
           />
         </div>
 
-        {/* Min/Max labels - below slider */}
+        {/* Min/Max labels */}
         <div className="flex justify-between mt-2">
           <span className="text-[12px] text-slate-400">${min.toLocaleString()}</span>
           <span className="text-[12px] text-slate-400">${max.toLocaleString()}</span>
         </div>
       </div>
 
-      {/* QUICK AMOUNT PILLS - Equal width across row */}
+      {/* QUICK AMOUNT PILLS */}
       <div className="mt-6 flex gap-3">
         {quickPicks.map((amt) => (
           <button
@@ -273,7 +359,7 @@ export default function CashAmountInput({
           -webkit-appearance: none;
           appearance: none;
           outline: none;
-          touch-action: pan-y;
+          touch-action: none;
         }
         
         /* Webkit Thumb - Black center, 28px diameter, white border - centered on track */
@@ -330,7 +416,6 @@ export default function CashAmountInput({
         }
       `}</style>
 
-      {/* Error message */}
       {error && (
         <p className="text-red-500 text-sm text-center mt-4 transition-opacity duration-200">
           {error}

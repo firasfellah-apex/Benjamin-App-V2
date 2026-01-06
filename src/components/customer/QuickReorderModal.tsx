@@ -9,13 +9,12 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { SlideToConfirm } from "@/components/customer/SlideToConfirm";
 import { DeliveryModeSelector, type DeliveryMode } from "@/components/customer/DeliveryModeSelector";
-import CashAmountInput from "@/components/customer/CashAmountInput";
 import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddresses";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { calculatePricing } from "@/lib/pricing";
@@ -68,6 +67,9 @@ export function QuickReorderModal({
   const accountSectionRef = useRef<HTMLDivElement>(null);
   const amountSectionRef = useRef<HTMLDivElement>(null);
   const deliverySectionRef = useRef<HTMLDivElement>(null);
+  
+  // Scroll container ref for scrollable content
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Prevent background scroll when modal is open - bulletproof with defensive resets
   useEffect(() => {
@@ -142,7 +144,7 @@ export function QuickReorderModal({
   useEffect(() => {
     if (!openSection) return;
 
-    // Wait for animation to complete (0.4s max-height + 0.35s opacity with 0.05s delay = ~0.4s total)
+    // Wait for animation to complete (0.55s max-height + 0.45s opacity with 0.1s delay = ~0.65s total)
     const timeoutId = setTimeout(() => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -158,7 +160,7 @@ export function QuickReorderModal({
           }
         });
       });
-    }, 450); // Slightly after animation duration (400ms + buffer)
+    }, 700); // Slightly after animation duration (650ms + buffer)
 
     return () => clearTimeout(timeoutId);
   }, [openSection]);
@@ -190,7 +192,15 @@ export function QuickReorderModal({
 
   const handleAmountChange = (newAmount: number) => {
     setAmount(newAmount);
-    // Don't auto-collapse amount - user might want to adjust
+
+    const amount_range =
+      newAmount >= 500 ? "high" : newAmount >= 300 ? "medium" : "low";
+
+    track("cash_amount_changed", {
+      amount: newAmount,
+      amount_range,
+      source: "quick_reorder_modal",
+    });
   };
 
   const handleDeliveryModeChange = (mode: DeliveryMode) => {
@@ -350,7 +360,9 @@ export function QuickReorderModal({
               : "max-h-0 opacity-0"
           )}
           style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxSizing: "border-box",
+            willChange: "max-height",
           }}
         >
           <div 
@@ -358,8 +370,10 @@ export function QuickReorderModal({
             style={{
               opacity: isOpen ? 1 : 0,
               transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s" // Fade in 100ms after expansion starts
+                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out with slower transition
+              pointerEvents: isOpen ? "auto" : "none",
+              boxSizing: "border-box",
             }}
           >
                 {addresses.map((addr) => {
@@ -446,7 +460,9 @@ export function QuickReorderModal({
               : "max-h-0 opacity-0"
           )}
           style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxSizing: "border-box",
+            willChange: "max-height",
           }}
         >
           <div 
@@ -454,8 +470,10 @@ export function QuickReorderModal({
             style={{
               opacity: isOpen ? 1 : 0,
               transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s" // Fade in 100ms after expansion starts
+                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out with slower transition
+              pointerEvents: isOpen ? "auto" : "none",
+              boxSizing: "border-box",
             }}
           >
                 {!hasAnyBank ? (
@@ -523,6 +541,54 @@ export function QuickReorderModal({
   // Amount section
   const AmountSection = () => {
     const isOpen = openSection === "amount";
+    const [isEditing, setIsEditing] = useState(false);
+    const [inputValue, setInputValue] = useState(String(amount));
+
+    // Sync input with amount when not editing
+    useEffect(() => {
+      if (!isEditing) {
+        setInputValue(String(amount));
+      }
+    }, [amount, isEditing]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value.replace(/,/g, "");
+      if (/^\d*$/.test(raw)) {
+        setInputValue(raw);
+      }
+    };
+
+    const handleInputBlur = () => {
+      const num = Number(inputValue.replace(/,/g, ""));
+      if (isNaN(num) || num < 100) {
+        setInputValue(String(100));
+        handleAmountChange(100);
+      } else if (num > 1000) {
+        setInputValue(String(1000));
+        handleAmountChange(1000);
+      } else {
+        // Round to nearest 20
+        const rounded = Math.round(num / 20) * 20;
+        const clamped = Math.min(1000, Math.max(100, rounded));
+        setInputValue(String(clamped));
+        handleAmountChange(clamped);
+      }
+      setIsEditing(false);
+    };
+
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleInputBlur();
+      }
+    };
+
+    const handleQuickPick = (amt: number) => {
+      handleAmountChange(amt);
+      setInputValue(String(amt));
+      setIsEditing(false);
+      setOpenSection(null); // Auto-collapse
+    };
 
     return (
       <div ref={amountSectionRef}>
@@ -550,7 +616,9 @@ export function QuickReorderModal({
               : "max-h-0 opacity-0"
           )}
           style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxSizing: "border-box",
+            willChange: "max-height",
           }}
         >
           <div 
@@ -558,34 +626,91 @@ export function QuickReorderModal({
             style={{
               opacity: isOpen ? 1 : 0,
               transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s"
+                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+              pointerEvents: isOpen ? "auto" : "none",
+              boxSizing: "border-box",
             }}
           >
-                <CashAmountInput
-                  value={amount}
-                  onChange={handleAmountChange}
-                  min={100}
-                  max={1000}
-                  step={20}
-                  hideAmountDisplay={false}
-                />
-                {pricing && (
-                  <div className="space-y-2 pt-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-600">You'll Get</span>
-                      <span className="font-semibold text-slate-900">
-                        ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-600">You'll Pay</span>
-                      <span className="font-semibold text-slate-900">
-                        ${pricing.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
+            {/* Large Amount Input */}
+            <div>
+              <div
+                className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center"
+                style={{ height: '96px', borderRadius: '12px' }}
+              >
+                {!isEditing ? (
+                  <div
+                    onClick={() => {
+                      setIsEditing(true);
+                      setInputValue(String(amount));
+                      setTimeout(() => {
+                        const input = document.querySelector('input[aria-label="Cash amount"]') as HTMLInputElement;
+                        input?.focus();
+                        input?.select();
+                      }, 0);
+                    }}
+                    className="cursor-text hover:opacity-80 transition-opacity"
+                  >
+                    <p className="text-4xl font-semibold text-slate-900">
+                      ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-4xl font-semibold text-slate-900">$</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={inputValue.replace(/,/g, "")}
+                      onChange={handleInputChange}
+                      onBlur={handleInputBlur}
+                      onKeyDown={handleInputKeyDown}
+                      className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
+                      style={{ maxWidth: '200px' }}
+                      aria-label="Cash amount"
+                      autoFocus
+                    />
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Quick Amount Pills */}
+            <div className="flex gap-3">
+              {[100, 200, 500, 1000].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => handleQuickPick(amt)}
+                  className={cn(
+                    "flex-1 h-11 rounded-full text-sm font-medium text-slate-900 flex items-center justify-center transition-colors touch-manipulation",
+                    amount === amt
+                      ? "border-2 border-black bg-white"
+                      : "border-0 bg-[#F7F7F7]"
+                  )}
+                >
+                  ${amt.toLocaleString()}
+                </button>
+              ))}
+            </div>
+
+            {pricing && (
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-600">You'll Get</span>
+                  <span className="font-semibold text-slate-900">
+                    ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-600">You'll Pay</span>
+                  <span className="font-semibold text-slate-900">
+                    ${pricing.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -613,7 +738,9 @@ export function QuickReorderModal({
               : "max-h-0 opacity-0"
           )}
           style={{
-            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxSizing: "border-box",
+            willChange: "max-height",
           }}
         >
           <div 
@@ -621,8 +748,10 @@ export function QuickReorderModal({
             style={{
               opacity: isOpen ? 1 : 0,
               transition: isOpen
-                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
-                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+                ? "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s" // Fade in 100ms after expansion starts
+                : "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out with slower transition
+              pointerEvents: isOpen ? "auto" : "none",
+              boxSizing: "border-box",
             }}
           >
                 <DeliveryModeSelector
@@ -635,24 +764,37 @@ export function QuickReorderModal({
     );
   };
 
-  if (typeof document === "undefined" || !open) {
+  if (typeof document === "undefined") {
     return null;
   }
 
   return createPortal(
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 z-[80]"
-        onClick={handleClose}
-      />
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleClose}
+            className="fixed inset-0 bg-black/40 z-[80]"
+          />
 
-      {/* Modal Container */}
-      <div className="fixed inset-0 z-[90] flex items-end justify-center">
-        <div
-          className="relative w-full bg-white rounded-t-[28px] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
+          {/* Modal Container */}
+          <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none">
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{
+                type: 'spring',
+                stiffness: 300,
+                damping: 30,
+              }}
+              className="relative w-full bg-white rounded-t-[28px] shadow-2xl flex flex-col max-h-[98vh] overflow-hidden pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
           {/* Header */}
           <div className="flex-shrink-0 px-6 pt-6 pb-4 flex items-center justify-between">
             <div className="flex-1">
@@ -676,7 +818,15 @@ export function QuickReorderModal({
           <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
 
           {/* Scrollable Content */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 min-h-0 overflow-y-auto px-6 py-4"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'none',
+            }}
+          >
             <div className="space-y-1">
               <AddressSection />
               <div className="h-[1px] bg-[#F7F7F7] my-2" />
@@ -701,9 +851,11 @@ export function QuickReorderModal({
               loadingLabel="Creating order..."
             />
           </div>
-        </div>
-      </div>
-    </>,
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
     document.body
   );
 }
