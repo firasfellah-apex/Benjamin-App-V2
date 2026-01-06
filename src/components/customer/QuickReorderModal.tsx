@@ -9,7 +9,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { X, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
@@ -142,7 +142,7 @@ export function QuickReorderModal({
   useEffect(() => {
     if (!openSection) return;
 
-    // Wait for animation to complete (0.42s duration + buffer)
+    // Wait for animation to complete (0.4s max-height + 0.35s opacity with 0.05s delay = ~0.4s total)
     const timeoutId = setTimeout(() => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -158,7 +158,7 @@ export function QuickReorderModal({
           }
         });
       });
-    }, 340); // Slightly after animation duration (320ms)
+    }, 450); // Slightly after animation duration (400ms + buffer)
 
     return () => clearTimeout(timeoutId);
   }, [openSection]);
@@ -266,7 +266,6 @@ export function QuickReorderModal({
   // Shared animation constants
   const ACCORDION_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
   const ACCORDION_DURATION = 0.32;
-  const ACCORDION_Y = 10;
 
   // Collapsed section header component
   const SectionHeader = ({
@@ -343,17 +342,26 @@ export function QuickReorderModal({
           ) : null}
         </SectionHeader>
 
-        <AnimatePresence initial={false} mode="wait">
-          {isOpen && (
-            <motion.div
-              key="address-content"
-              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              animate={{ height: "auto", opacity: 1, y: 0 }}
-              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
-              style={{ overflow: "hidden" }}
-            >
-              <div className="pt-2 pb-4 space-y-3">
+        <div
+          className={cn(
+            "overflow-hidden relative",
+            isOpen 
+              ? "max-h-[500px] opacity-100" 
+              : "max-h-0 opacity-0"
+          )}
+          style={{
+            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          <div 
+            className="pt-2 pb-4 space-y-3"
+            style={{
+              opacity: isOpen ? 1 : 0,
+              transition: isOpen
+                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+            }}
+          >
                 {addresses.map((addr) => {
                   const IconComponent = getIconByName(addr.icon || "Home");
                   const isSelected = addr.id === selectedAddressId;
@@ -384,10 +392,8 @@ export function QuickReorderModal({
                     </button>
                   );
                 })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </div>
       </div>
     );
   };
@@ -432,17 +438,26 @@ export function QuickReorderModal({
           ) : null}
         </SectionHeader>
 
-        <AnimatePresence initial={false} mode="wait">
-          {isOpen && (
-            <motion.div
-              key="account-content"
-              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              animate={{ height: "auto", opacity: 1, y: 0 }}
-              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
-              style={{ overflow: "hidden" }}
-            >
-              <div className="pt-2 pb-4 space-y-3">
+        <div
+          className={cn(
+            "overflow-hidden relative",
+            isOpen 
+              ? "max-h-[500px] opacity-100" 
+              : "max-h-0 opacity-0"
+          )}
+          style={{
+            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          <div 
+            className="pt-2 pb-4 space-y-3"
+            style={{
+              opacity: isOpen ? 1 : 0,
+              transition: isOpen
+                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+            }}
+          >
                 {!hasAnyBank ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-slate-600 mb-3">No bank accounts connected</p>
@@ -499,10 +514,8 @@ export function QuickReorderModal({
                     })}
                   </>
                 )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </div>
       </div>
     );
   };
@@ -529,17 +542,26 @@ export function QuickReorderModal({
           </span>
         </SectionHeader>
 
-        <AnimatePresence initial={false} mode="wait">
-          {isOpen && (
-            <motion.div
-              key="amount-content"
-              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              animate={{ height: "auto", opacity: 1, y: 0 }}
-              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
-              style={{ overflow: "hidden" }}
-            >
-              <div className="pt-2 pb-4 space-y-4">
+        <div
+          className={cn(
+            "overflow-hidden relative",
+            isOpen 
+              ? "max-h-[500px] opacity-100" 
+              : "max-h-0 opacity-0"
+          )}
+          style={{
+            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          <div 
+            className="pt-2 pb-4 space-y-4"
+            style={{
+              opacity: isOpen ? 1 : 0,
+              transition: isOpen
+                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+            }}
+          >
                 <CashAmountInput
                   value={amount}
                   onChange={handleAmountChange}
@@ -564,10 +586,8 @@ export function QuickReorderModal({
                     </div>
                   </div>
                 )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </div>
       </div>
     );
   };
@@ -585,25 +605,32 @@ export function QuickReorderModal({
           {deliveryMode === "count_confirm" ? "Counted" : "Discreet"}
         </SectionHeader>
 
-        <AnimatePresence initial={false} mode="wait">
-          {isOpen && (
-            <motion.div
-              key="delivery-content"
-              initial={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              animate={{ height: "auto", opacity: 1, y: 0 }}
-              exit={{ height: 0, opacity: 0, y: -ACCORDION_Y }}
-              transition={{ duration: ACCORDION_DURATION, ease: ACCORDION_EASE }}
-              style={{ overflow: "hidden" }}
-            >
-              <div className="pt-2 pb-4">
+        <div
+          className={cn(
+            "overflow-hidden relative",
+            isOpen 
+              ? "max-h-[500px] opacity-100" 
+              : "max-h-0 opacity-0"
+          )}
+          style={{
+            transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          <div 
+            className="pt-2 pb-4"
+            style={{
+              opacity: isOpen ? 1 : 0,
+              transition: isOpen
+                ? "opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s" // Fade in 50ms after expansion starts
+                : "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)", // Fade out immediately when collapsing
+            }}
+          >
                 <DeliveryModeSelector
                   value={deliveryMode}
                   onChange={handleDeliveryModeChange}
                 />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </div>
       </div>
     );
   };
@@ -662,10 +689,10 @@ export function QuickReorderModal({
           </div>
 
           {/* Divider */}
-          <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+          <div className="border-t border-slate-200/70" />
 
           {/* Footer */}
-          <div className="flex-shrink-0 bg-white px-6 pt-5 pb-[max(16px,env(safe-area-inset-bottom))]">
+          <div className="flex-shrink-0 bg-white px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
             <SlideToConfirm
               onConfirm={handleConfirm}
               disabled={!canConfirm || loading}

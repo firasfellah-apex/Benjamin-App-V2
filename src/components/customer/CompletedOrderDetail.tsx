@@ -15,6 +15,7 @@ import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddres
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
 import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
+import { QuickReorderModal } from "@/components/customer/QuickReorderModal";
 import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
 import { Lock } from "lucide-react";
 
@@ -43,6 +44,7 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
   const [submittingRating, setSubmittingRating] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [showQuickReorderModal, setShowQuickReorderModal] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
   const hasRunnerRating = !!order.runner_rating;
 
@@ -73,37 +75,29 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
       return;
     }
     
-    // Run reorder eligibility check (only when onReorder is not provided - i.e., default reorder logic)
-    if (!onReorder) {
-      const result = validateReorderEligibility({
-        profile: profile || null,
-        addresses: addresses || [],
-        previousOrder: order,
-        bankAccounts: bankAccounts || [],
-      });
-      
-      if (!result.ok) {
-        // Show blocked modal
-        setEligibilityResult(result);
-        setShowBlockedModal(true);
-        return;
-      }
-    }
-    
-    // All checks passed or onReorder provided - proceed with reorder
+    // If onReorder callback is provided, use it (for custom reorder logic)
     if (onReorder) {
       onReorder(order);
-    } else {
-      // Default reorder logic
-      const params = new URLSearchParams();
-      params.set('amount', order.requested_amount.toString());
-      if (order.address_id) {
-        params.set('address_id', order.address_id);
-      } else if (order.address_snapshot) {
-        sessionStorage.setItem('reorder_address_snapshot', JSON.stringify(order.address_snapshot));
-      }
-      navigate(`/customer/request?${params.toString()}`);
+      return;
     }
+    
+    // Default reorder logic - run eligibility check
+    const result = validateReorderEligibility({
+      profile: profile || null,
+      addresses: addresses || [],
+      previousOrder: order,
+      bankAccounts: bankAccounts || [],
+    });
+    
+    if (!result.ok) {
+      // Show blocked modal
+      setEligibilityResult(result);
+      setShowBlockedModal(true);
+      return;
+    }
+    
+    // All checks passed - show Quick Reorder modal
+    setShowQuickReorderModal(true);
   };
   
   const handleStartNewRequest = () => {
@@ -371,6 +365,13 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
           </div>
         </div>
         
+        {/* Quick Reorder Modal */}
+        <QuickReorderModal
+          open={showQuickReorderModal}
+          onOpenChange={setShowQuickReorderModal}
+          order={order}
+        />
+
         {/* Reorder Blocked Modal */}
         {eligibilityResult && (
           <ReorderBlockedModal

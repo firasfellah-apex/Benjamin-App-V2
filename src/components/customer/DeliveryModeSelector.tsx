@@ -15,7 +15,7 @@ const modes = [
   {
     value: "count_confirm" as DeliveryMode,
     title: "Counted",
-    description: "Count the cash with the runner present",
+    description: "Count the cash with the runner present.",
     recommendation: "Recommended for first and/or large orders.",
     animationData: countedAnimation,
   },

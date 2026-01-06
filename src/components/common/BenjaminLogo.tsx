@@ -2,10 +2,12 @@
  * Benjamin Logo Component
  * 
  * Reusable logo component that supports theme-based coloring.
- * The SVG uses `currentColor` so it inherits the text color from the parent.
+ * For customer app: uses PNG image
+ * For runner/admin: uses SVG with currentColor
  */
 
 import { cn } from "@/lib/utils";
+import customerLogo from "@/assets/illustrations/benjaminlogoapp.png";
 
 interface BenjaminLogoProps {
   className?: string;
@@ -14,9 +16,21 @@ interface BenjaminLogoProps {
 }
 
 export function BenjaminLogo({ className, variant = 'customer', height = 24 }: BenjaminLogoProps) {
-  // Theme-based color classes
+  // For customer variant, use PNG image
+  if (variant === 'customer') {
+    return (
+      <img
+        src={customerLogo}
+        alt="Benjamin Logo"
+        height={height}
+        style={{ width: 'auto', height: `${height}px` }}
+        className={className}
+      />
+    );
+  }
+
+  // For runner/admin variants, use SVG (maintains backward compatibility)
   const colorClasses = {
-    customer: 'text-black', // Customer: black text on white background
     runner: 'text-white', // Runner: white text on dark background
     admin: 'text-[#F1F3F5]', // Admin: light text on dark background
   };

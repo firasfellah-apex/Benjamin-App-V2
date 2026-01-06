@@ -171,7 +171,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setShowTooltip(true);
+                          setShowTooltip((prev) => !prev);
                         }}
                         className="flex-1 cursor-pointer"
                       >
@@ -188,7 +188,8 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"
-                      className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      onClick={() => setShowTooltip(false)}
                     >
                       <p className="leading-relaxed">
                         Cannot make a new order when one is already in motion. Please wait for your current order to complete.
@@ -234,7 +235,8 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"
-                      className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      onClick={() => setShowTooltip(false)}
                     >
                       <p className="leading-relaxed">
                         Cannot make a new order when one is already in motion. Please wait for your current order to complete.
@@ -291,7 +293,8 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"
-                      className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      onClick={() => setShowTooltip(false)}
                     >
                       <p className="leading-relaxed">
                         Cannot make a new order when one is already in motion. Please wait for your current order to complete.
@@ -337,7 +340,8 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"
-                      className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      onClick={() => setShowTooltip(false)}
                     >
                       <p className="leading-relaxed">
                         Cannot make a new order when one is already in motion. Please wait for your current order to complete.
@@ -383,7 +387,8 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"
-                      className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                      onClick={() => setShowTooltip(false)}
                     >
                       <p className="leading-relaxed">
                         Cannot make a new order when one is already in motion. Please wait for your current order to complete.

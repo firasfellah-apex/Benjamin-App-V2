@@ -27,6 +27,7 @@ import { useCustomerAddresses } from "@/features/address/hooks/useCustomerAddres
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { validateReorderEligibility } from "@/features/orders/reorderEligibility";
 import { ReorderBlockedModal } from "@/components/customer/ReorderBlockedModal";
+import { QuickReorderModal } from "@/components/customer/QuickReorderModal";
 import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
 import { Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -119,10 +120,10 @@ export default function CustomerDeliveryDetail() {
   );
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [showReportIssueSheet, setShowReportIssueSheet] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [showQuickReorderModal, setShowQuickReorderModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
 
@@ -217,8 +218,6 @@ export default function CustomerDeliveryDetail() {
   }, [refetchDeliveries, deliveryId]);
 
   const handleReorder = useCallback(() => {
-    if (isNavigating) return; // Prevent double-clicks
-    
     // Block reorder if there's an active order
     if (hasActiveOrder) {
       return;
@@ -244,29 +243,14 @@ export default function CustomerDeliveryDetail() {
       return;
     }
 
-    // All checks passed - proceed with reorder
-    setIsNavigating(true);
-    
-    const params = new URLSearchParams();
-    params.set('amount', order.requested_amount.toString());
-    
-    if (order.address_id) {
-      params.set('address_id', order.address_id);
-    } else if (order.address_snapshot) {
-      sessionStorage.setItem('reorder_address_snapshot', JSON.stringify(order.address_snapshot));
-    }
-    
-    // Clear bottom nav before navigation to prevent glitches
-    setBottomSlot(null);
-    
-    navigate(`/customer/request?${params.toString()}`);
-  }, [order, navigate, isNavigating, setBottomSlot, profile, addresses, hasActiveOrder]);
+    // All checks passed - show Quick Reorder modal
+    setShowQuickReorderModal(true);
+  }, [order, profile, addresses, bankAccounts, hasActiveOrder]);
   
   const handleStartNewRequest = useCallback(() => {
     // Navigate to normal order flow (no reorder params)
-    setBottomSlot(null);
     navigate('/customer/request');
-  }, [navigate, setBottomSlot]);
+  }, [navigate]);
 
   const handleReportProblem = useCallback(() => {
     if (!order) {
@@ -278,7 +262,7 @@ export default function CustomerDeliveryDetail() {
 
   // Memoize bottom nav to prevent glitching/flashing
   const bottomNav = useMemo(() => {
-    if (!delivery || isNavigating) return null;
+    if (!delivery) return null;
 
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-[70] w-screen max-w-none bg-white border-t border-slate-200/70">
@@ -292,7 +276,7 @@ export default function CustomerDeliveryDetail() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setShowTooltip(true);
+                      setShowTooltip((prev) => !prev);
                     }}
                     className="w-full cursor-pointer"
                   >
@@ -302,14 +286,15 @@ export default function CustomerDeliveryDetail() {
                       className="w-full h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
                     >
-                      <span>{loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}</span>
+                      <span>{loadingOrder ? "Loading..." : "Reorder"}</span>
                       <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                     </Button>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent
                   side="top"
-                  className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                  className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                  onClick={() => setShowTooltip(false)}
                 >
                   <p className="leading-relaxed">
                     Cannot make a new order when one is already in motion. Please wait for your current order to complete.
@@ -320,10 +305,10 @@ export default function CustomerDeliveryDetail() {
               <Button
                 type="button"
                 onClick={handleReorder}
-                disabled={!order || loadingOrder || isNavigating}
+                disabled={!order || loadingOrder}
                 className="w-full h-14 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <span>{loadingOrder || isNavigating ? "Loading..." : "Reorder to this Address"}</span>
+                <span>{loadingOrder ? "Loading..." : "Reorder"}</span>
               </Button>
             )}
           </div>
@@ -331,7 +316,7 @@ export default function CustomerDeliveryDetail() {
           {/* Secondary Action: Report Problem */}
           <button
             onClick={handleReportProblem}
-            disabled={isNavigating || !order}
+            disabled={!order}
             className="w-full text-xs text-slate-400 text-center py-2 transition-colors hover:text-slate-600 disabled:opacity-50"
           >
             Report a problem with this order
@@ -339,19 +324,15 @@ export default function CustomerDeliveryDetail() {
         </div>
       </nav>
     );
-  }, [delivery, order, loadingOrder, isNavigating, handleReorder, handleReportProblem]);
+  }, [delivery, order, loadingOrder, handleReorder, handleReportProblem, hasActiveOrder, showTooltip]);
 
   // Set bottom nav - only update when bottomNav changes
   useEffect(() => {
-    if (isNavigating) {
-      setBottomSlot(null);
-      return;
-    }
     setBottomSlot(bottomNav);
     return () => {
       setBottomSlot(null);
     };
-  }, [bottomNav, isNavigating, setBottomSlot]);
+  }, [bottomNav, setBottomSlot]);
 
   // Build timeline events
   const timelineEvents = useMemo(() => {
@@ -418,7 +399,7 @@ export default function CustomerDeliveryDetail() {
 
   return (
     <CustomerScreen
-      title={`Cash delivery to ${delivery.locationLabel}`}
+      title={`Cash order to ${delivery.locationLabel}`}
       subtitle={subtitle}
       showBack={true}
       onBack={handleBack}
@@ -527,6 +508,15 @@ export default function CustomerDeliveryDetail() {
           open={showReportIssueSheet}
           order={order}
           onClose={() => setShowReportIssueSheet(false)}
+        />
+      )}
+
+      {/* Quick Reorder Modal */}
+      {order && (
+        <QuickReorderModal
+          open={showQuickReorderModal}
+          onOpenChange={setShowQuickReorderModal}
+          order={order}
         />
       )}
 

@@ -236,7 +236,7 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setShowTooltip(true);
+                      setShowTooltip((prev) => !prev);
                     }}
                     className="w-full cursor-pointer"
                   >
@@ -287,7 +287,8 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                 </TooltipTrigger>
                 <TooltipContent
                   side="top"
-                  className="bg-black text-white text-xs rounded-lg shadow-lg max-w-xs px-3 py-2.5 border-0 z-[100]"
+                  className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                  onClick={() => setShowTooltip(false)}
                 >
                   <p className="leading-relaxed">{primaryTooltip}</p>
                 </TooltipContent>
