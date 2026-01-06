@@ -2715,13 +2715,15 @@ async function checkTableExists(): Promise<boolean> {
   checkingTableExistence = (async () => {
     try {
       // Try a simple query to see if table exists
+      // Note: This will show a 404 in console if table doesn't exist, which is expected
+      // The error is handled gracefully below, but browser network errors can't be suppressed
       const { error } = await supabase
         .from('order_issues')
         .select('id')
         .limit(0);
       
       // Check for 404 or PGRST205 (table not found)
-      // Supabase returns 404 for missing tables, which may not have a specific error code
+      // Supabase returns 404 for missing tables, which is expected and handled silently
       const is404 = error && (
         error.code === 'PGRST205' || 
         error.message?.includes('404') || 
@@ -2733,6 +2735,9 @@ async function checkTableExists(): Promise<boolean> {
       );
       
       if (is404) {
+        // Table doesn't exist - this is expected and harmless
+        // The 404 appears in console but doesn't affect functionality
+        // Cache the result so we don't check again
         orderIssuesTableExists = false;
         checkingTableExistence = null;
         return false;

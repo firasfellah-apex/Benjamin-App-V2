@@ -262,6 +262,9 @@ export default function CustomerHome() {
       const issueSet = new Set<string>();
       
       // Check issues in parallel but with reasonable batching
+      // Note: hasOrderIssue() checks if order_issues table exists, which may show a 404
+      // in console if the table doesn't exist. This is expected and harmless - the check
+      // is cached after the first attempt, so it only happens once per session.
       const checks = completedOrdersWithoutRatings.map(async (order) => {
         if (cancelled) return;
         const hasIssue = await hasOrderIssue(order.id);
