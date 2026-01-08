@@ -143,10 +143,12 @@ export default function CashRequest() {
     }
   }, [searchParams, step]);
 
-  // Auto-select first bank account when banks load
+  // Auto-select primary bank account when banks load
   useEffect(() => {
     if (hasAnyBank && bankAccounts.length > 0 && !selectedBankAccountId) {
-      setSelectedBankAccountId(bankAccounts[0].id);
+      // Find primary bank account, or fall back to first account if none is primary
+      const primaryBank = bankAccounts.find(ba => ba.is_primary) || bankAccounts[0];
+      setSelectedBankAccountId(primaryBank.id);
     }
   }, [hasAnyBank, bankAccounts, selectedBankAccountId]);
 
@@ -735,11 +737,12 @@ export default function CashRequest() {
       }
       
       const order = await createOrder(
-        draft.amount,
+        amount,
         formatAddress(selectedAddress),
-        deliveryNotes,
-        draft.addressId,
-        deliveryStyle
+        deliveryNotes || undefined,
+        selectedAddress.id,
+        deliveryMode === "count_confirm" ? "COUNTED" : "SPEED",
+        selectedBankAccountId || undefined // Pass selected bank account ID
       );
       
       // CRITICAL: Verify the order was created with the correct delivery style

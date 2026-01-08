@@ -51,5 +51,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_APP_TARGET': JSON.stringify(appTarget || ''),
     },
+    // Base path for Capacitor (empty for local file system)
+    base: process.env.CAPACITOR ? './' : '/',
   };
 });

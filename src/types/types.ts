@@ -172,6 +172,7 @@ export interface Order {
   pickup_address: string | null;
   pickup_lat: number | null;
   pickup_lng: number | null;
+  bank_account_id: string | null; // Bank account used to fund this order (for refund routing)
   created_at: string;
   updated_at: string;
 }

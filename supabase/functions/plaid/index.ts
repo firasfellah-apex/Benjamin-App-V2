@@ -42,16 +42,21 @@ function getSupabaseClient(authHeader: string) {
   });
 }
 
+// CORS headers helper
+function getCorsHeaders(): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
+  };
+}
+
 serve(async (req) => {
-  // Handle CORS
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, content-type",
-      },
+      headers: getCorsHeaders(),
     });
   }
 
@@ -63,7 +68,7 @@ serve(async (req) => {
         JSON.stringify({ error: "Missing authorization header" }),
         {
           status: 401,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          headers: { "Content-Type": "application/json", ...getCorsHeaders() },
         }
       );
     }
@@ -81,13 +86,32 @@ serve(async (req) => {
         JSON.stringify({ error: "Unauthorized" }),
         {
           status: 401,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          headers: { "Content-Type": "application/json", ...getCorsHeaders() },
         }
       );
     }
 
     const url = new URL(req.url);
-    const path = url.pathname.split("/").pop();
+    // Try to get path from URL first
+    let path = url.pathname.split("/").pop();
+    
+    // If path is "plaid" (from supabase.functions.invoke), read body to get actual path
+    // We need to read body once and reuse it
+    let requestBody: any = null;
+    if (path === "plaid" || !path) {
+      try {
+        requestBody = await req.json();
+        path = requestBody.path || path;
+        console.log("[Plaid Edge Function] Path from body:", path);
+      } catch (e) {
+        console.error("[Plaid Edge Function] Failed to parse body:", e);
+        // If body parsing fails, continue with URL path
+      }
+    }
+
+    console.log("[Plaid Edge Function] Request path:", path);
+    console.log("[Plaid Edge Function] Request URL:", req.url);
+    console.log("[Plaid Edge Function] Request method:", req.method);
 
     // Route: /create-link-token
     if (path === "create-link-token" && req.method === "POST") {
@@ -107,14 +131,35 @@ serve(async (req) => {
         JSON.stringify({ link_token: linkTokenResponse.data.link_token }),
         {
           status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          headers: { "Content-Type": "application/json", ...getCorsHeaders() },
         }
       );
     }
 
     // Route: /exchange-public-token
     if (path === "exchange-public-token" && req.method === "POST") {
-      const body = await req.json();
+      // Use the body we already parsed, or parse it if we haven't yet
+      let body: any = requestBody;
+      if (!body) {
+        try {
+          body = await req.json();
+        } catch (e) {
+          return new Response(
+            JSON.stringify({ error: "Invalid JSON body" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...getCorsHeaders() },
+            }
+          );
+        }
+      }
+      
+      console.log("[Plaid Edge Function] Exchange request body:", {
+        has_public_token: !!body.public_token,
+        has_institution_id: !!body.institution_id,
+        path_from_body: body.path,
+      });
+      
       const { public_token, institution_id: metadataInstitutionId } = body;
 
       if (!public_token) {
@@ -122,7 +167,7 @@ serve(async (req) => {
           JSON.stringify({ error: "Missing public_token" }),
           {
             status: 400,
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            headers: { "Content-Type": "application/json", ...getCorsHeaders() },
           }
         );
       }
@@ -252,7 +297,7 @@ serve(async (req) => {
           JSON.stringify({ error: "Failed to fetch user profile" }),
           {
             status: 500,
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            headers: { "Content-Type": "application/json", ...getCorsHeaders() },
           }
         );
       }
@@ -277,7 +322,7 @@ serve(async (req) => {
               status: 400,
               headers: {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
+                ...getCorsHeaders(),
               },
             }
           );
@@ -297,7 +342,7 @@ serve(async (req) => {
               status: 400,
               headers: {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
+                ...getCorsHeaders(),
               },
             }
           );
@@ -439,6 +484,20 @@ serve(async (req) => {
         has_institution_logo: !!institutionLogoUrl,
       });
       
+      // Validate plaid_item_id is present before insert
+      if (!itemId) {
+        console.error("[Plaid] ❌ CRITICAL: itemId is missing! Cannot insert bank account without plaid_item_id");
+        return new Response(
+          JSON.stringify({ 
+            error: "Missing Plaid item ID",
+            details: "plaid_item_id is required but was not provided"
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("[Plaid] 💾 Bank account data before upsert:", JSON.stringify(bankAccountData, null, 2));
+
       const { error: bankAccountError, data: bankAccountResult } = await supabase
         .from("bank_accounts")
         .upsert(bankAccountData, {
@@ -448,6 +507,14 @@ serve(async (req) => {
         .select();
 
       if (bankAccountError) {
+        console.error("[Plaid] ❌ Bank account upsert error:", {
+          code: bankAccountError.code,
+          message: bankAccountError.message,
+          details: bankAccountError.details,
+          hint: bankAccountError.hint,
+          fullError: JSON.stringify(bankAccountError, null, 2),
+          bankAccountData: JSON.stringify(bankAccountData, null, 2),
+        });
         // If bank_accounts table doesn't exist, fall back to profiles table
         if (bankAccountError.code === 'PGRST205' || bankAccountError.message?.includes('does not exist') || bankAccountError.message?.includes('relation "bank_accounts"') || bankAccountError.message?.includes('schema cache')) {
           console.error("[Plaid] ❌ CRITICAL ERROR: bank_accounts table does not exist!");
@@ -489,7 +556,7 @@ serve(async (req) => {
               }),
               {
                 status: 500,
-                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                headers: { "Content-Type": "application/json", ...getCorsHeaders() },
               }
             );
           }
@@ -504,7 +571,7 @@ serve(async (req) => {
             }),
             {
               status: 500,
-              headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+              headers: { "Content-Type": "application/json", ...getCorsHeaders() },
             }
           );
         }
@@ -569,7 +636,7 @@ serve(async (req) => {
         }),
         {
           status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          headers: { "Content-Type": "application/json", ...getCorsHeaders() },
         }
       );
     }
@@ -579,7 +646,7 @@ serve(async (req) => {
       JSON.stringify({ error: "Not found" }),
       {
         status: 404,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        headers: { "Content-Type": "application/json", ...getCorsHeaders() },
       }
     );
   } catch (error: any) {
@@ -590,7 +657,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        headers: { "Content-Type": "application/json", ...getCorsHeaders() },
       }
     );
   }

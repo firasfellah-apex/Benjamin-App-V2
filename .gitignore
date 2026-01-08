@@ -165,3 +165,8 @@ dist
 !.env.example
 .supabase
 .DS_Store
+
+# Capacitor
+ios/
+android/
+.capacitor/

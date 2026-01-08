@@ -769,7 +769,8 @@ export async function createOrder(
   customerAddress: string,
   customerNotes?: string,
   addressId?: string,
-  deliveryStyle?: 'COUNTED' | 'SPEED'
+  deliveryStyle?: 'COUNTED' | 'SPEED',
+  bankAccountId?: string | null
 ): Promise<Order | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -787,6 +788,53 @@ export async function createOrder(
     : 'Customer';
 
   const fees = calculateFees(requestedAmount);
+
+  // Determine bank_account_id: use provided one, or fallback to primary
+  // NOTE: bank_account_id is NOT NULL, so we MUST have a value
+  let finalBankAccountId: string | null = bankAccountId || null;
+  
+  // Fetch user's bank accounts for validation and fallback
+  const userBankAccounts = await getBankAccounts();
+  
+  if (!finalBankAccountId) {
+    // No bank account provided - use primary as default
+    const primaryBank = userBankAccounts.find(ba => ba.is_primary) || userBankAccounts[0];
+    
+    if (!primaryBank) {
+      throw new Error('Cannot create order: No bank account available. Please connect a bank account first.');
+    }
+    
+    finalBankAccountId = primaryBank.id;
+    console.log('[ORDER_CREATE] Using primary bank account as default:', {
+      bankAccountId: finalBankAccountId,
+      institutionName: primaryBank.bank_institution_name,
+      isPrimary: primaryBank.is_primary
+    });
+  } else {
+    // Validate that the provided bank account belongs to the user
+    const isValidBank = userBankAccounts.some(ba => ba.id === finalBankAccountId);
+    
+    if (!isValidBank) {
+      console.error('[ORDER_CREATE] Invalid bank_account_id provided. Falling back to primary.');
+      const primaryBank = userBankAccounts.find(ba => ba.is_primary) || userBankAccounts[0];
+      
+      if (!primaryBank) {
+        throw new Error('Cannot create order: Invalid bank account and no primary account available.');
+      }
+      
+      finalBankAccountId = primaryBank.id;
+    } else {
+      console.log('[ORDER_CREATE] Using provided bank account:', {
+        bankAccountId: finalBankAccountId,
+        institutionName: userBankAccounts.find(ba => ba.id === finalBankAccountId)?.bank_institution_name
+      });
+    }
+  }
+  
+  // Final validation: ensure we have a bank account ID (required by NOT NULL constraint)
+  if (!finalBankAccountId) {
+    throw new Error('Cannot create order: bank_account_id is required but not available.');
+  }
 
   // If addressId is provided, fetch the address and create snapshot
   let addressSnapshot: AddressSnapshot | null = null;
@@ -860,6 +908,7 @@ export async function createOrder(
     customer_address: customerAddress, // Legacy field for backward compatibility
     customer_name: customerName,
     customer_notes: customerNotes || null,
+    bank_account_id: finalBankAccountId, // Bank account used for this order (for refund routing)
     status: "Pending"
   };
 
@@ -1960,11 +2009,94 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
       }
     );
 
-    return { success: true, message: "Order cancelled successfully" };
+    // Invoke refund processing Edge Function
+    // The Edge Function handles idempotency and will process refund asynchronously
+    console.log("[cancelOrder] Invoking refund function with order_id:", orderId);
+    
+    // Ensure body is always a valid object (never undefined/null)
+    if (!orderId) {
+      console.error("[cancelOrder] Cannot invoke refund: orderId is missing");
+      return { success: true, message: "Order cancelled successfully (refund skipped: no orderId)" };
+    }
+    
+    // Fire and forget - don't block UI, but log the result
+    supabase.functions.invoke('process-refund', {
+      body: { order_id: orderId }
+    }).then(({ data, error }) => {
+      if (error) {
+        console.error("[cancelOrder] Error invoking refund function:", {
+          error,
+          orderId,
+          errorMessage: error?.message,
+          errorContext: error?.context
+        });
+        // Don't throw - refund processing failure shouldn't block cancellation
+      } else {
+        const refundStatus = data?.status || 'unknown';
+        const refundMessage = data?.message || 'Refund processing initiated';
+        console.log("[cancelOrder] ✅ Refund processing initiated:", {
+          data,
+          orderId,
+          refundStatus,
+          refundMessage
+        });
+        
+        // If provider is not configured, log a warning (but don't fail cancellation)
+        if (data?.provider_error === "REFUND_PROVIDER_NOT_CONFIGURED" || 
+            data?.warning === "Refund provider not configured") {
+          console.warn("[cancelOrder] ⚠️ Refund provider not configured - refund job created but no funds movement executed");
+        }
+      }
+    }).catch((err) => {
+      console.error("[cancelOrder] Exception invoking refund function:", {
+        err,
+        orderId,
+        errorMessage: err?.message,
+        stack: err?.stack
+      });
+      // Don't throw - refund processing failure shouldn't block cancellation
+    });
+
+    return { success: true, message: "Order cancelled successfully. Refund processing initiated." };
   } catch (error: any) {
     console.error("Error in cancelOrder:", error);
     return { success: false, message: error.message || "An unexpected error occurred" };
   }
+}
+
+/**
+ * DEV ONLY — retry failed refunds for specific orders
+ * @param orderId - The order ID to retry refund for
+ */
+export async function retryRefund(orderId: string) {
+  const { data, error } = await supabase.functions.invoke("process-refund", {
+    body: { order_id: orderId },
+  });
+
+  if (error) {
+    console.error("[retryRefund] failed", { orderId, error });
+    throw error;
+  }
+
+  console.log("[retryRefund] ok", { orderId, data });
+  return data;
+}
+
+/**
+ * DEV ONLY — retry failed refunds for a list of order IDs
+ * @param orderIds - Array of order IDs to retry refunds for
+ */
+export async function retryRefunds(orderIds: string[]) {
+  const results = [];
+  for (const id of orderIds) {
+    try {
+      const result = await retryRefund(id);
+      results.push({ orderId: id, success: true, data: result });
+    } catch (error: any) {
+      results.push({ orderId: id, success: false, error: error.message || "Unknown error" });
+    }
+  }
+  return results;
 }
 
 export async function updateRunnerOnlineStatus(isOnline: boolean): Promise<{ success: boolean; error?: string; data?: any }> {
@@ -2717,6 +2849,11 @@ async function checkTableExists(): Promise<boolean> {
       // Try a simple query to see if table exists
       // Note: This will show a 404 in console if table doesn't exist, which is expected
       // The error is handled gracefully below, but browser network errors can't be suppressed
+      // Try a simple query to see if table exists
+      // NOTE: This will show a 404 in browser console if table doesn't exist.
+      // This is EXPECTED and HARMLESS - the error is handled gracefully below.
+      // The 404 only appears once per session (result is cached).
+      // To eliminate the 404, either create the order_issues table or remove this feature.
       const { error } = await supabase
         .from('order_issues')
         .select('id')
@@ -3262,7 +3399,6 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
     .from("bank_accounts")
     .select("*")
     .eq("user_id", user.id)
-    .order("is_primary", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -3352,6 +3488,33 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
   
   console.log("[getBankAccounts] Returning bank accounts from table:", result.length);
   return result;
+}
+
+export async function setPrimaryBankAccount(bankAccountId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  console.log("[setPrimaryBankAccount] Setting primary bank account:", bankAccountId);
+
+  try {
+    // Use atomic RPC function to set primary (prevents race conditions)
+    // This ensures: set all user's accounts is_primary=false, then set chosen one is_primary=true
+    // All in one transaction, preventing "0 primary" or "2 primaries" scenarios
+    const { data, error } = await supabase.rpc('rpc_set_primary_bank_account', {
+      p_bank_account_id: bankAccountId
+    });
+
+    if (error) {
+      console.error("[setPrimaryBankAccount] Error setting primary account:", error);
+      return false;
+    }
+
+    console.log("[setPrimaryBankAccount] ✅ Successfully set primary bank account");
+    return true;
+  } catch (error) {
+    console.error("[setPrimaryBankAccount] Exception:", error);
+    return false;
+  }
 }
 
 export async function deleteBankAccount(bankAccountId: string): Promise<boolean> {

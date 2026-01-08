@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/db/supabase';
 import type { Session, User } from '@supabase/supabase-js';
+import { setSentryUser, clearSentryUser } from '@/lib/sentry';
 
 type AuthContextValue = {
   user: User | null;
@@ -67,6 +68,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('✅ SIGNED_IN event - User logged in successfully!');
         setSession(newSession);
         setUser(newSession?.user ?? null);
+        
+        // Set Sentry user (role will be updated by ProfileContext)
+        if (newSession?.user) {
+          setSentryUser({
+            id: newSession.user.id,
+            email: newSession.user.email,
+            role: [], // Will be updated by ProfileContext
+          });
+        }
+        
         setLoading(false);
         
         // Clear the hash after successful sign-in
@@ -83,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('⚠️ SIGNED_OUT event - User logged out');
         setSession(null);
         setUser(null);
+        clearSentryUser();
         setLoading(false);
       } else if (event === 'INITIAL_SESSION') {
         console.log('Initial session loaded');
@@ -132,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
+    clearSentryUser();
   };
 
   return (

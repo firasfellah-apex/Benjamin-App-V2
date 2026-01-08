@@ -14,6 +14,8 @@ import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFoo
 import { Landmark, HelpCircle, MoreVertical, X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { Switch } from "@/components/ui/switch";
+import { setPrimaryBankAccount } from "@/db/api";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlaidLinkKyc } from "@/hooks/usePlaidLinkKyc";
@@ -44,6 +46,7 @@ export default function BankAccounts() {
   const [expandedBankId, setExpandedBankId] = useState<string | null>(null);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [bankAccountToDisconnect, setBankAccountToDisconnect] = useState<{ id: string; institutionName: string; last4: string; logoUrl: string | null } | null>(null);
+  const [isSettingPrimary, setIsSettingPrimary] = useState<string | null>(null);
   const { setBottomSlot } = useCustomerBottomSlot();
   
   // Ref to track help button position - MUST be before any conditional returns
@@ -95,9 +98,52 @@ export default function BankAccounts() {
     }
   };
 
+  // Handler for setting primary bank account
+  const handleSetPrimary = async (bankAccountId: string, checked: boolean) => {
+    // If unchecking and this is the only account, don't allow
+    if (!checked) {
+      const primaryCount = bankAccounts.filter(ba => ba.is_primary).length;
+      if (primaryCount === 1 && bankAccounts.find(ba => ba.id === bankAccountId)?.is_primary) {
+        toast.error('You must have at least one primary account. Set another account as primary first.');
+        return;
+      }
+    }
+
+    setIsSettingPrimary(bankAccountId);
+    
+    try {
+      const success = await setPrimaryBankAccount(bankAccountId);
+      
+      if (success) {
+        // Invalidate bank accounts cache to refresh the list
+        await invalidateBankAccounts();
+        toast.success('Primary bank account updated');
+      } else {
+        throw new Error('Failed to set primary bank account');
+      }
+    } catch (error) {
+      console.error('[Set Primary Bank] Error:', error);
+      toast.error('Failed to set primary bank account');
+    } finally {
+      setIsSettingPrimary(null);
+    }
+  };
+
   // Handler for confirming bank account disconnection
   const confirmDisconnect = async () => {
     if (!bankAccountToDisconnect) return;
+    
+    // Check if this is the only primary account
+    const isOnlyPrimary = bankAccounts.length > 0 && 
+      bankAccounts.filter(ba => ba.is_primary).length === 1 &&
+      bankAccountToDisconnect.id === bankAccounts.find(ba => ba.is_primary)?.id;
+    
+    if (isOnlyPrimary) {
+      toast.error('Cannot disconnect your only primary bank account. Set another account as primary first.');
+      setShowDisconnectDialog(false);
+      setBankAccountToDisconnect(null);
+      return;
+    }
     
     console.log('[Disconnect Bank] Starting disconnect process for:', bankAccountToDisconnect.id);
     setIsDisconnecting(true);
@@ -511,6 +557,10 @@ export default function BankAccounts() {
                     const institutionLogo = bankAccount.bank_institution_logo_url;
                     const isExpanded = expandedBankId === bankAccount.id;
 
+                    const isPrimary = bankAccount.is_primary;
+                    const isOnlyPrimary = bankAccounts.filter(ba => ba.is_primary).length === 1 && isPrimary;
+                    const isSettingThisPrimary = isSettingPrimary === bankAccount.id;
+
                     return (
                       <div key={bankAccount.id} className="rounded-2xl border border-slate-200/70 bg-slate-50/40 overflow-hidden">
                         {/* Bank Account Card - 12px padding all around */}
@@ -535,9 +585,16 @@ export default function BankAccounts() {
                             
                             {/* Bank Name and Account Number */}
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-base font-semibold text-slate-900 truncate">
-                                {institutionName}
-                              </h3>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-base font-semibold text-slate-900 truncate">
+                                  {institutionName}
+                                </h3>
+                                {isPrimary && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Primary
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-sm text-slate-600">
                                 **** {last4}
                               </p>
@@ -558,23 +615,63 @@ export default function BankAccounts() {
                           </div>
                         </div>
                         
-                        {/* Disconnect Button - Shows when expanded with smooth animation */}
+                        {/* Expanded Menu - Shows when kebab is clicked */}
                         <div
                           className="overflow-hidden transition-all duration-300 ease-in-out"
                           style={{
-                            maxHeight: isExpanded ? '100px' : '0',
+                            maxHeight: isExpanded ? '200px' : '0',
                             opacity: isExpanded ? 1 : 0,
                           }}
                         >
-                          <div className="px-3 pt-2 pb-3">
+                          <div className="px-3 pt-2 pb-3 space-y-3">
+                            {/* Make Primary Toggle - Only visible in expanded menu */}
+                            {!isPrimary && (
+                              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-slate-900">Make Primary</span>
+                              <InfoTooltip
+                                label="Primary Bank Account"
+                                side="top"
+                                align="start"
+                              >
+                                    <div className="space-y-2">
+                                      <p className="text-sm text-slate-300">
+                                        This is your default bank for identity verification and account-level refunds.
+                                      </p>
+                                      <p className="text-sm text-slate-300">
+                                        For individual orders, refunds always go back to the bank used for that order.
+                                      </p>
+                                    </div>
+                              </InfoTooltip>
+                                </div>
+                                <Switch
+                                  checked={false}
+                                  onCheckedChange={(checked) => handleSetPrimary(bankAccount.id, checked)}
+                                  disabled={isSettingThisPrimary}
+                                  className="data-[state=checked]:bg-[#13F287] data-[state=checked]:border-[#13F287]"
+                                />
+                              </div>
+                            )}
+
+                            {/* Disconnect Button */}
                             <Button
                               onClick={() => handleDisconnectBank(bankAccount.id)}
-                              disabled={isDisconnecting}
-                              className="w-full h-14 text-white hover:opacity-90 transition-opacity"
+                              disabled={isDisconnecting || isOnlyPrimary}
+                              className="w-full h-14 text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{ backgroundColor: '#E84855' }}
                             >
-                              {isDisconnecting ? 'Disconnecting...' : 'Disconnect Bank Account'}
+                              {isDisconnecting 
+                                ? 'Disconnecting...' 
+                                : isOnlyPrimary 
+                                  ? 'Cannot disconnect primary account'
+                                  : 'Disconnect Bank Account'
+                              }
                             </Button>
+                            {isOnlyPrimary && (
+                              <p className="text-xs text-slate-500 text-center">
+                                Set another account as primary first
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

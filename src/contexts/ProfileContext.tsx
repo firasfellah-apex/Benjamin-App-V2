@@ -1,7 +1,8 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useEffect, type ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile as useProfileHook } from "@/hooks/useProfile";
 import { queryClient } from "@/lib/queryClient";
+import { setSentryUser } from "@/lib/sentry";
 import type { Profile, UserRole } from "@/types/types";
 
 interface ProfileContextType {
@@ -30,6 +31,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
     }
   };
+
+  // Update Sentry user context when profile loads
+  useEffect(() => {
+    if (user && profile) {
+      setSentryUser({
+        id: user.id,
+        email: user.email,
+        role: profile.role || [],
+      });
+    }
+  }, [user, profile]);
 
   const value: ProfileContextType = useMemo(() => ({
     profile,
