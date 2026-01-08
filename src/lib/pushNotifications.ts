@@ -2,6 +2,9 @@ import { PushNotifications, type PermissionStatus, type Token } from '@capacitor
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { supabase } from '@/db/supabase';
+import { toast } from '@/hooks/use-toast';
+import React from 'react';
+import { ToastAction } from '@/components/ui/toast';
 
 export type AppRole = 'customer' | 'runner' | 'admin';
 
@@ -207,6 +210,57 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
 
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
     console.log('📩 PUSH RECEIVED:', JSON.stringify(notification));
+    
+    // Extract notification data
+    const notificationData = notification.data as Record<string, any> | undefined;
+    const orderId = notificationData?.order_id;
+    const messageId = notificationData?.message_id;
+    const eventType = notificationData?.event_type;
+    
+    // Prevent spam: don't toast if user is already in that chat
+    if (orderId) {
+      const href = window.location.href;
+      // Check if user is already in the chat or order detail page
+      if (href.includes(`/chat/${orderId}`) || href.includes(`/deliveries/${orderId}`)) {
+        console.log('[Push Notifications] User already in chat/order page, skipping toast');
+        return;
+      }
+    }
+    
+    // Determine if this is a message notification
+    const isMessageNotification = !!messageId;
+    
+    // Build toast title and description
+    const title = notification.title || (isMessageNotification ? 'New message' : 'New notification');
+    const description = notification.body || '';
+    
+    // Build action button for message notifications
+    let actionButton: React.ReactElement | undefined;
+    if (isMessageNotification && orderId) {
+      // Determine app role from current path
+      const isRunner = window.location.pathname.startsWith('/runner');
+      const chatPath = isRunner ? `/runner/chat/${orderId}` : `/customer/chat/${orderId}`;
+      
+      // Create ToastAction button using React.createElement
+      actionButton = React.createElement(
+        ToastAction,
+        {
+          altText: 'Open chat',
+          onClick: () => {
+            window.location.href = chatPath;
+          },
+        },
+        'Open chat'
+      );
+    }
+    
+    // Show in-app toast notification
+    toast({
+      title,
+      description,
+      duration: 4500,
+      action: actionButton,
+    });
   });
 
   PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {

@@ -1,5 +1,5 @@
-// Supabase Edge Function: Notify Order Event
-// Sends push notifications when order events occur
+// Supabase Edge Function: Notify Message Event
+// Sends push notifications when new messages are created in order chat
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,6 +19,10 @@ function getBearerToken(req: Request): string | null {
   if (!auth) return null;
   const m = auth.match(/^Bearer\s+(.+)$/i);
   return m ? m[1] : null;
+}
+
+function getWebhookSecret(req: Request): string | null {
+  return req.headers.get("x-webhook-secret") || req.headers.get("X-Webhook-Secret");
 }
 
 // Initialize Supabase client with service role (for RLS bypass)
@@ -49,68 +53,6 @@ function getCorsHeaders(req?: Request): Record<string, string> {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": requested ?? "authorization, content-type, apikey, x-client-info, x-requested-with",
     "Access-Control-Max-Age": "86400",
-  };
-}
-
-// Notification templates (Benjamin tone: clear, friendly, action-oriented)
-const NOTIFICATION_TEMPLATES: Record<string, { title: string; body: (payload: any) => string }> = {
-  order_created: {
-    title: "Order placed",
-    body: () => "Your cash delivery request is being processed. We'll match you with a runner soon."
-  },
-  runner_assigned: {
-    title: "Runner assigned",
-    body: (p) => `Your runner is on the way! ${p.runner_name ? `Meet ${p.runner_name}` : "They'll arrive soon"}.`
-  },
-  runner_en_route: {
-    title: "Runner on the way",
-    body: (p) => p.eta_seconds 
-      ? `Your runner will arrive in ${Math.round(p.eta_seconds / 60)} minutes.`
-      : "Your runner is heading to your location."
-  },
-  runner_arrived: {
-    title: "Runner arrived",
-    body: () => "Your runner has arrived at your location. Please verify the OTP to complete the handoff."
-  },
-  otp_verified: {
-    title: "OTP verified",
-    body: () => "Handoff in progress. Your runner will complete the delivery shortly."
-  },
-  handoff_completed: {
-    title: "Delivery completed",
-    body: () => "Your cash delivery is complete! Thank you for using Benjamin."
-  },
-  order_cancelled: {
-    title: "Order cancelled",
-    body: (p) => p.cancelled_by === "customer" 
-      ? "Your order has been cancelled. Refund processing initiated."
-      : "Your order has been cancelled. Refund processing initiated."
-  },
-  refund_processing: {
-    title: "Refund processing",
-    body: () => "Your refund is being processed. Funds will be returned to your bank account."
-  },
-  refund_succeeded: {
-    title: "Refund completed",
-    body: () => "Your refund has been processed. Funds have been returned to your bank account."
-  },
-  refund_failed: {
-    title: "Refund issue",
-    body: (p) => `There was an issue processing your refund. ${p.error ? `Error: ${p.error}` : "Please contact support."}`
-  }
-};
-
-// Get notification content for an event
-function getNotificationContent(eventType: string, payload: any): { title: string; body: string } | null {
-  const template = NOTIFICATION_TEMPLATES[eventType];
-  if (!template) {
-    console.warn(`[Notify] No template for event_type: ${eventType}`);
-    return null;
-  }
-  
-  return {
-    title: template.title,
-    body: template.body(payload || {})
   };
 }
 
@@ -378,38 +320,50 @@ Deno.serve(async (req) => {
   try {
     const supabase = getSupabaseClient();
 
-    // Verify caller identity (Verify JWT should be ON). We enforce order ownership.
-    const jwt = getBearerToken(req);
-    if (!jwt) {
-      return new Response(
-        JSON.stringify({ error: "Missing Authorization bearer token" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-      );
+    // Check for webhook secret (database trigger calls)
+    const webhookSecret = getWebhookSecret(req);
+    const expectedWebhookSecret = Deno.env.get("WEBHOOK_SECRET") || "";
+    const isWebhookCall = webhookSecret && expectedWebhookSecret && webhookSecret === expectedWebhookSecret;
+
+    let callerUserId: string | null = null;
+
+    if (!isWebhookCall) {
+      // In-app call: require JWT authentication
+      const jwt = getBearerToken(req);
+      if (!jwt) {
+        return new Response(
+          JSON.stringify({ error: "Missing Authorization bearer token" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+        );
+      }
+
+      // Use anon key from env (preferred) or fall back to incoming apikey header
+      const supabaseAnonKey = (Deno.env.get("SUPABASE_ANON_KEY") || req.headers.get("apikey") || "").toString();
+      if (!supabaseAnonKey) {
+        return new Response(
+          JSON.stringify({ error: "SUPABASE_ANON_KEY must be set (or provide apikey header)" }),
+          { status: 500, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+        );
+      }
+
+      const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL") || "", supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      const { data: userData, error: userErr } = await supabaseAuth.auth.getUser();
+      if (userErr || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized", details: userErr?.message }),
+          { status: 401, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+        );
+      }
+
+      callerUserId = userData.user.id;
+    } else {
+      // Webhook call: authenticated via secret, no user context needed
+      console.log("[Notify] Webhook call authenticated via secret");
     }
-
-    // Use anon key from env (preferred) or fall back to incoming apikey header
-    const supabaseAnonKey = (Deno.env.get("SUPABASE_ANON_KEY") || req.headers.get("apikey") || "").toString();
-    if (!supabaseAnonKey) {
-      return new Response(
-        JSON.stringify({ error: "SUPABASE_ANON_KEY must be set (or provide apikey header)" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-      );
-    }
-
-    const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL") || "", supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${jwt}` } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser();
-    if (userErr || !userData?.user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized", details: userErr?.message }),
-        { status: 401, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-      );
-    }
-
-    const callerUserId = userData.user.id;
 
     // Parse request body (safe)
     let body: any;
@@ -423,82 +377,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { order_id, event_type, payload, order_event_id, token, title, body: bodyText } = body;
+    const { message_id } = body;
     
-    // ============================================================================
-    // TEST SEND PATH: Direct push notification test
-    // Accepts: { "token": "...", "title": "Test", "body": "Hello" }
-    // ============================================================================
-    if (token && title && bodyText && !order_id && !order_event_id) {
-      console.log("[Notify] 🧪 Test send requested:", {
-        tokenPreview: token.substring(0, 20) + "...",
-        title,
-        body: bodyText
-      });
-      
-      // For test sends, default to android (FCM) - can be extended to detect platform
-      const platform = 'android' as 'ios' | 'android' | 'web';
-      
-      const result = await sendPushNotification({
-        token,
-        platform,
-        title,
-        body: bodyText,
-        data: { test: 'true' }
-      });
-      
+    if (!message_id) {
       return new Response(
-        JSON.stringify({
-          success: result.success,
-          message: "Test notification sent",
-          tokenPreview: token.substring(0, 20) + "...",
-          platform,
-          error: result.error
-        }),
-        {
-          status: result.success ? 200 : 500,
-          headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
-        }
-      );
-    }
-    
-    // ============================================================================
-    // NORMAL PATH: Order event notifications
-    // ============================================================================
-    
-    // Get event data (either from order_event_id or from params)
-    let event;
-    if (order_event_id) {
-      // Load event from database
-      const { data: eventData, error: eventError } = await supabase
-        .from("order_events")
-        .select("id, order_id, event_type, payload")
-        .eq("id", order_event_id)
-        .single();
-      
-      if (eventError || !eventData) {
-        return new Response(
-          JSON.stringify({ error: "Order event not found", details: eventError?.message }),
-          { status: 404, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-        );
-      }
-      
-      event = eventData;
-    } else if (order_id && event_type) {
-      // Use provided params
-      event = { order_id, event_type, payload: payload || {} };
-    } else {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields: order_id + event_type OR order_event_id" }),
+        JSON.stringify({ error: "Missing required field: message_id" }),
         { status: 400, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
       );
     }
     
-    // Load order to get customer_id
+    // Load message from database
+    const { data: message, error: messageError } = await supabase
+      .from("messages")
+      .select("id, order_id, sender_id, sender_role, body, created_at")
+      .eq("id", message_id)
+      .single();
+    
+    if (messageError || !message) {
+      return new Response(
+        JSON.stringify({ error: "Message not found", details: messageError?.message }),
+        { status: 404, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+      );
+    }
+    
+    // Load order to get customer_id and runner_id
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, customer_id, status")
-      .eq("id", event.order_id)
+      .select("id, customer_id, runner_id, status")
+      .eq("id", message.order_id)
       .single();
     
     if (orderError || !order) {
@@ -508,88 +414,113 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Ownership guard: callers may only notify events for their own orders
-    if (order.customer_id !== callerUserId) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden", message: "You do not have access to this order" }),
-        { status: 403, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-      );
+    // Determine recipient: if sender is customer, notify runner; if sender is runner, notify customer
+    // Admin messages notify both customer and runner
+    let recipientIds: string[] = [];
+    
+    if (message.sender_role === 'customer') {
+      // Customer sent message - notify runner
+      if (order.runner_id) {
+        recipientIds = [order.runner_id];
+      }
+    } else if (message.sender_role === 'runner') {
+      // Runner sent message - notify customer
+      recipientIds = [order.customer_id];
+    } else if (message.sender_role === 'admin') {
+      // Admin sent message - notify both customer and runner
+      recipientIds = [order.customer_id];
+      if (order.runner_id) {
+        recipientIds.push(order.runner_id);
+      }
     }
     
-    // Get notification content
-    const notification = getNotificationContent(event.event_type, event.payload);
-    if (!notification) {
-      // No template for this event type - skip notification
+    // Don't notify the sender
+    recipientIds = recipientIds.filter(id => id !== message.sender_id);
+    
+    if (recipientIds.length === 0) {
+      console.log("[Notify] No recipients for message:", message_id);
       return new Response(
-        JSON.stringify({ message: "No notification template for this event type", event_type: event.event_type }),
+        JSON.stringify({ message: "No recipients found", message_id }),
         { status: 200, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
       );
     }
     
-    // Load active push tokens for customer
-    const { data: devices, error: devicesError } = await supabase
-      .from("user_push_tokens")
-      .select("token, platform, app_role")
-      .eq("user_id", order.customer_id)
-      .eq("is_active", true);
+    // Get sender name for notification
+    const { data: senderProfile } = await supabase
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", message.sender_id)
+      .single();
     
-    if (devicesError) {
-      console.error("[Notify] Error loading devices:", devicesError);
-      return new Response(
-        JSON.stringify({ error: "Failed to load devices", details: devicesError.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-      );
-    }
+    const senderName = senderProfile 
+      ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() || 'Someone'
+      : 'Someone';
     
-    if (!devices || devices.length === 0) {
-      console.log("[Notify] No active devices for customer:", order.customer_id);
-      return new Response(
-        JSON.stringify({ message: "No active devices found", customer_id: order.customer_id }),
-        { status: 200, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-      );
-    }
+    // Build notification content
+    const notificationTitle = "New message";
+    const notificationBody = message.body.length > 100 
+      ? `${message.body.substring(0, 100)}...`
+      : message.body;
     
-    // Send notifications to all active devices
-    const results: Array<{ device_id: string; platform: string; success: boolean; error?: string }> = [];
-    for (const device of devices) {
-      // Only send to customer app (not runner/admin)
-      if (device.app_role !== 'customer') {
+    // Send notifications to all recipients
+    const results: Array<{ user_id: string; platform: string; success: boolean; error?: string }> = [];
+    
+    for (const recipientId of recipientIds) {
+      // Load active push tokens for recipient
+      const { data: devices, error: devicesError } = await supabase
+        .from("user_push_tokens")
+        .select("token, platform, app_role")
+        .eq("user_id", recipientId)
+        .eq("is_active", true);
+      
+      if (devicesError) {
+        console.error("[Notify] Error loading devices for user:", recipientId, devicesError);
         continue;
       }
       
-      const result = await sendPushNotification({
-        token: device.token,
-        platform: device.platform as 'ios' | 'android' | 'web',
-        title: notification.title,
-        body: notification.body,
-        data: {
-          order_id: order.id,
-          event_type: event.event_type,
-          ...event.payload
-        }
-      });
+      if (!devices || devices.length === 0) {
+        console.log("[Notify] No active devices for user:", recipientId);
+        continue;
+      }
       
-      results.push({
-        device_id: device.token.substring(0, 20) + "...",
-        platform: device.platform,
-        success: result.success,
-        error: result.error
-      });
+      // Send to all active devices for this recipient
+      for (const device of devices) {
+        const result = await sendPushNotification({
+          token: device.token,
+          platform: device.platform as 'ios' | 'android' | 'web',
+          title: notificationTitle,
+          body: `${senderName}: ${notificationBody}`,
+          data: {
+            message_id: message.id,
+            order_id: order.id,
+            sender_id: message.sender_id,
+            sender_role: message.sender_role
+          }
+        });
+        
+        results.push({
+          user_id: recipientId,
+          platform: device.platform,
+          success: result.success,
+          error: result.error
+        });
+      }
     }
     
-    console.log("[Notify] ✅ Notifications sent:", {
+    console.log("[Notify] ✅ Message notifications sent:", {
+      message_id: message.id,
       order_id: order.id,
-      event_type: event.event_type,
-      devices_count: devices.length,
+      sender_role: message.sender_role,
+      recipients_count: recipientIds.length,
       results
     });
     
     return new Response(
       JSON.stringify({
         success: true,
+        message_id: message.id,
         order_id: order.id,
-        event_type: event.event_type,
-        devices_notified: results.length,
+        recipients_notified: results.length,
         results
       }),
       {
@@ -612,3 +543,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+

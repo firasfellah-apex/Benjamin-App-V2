@@ -30,6 +30,8 @@ import { useBankAccounts } from '@/hooks/useBankAccounts';
 import LottieComponent from 'lottie-react';
 import bankAnimation from '@/assets/animations/bank.json';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { supabase } from '@/db/supabase';
+import { toast } from '@/hooks/use-toast';
 
 export default function CustomerHome() {
   const { user, loading: authLoading } = useAuth();
@@ -615,8 +617,95 @@ export default function CustomerHome() {
     return undefined; // Uses default in CustomerScreen
   }, [hasActiveOrder, activeOrder]);
 
+  // DEV-ONLY: Test push notification handler
+  const handleTestPush = useCallback(async () => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        alert('No user found. Please log in.');
+        return;
+      }
+
+      // Query for newest active Android token
+      const { data: tokens, error: tokenError } = await supabase
+        .from('user_push_tokens')
+        .select('token')
+        .eq('user_id', user.id)
+        .eq('platform', 'android')
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (tokenError) {
+        console.error('[Test Push] Error querying tokens:', tokenError);
+        alert(`Error: ${tokenError.message}`);
+        return;
+      }
+
+      if (!tokens || tokens.length === 0) {
+        alert('No android token found. Open app once on emulator to register token.');
+        return;
+      }
+
+      const token = tokens[0].token;
+
+      // Call edge function
+      const { data, error } = await supabase.functions.invoke('notify-order-event', {
+        body: {
+          token,
+          title: 'Benjamin Test',
+          body: 'Push test ✅'
+        }
+      });
+
+      console.log('[Test Push] Full response:', { data, error });
+
+      if (error) {
+        alert(`Error: ${error.message || JSON.stringify(error)}`);
+      } else {
+        alert(`Success! Check console for full response.`);
+      }
+    } catch (error: any) {
+      console.error('[Test Push] Unexpected error:', error);
+      alert(`Unexpected error: ${error.message || 'Unknown error'}`);
+    }
+  }, []);
+
   return (
     <>
+      {/* DEV-ONLY: Test Buttons */}
+      {import.meta.env.DEV && (
+        <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+          <Button
+            onClick={handleTestPush}
+            size="sm"
+            variant="outline"
+            className="bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-200 text-xs"
+          >
+            DEV: Test Push
+          </Button>
+          <Button
+            onClick={() => {
+              toast({
+                title: "Toast works",
+                description: "UI is rendering ✅",
+                duration: 3000,
+              });
+            }}
+            size="sm"
+            variant="outline"
+            className="bg-green-100 border-green-300 text-green-800 hover:bg-green-200 text-xs"
+          >
+            DEV: Test Toast
+          </Button>
+        </div>
+      )}
+
       <CustomerScreen
         title={title}
         subtitle="Skip the ATM. Request cash in seconds."
