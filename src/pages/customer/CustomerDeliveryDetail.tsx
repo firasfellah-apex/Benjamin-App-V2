@@ -4,7 +4,7 @@
  * Detailed view of a single past delivery with timeline, cost breakdown, runner info, and rating
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Check, Clock, MapPin, DollarSign, Star } from "@/lib/icons";
@@ -31,6 +31,10 @@ import { QuickReorderModal } from "@/components/customer/QuickReorderModal";
 import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
 import { Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import LottieComponent from "lottie-react";
+import reorderAnimation from "@/assets/animations/reorder.json";
+import lockReorderAnimation from "@/assets/animations/lockreorder.json";
+import ratingStarAnimation from "@/assets/animations/ratingstar.json";
 
 /**
  * Build timeline events from delivery data
@@ -112,7 +116,7 @@ export default function CustomerDeliveryDetail() {
   const { profile } = useProfile(user?.id);
   const { addresses } = useCustomerAddresses();
   const { bankAccounts } = useBankAccounts();
-  const { hasActiveOrder } = useActiveCustomerOrder();
+  const { hasActiveOrder, isLoading: activeOrderLoading } = useActiveCustomerOrder();
   
   // Try to get delivery from location state first (for instant render)
   const [delivery, setDelivery] = useState<CustomerDelivery | null>(
@@ -126,6 +130,21 @@ export default function CustomerDeliveryDetail() {
   const [showQuickReorderModal, setShowQuickReorderModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
+  
+  // Ref for rating star animation
+  const ratingStarLottieRef = useRef<any>(null);
+  
+  // Play rating star animation once on mount when delivery is available and not rated
+  useEffect(() => {
+    if (delivery && !delivery.customerRating && ratingStarLottieRef.current) {
+      const timer = setTimeout(() => {
+        if (ratingStarLottieRef.current) {
+          ratingStarLottieRef.current.goToAndPlay(0);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [delivery]);
 
   // If not in state, find from deliveries list
   useEffect(() => {
@@ -218,8 +237,8 @@ export default function CustomerDeliveryDetail() {
   }, [refetchDeliveries, deliveryId]);
 
   const handleReorder = useCallback(() => {
-    // Block reorder if there's an active order
-    if (hasActiveOrder) {
+    // Block reorder if we're still checking for active orders or if there's an active order
+    if (activeOrderLoading || hasActiveOrder) {
       return;
     }
     
@@ -269,7 +288,7 @@ export default function CustomerDeliveryDetail() {
         <div className="w-full px-6 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           {/* Primary CTA */}
           <div className="flex w-full gap-3 items-center justify-center mb-2">
-            {hasActiveOrder ? (
+            {(activeOrderLoading || hasActiveOrder) ? (
               <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                 <TooltipTrigger asChild>
                   <div
@@ -286,8 +305,15 @@ export default function CustomerDeliveryDetail() {
                       className="w-full h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
                     >
+                      <div className="w-5 h-5 flex items-center justify-center">
+                        <LottieComponent
+                          animationData={lockReorderAnimation}
+                          loop={false}
+                          autoplay={true}
+                          style={{ width: '20px', height: '20px' }}
+                        />
+                      </div>
                       <span>{loadingOrder ? "Loading..." : "Reorder"}</span>
-                      <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                     </Button>
                   </div>
                 </TooltipTrigger>
@@ -305,9 +331,17 @@ export default function CustomerDeliveryDetail() {
             <Button
               type="button"
               onClick={handleReorder}
-                disabled={!order || loadingOrder}
+                disabled={!order || loadingOrder || activeOrderLoading}
                 className="w-full h-14 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <LottieComponent
+                    animationData={reorderAnimation}
+                    loop={false}
+                    autoplay={true}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                </div>
                 <span>{loadingOrder ? "Loading..." : "Reorder"}</span>
             </Button>
             )}
@@ -324,7 +358,7 @@ export default function CustomerDeliveryDetail() {
         </div>
       </nav>
     );
-  }, [delivery, order, loadingOrder, handleReorder, handleReportProblem, hasActiveOrder, showTooltip]);
+  }, [delivery, order, loadingOrder, handleReorder, handleReportProblem, activeOrderLoading, hasActiveOrder, showTooltip]);
 
   // Set bottom nav - only update when bottomNav changes
   useEffect(() => {
@@ -481,7 +515,15 @@ export default function CustomerDeliveryDetail() {
                     className="inline-flex items-center justify-center gap-2 px-5 h-14 bg-yellow-400 text-sm font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] active:opacity-90 transition-all duration-150 flex-shrink-0"
                     style={{ color: '#D97708' }}
                   >
-                    <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        lottieRef={ratingStarLottieRef}
+                        animationData={ratingStarAnimation}
+                        loop={false}
+                        autoplay={false}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
                     <span>Rate Runner</span>
                   </Button>
                 )}

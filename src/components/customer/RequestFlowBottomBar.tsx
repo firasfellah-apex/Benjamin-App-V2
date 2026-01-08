@@ -10,6 +10,9 @@ import { OtpDisplay } from "@/components/customer/OtpDisplay";
 import type { OrderWithDetails, OrderStatus } from "@/types/types";
 import { supabase } from "@/db/supabase";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import LottieComponent from "lottie-react";
+import reorderAnimation from "@/assets/animations/reorder.json";
+import lockReorderAnimation from "@/assets/animations/lockreorder.json";
 
 type Mode =
   | "home"           // Home: single "Request Cash"
@@ -278,8 +281,20 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                         transition={{ duration: 0.15 }}
                         className="flex items-center gap-2"
                       >
+                        {/* Show lock animation for Reorder when disabled */}
+                        {primaryLabel === "Reorder" && primaryDisabled && (
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <LottieComponent
+                              animationData={lockReorderAnimation}
+                              loop={false}
+                              autoplay={true}
+                              style={{ width: '20px', height: '20px' }}
+                            />
+                          </div>
+                        )}
                         {isLoading ? "Processing..." : primaryLabel}
-                        {primaryIcon}
+                        {/* Only show primaryIcon if it's not Reorder (to avoid duplicate icon) */}
+                        {primaryLabel !== "Reorder" && primaryIcon}
                       </motion.span>
                     </AnimatePresence>
                   </motion.button>
@@ -335,8 +350,31 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                   transition={{ duration: 0.15 }}
                     className="flex items-center gap-2"
                 >
+                  {/* Show reorder animation for Reorder when enabled */}
+                  {primaryLabel === "Reorder" && !primaryDisabled && !isLoading && (
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={reorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
+                  )}
+                  {/* Show lock animation for Reorder when disabled */}
+                  {primaryLabel === "Reorder" && primaryDisabled && (
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={lockReorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
+                  )}
                   {isLoading ? "Processing..." : primaryLabel}
-                    {primaryIcon}
+                  {/* Only show primaryIcon if it's not Reorder (to avoid duplicate icon) */}
+                  {primaryLabel !== "Reorder" && primaryIcon}
                 </motion.span>
               </AnimatePresence>
             </motion.button>
@@ -453,8 +491,31 @@ export const RequestFlowBottomBar: React.FC<RequestFlowBottomBarProps> = memo(({
                       transition={{ duration: 0.15 }}
                       className="flex items-center gap-2"
                     >
+                      {/* Show reorder animation for Reorder when enabled */}
+                      {primaryLabel === "Reorder" && !primaryDisabled && !isLoading && (
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          <LottieComponent
+                            animationData={reorderAnimation}
+                            loop={false}
+                            autoplay={true}
+                            style={{ width: '20px', height: '20px' }}
+                          />
+                        </div>
+                      )}
+                      {/* Show lock animation for Reorder when disabled */}
+                      {primaryLabel === "Reorder" && primaryDisabled && (
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          <LottieComponent
+                            animationData={lockReorderAnimation}
+                            loop={false}
+                            autoplay={true}
+                            style={{ width: '20px', height: '20px' }}
+                          />
+                        </div>
+                      )}
                       {isLoading ? "Processing..." : primaryLabel}
-                      {primaryIcon}
+                      {/* Only show primaryIcon if it's not Reorder (to avoid duplicate icon) */}
+                      {primaryLabel !== "Reorder" && primaryIcon}
                     </motion.span>
                   </AnimatePresence>
                 </motion.button>

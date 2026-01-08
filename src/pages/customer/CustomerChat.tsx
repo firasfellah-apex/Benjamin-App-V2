@@ -136,9 +136,16 @@ export default function CustomerChat() {
   const runnerFallback = runnerProfile?.first_name || 'R';
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      {/* Fixed Header - stays at top when keyboard rises */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white fixed top-0 left-0 right-0 z-10">
+    <div className="flex flex-col h-screen bg-white overflow-hidden">
+      {/* Fixed Header - stays at absolute top when keyboard rises */}
+      <div 
+        className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white fixed top-0 left-0 right-0 z-50" 
+        style={{ 
+          paddingTop: 'max(12px, env(safe-area-inset-top))',
+          top: 0,
+          position: 'fixed'
+        }}
+      >
         <IconButton
           onClick={handleBack}
           size="lg"
@@ -167,9 +174,16 @@ export default function CustomerChat() {
         </div>
       </div>
 
-      {/* Chat Content - scrolls beneath fixed header */}
-      <div className="flex-1 overflow-hidden bg-slate-50 flex flex-col pt-[73px]">
-        <div className="flex-1 overflow-hidden">
+      {/* Chat Content - scrolls beneath fixed header, adjusts for keyboard */}
+      <div 
+        className="flex-1 overflow-hidden bg-slate-50 flex flex-col min-h-0"
+        style={{ 
+          paddingTop: 'calc(73px + max(0px, env(safe-area-inset-top)))',
+          // Height adjusts automatically with keyboard via flexbox
+          height: '100%'
+        }}
+      >
+        <div className="flex-1 overflow-hidden min-h-0">
           {(() => {
             if (import.meta.env.DEV) {
               console.log('[CustomerChat] Rendering OrderChatThread with:', {

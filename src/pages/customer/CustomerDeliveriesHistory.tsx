@@ -188,7 +188,7 @@ export default function CustomerDeliveriesHistory() {
   return (
     <CustomerScreen
       title="My Orders"
-      subtitle="Your past cash orders at a glance"
+      subtitle="Your past cash orders at a glance."
       showBack={true}
       onBack={handleBack}
       useXButton={true}

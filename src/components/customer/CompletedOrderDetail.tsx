@@ -40,7 +40,7 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
   const { profile } = useProfile(user?.id);
   const { addresses } = useCustomerAddresses();
   const { bankAccounts } = useBankAccounts();
-  const { hasActiveOrder } = useActiveCustomerOrder();
+  const { hasActiveOrder, isLoading: activeOrderLoading } = useActiveCustomerOrder();
   const [submittingRating, setSubmittingRating] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
@@ -70,8 +70,8 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
 
   // Handle reorder
   const handleReorder = () => {
-    // Block reorder if there's an active order
-    if (hasActiveOrder) {
+    // Block reorder if we're still checking for active orders or if there's an active order
+    if (activeOrderLoading || hasActiveOrder) {
       return;
     }
     
@@ -152,9 +152,9 @@ export function CompletedOrderDetail({ order, onReorder }: CompletedOrderDetailP
           onPrimary={handleReorder}
           primaryLabel="Reorder"
           useFixedPosition={true}
-          primaryDisabled={hasActiveOrder}
-          primaryIcon={hasActiveOrder ? <Lock className="w-4 h-4" style={{ color: '#6B7280' }} /> : undefined}
-          primaryTooltip={hasActiveOrder ? "Cannot make a new order when one is already in motion. Please wait for your current order to complete." : undefined}
+          primaryDisabled={activeOrderLoading || hasActiveOrder}
+          primaryIcon={undefined}
+          primaryTooltip={(activeOrderLoading || hasActiveOrder) ? "Cannot make a new order when one is already in motion. Please wait for your current order to complete." : undefined}
         />
       }
     >

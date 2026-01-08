@@ -6,7 +6,7 @@
  * Shows delivery amount, address, time, rating status, and navigation to full history.
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { OrderWithDetails } from "@/types/types";
@@ -21,6 +21,10 @@ import { QuickReorderModal } from "@/components/customer/QuickReorderModal";
 import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
 import { Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import LottieComponent from "lottie-react";
+import reorderAnimation from "@/assets/animations/reorder.json";
+import lockReorderAnimation from "@/assets/animations/lockreorder.json";
+import ratingStarAnimation from "@/assets/animations/ratingstar.json";
 
 interface LastDeliveryCardProps {
   order: OrderWithDetails;
@@ -34,17 +38,32 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
   const { profile } = useProfile(user?.id);
   const { addresses } = useCustomerAddresses();
   const { bankAccounts, isLoading: bankAccountsLoading } = useBankAccounts();
-  const { hasActiveOrder } = useActiveCustomerOrder();
+  const { hasActiveOrder, isLoading: activeOrderLoading } = useActiveCustomerOrder();
   const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [showQuickReorderModal, setShowQuickReorderModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<{ ok: boolean; reason?: 'missing_bank' | 'missing_address' | 'blocked_order' | 'runner_disabled'; message?: string } | null>(null);
+  
+  // Ref for rating star animation
+  const ratingStarLottieRef = useRef<any>(null);
   
   if (!order) return null;
   
   const isRated = hasRunnerRating(order);
   const canRate = order.status === 'Completed' && !isRated && !hasIssue;
   const isCancelled = order.status === 'Cancelled';
+  
+  // Play rating star animation once on mount
+  useEffect(() => {
+    if (canRate && ratingStarLottieRef.current) {
+      const timer = setTimeout(() => {
+        if (ratingStarLottieRef.current) {
+          ratingStarLottieRef.current.goToAndPlay(0);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [canRate]);
   
   const handleRateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -59,8 +78,8 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
   const handleReorder = (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // Block reorder if there's an active order
-    if (hasActiveOrder) {
+    // Block reorder if we're still checking for active orders or if there's an active order
+    if (activeOrderLoading || hasActiveOrder) {
       return;
     }
     
@@ -161,10 +180,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   className="flex-1 h-14 items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-400 active:bg-yellow-400 text-base font-semibold border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 active:scale-[0.98] transition-all duration-150"
                   style={{ color: '#D97708' }}
                 >
-                  <span className="text-base leading-[0]" style={{ color: '#D97708' }}>★</span>
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <LottieComponent
+                      lottieRef={ratingStarLottieRef}
+                      animationData={ratingStarAnimation}
+                      loop={false}
+                      autoplay={false}
+                      style={{ width: '20px', height: '20px' }}
+                    />
+                  </div>
                   <span>Rate Runner</span>
                 </Button>
-                {hasActiveOrder ? (
+                {(activeOrderLoading || hasActiveOrder) ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -178,11 +205,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                         <Button
                           type="button"
                           disabled={true}
-                          className="w-full h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
+                          className="h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280', width: '158px' }}
                         >
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <LottieComponent
+                              animationData={lockReorderAnimation}
+                              loop={false}
+                              autoplay={true}
+                              style={{ width: '20px', height: '20px' }}
+                            />
+                          </div>
                           <span>Reorder</span>
-                          <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                         </Button>
                       </div>
                     </TooltipTrigger>
@@ -202,6 +236,14 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   onClick={handleReorder}
                     className="flex-1 h-14 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
                 >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={reorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
                     <span>Reorder</span>
                 </Button>
                 )}
@@ -211,7 +253,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <div className="flex items-center justify-between flex-1">
                   <span className="text-xs text-slate-600">This delivery is being investigated.</span>
                 </div>
-                {hasActiveOrder ? (
+                {(activeOrderLoading || hasActiveOrder) ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -225,11 +267,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                         <Button
                           type="button"
                           disabled={true}
-                          className="h-14 px-6 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
+                          className="h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280', width: '158px' }}
                         >
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <LottieComponent
+                              animationData={lockReorderAnimation}
+                              loop={false}
+                              autoplay={true}
+                              style={{ width: '20px', height: '20px' }}
+                            />
+                          </div>
                           <span>Reorder</span>
-                          <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                         </Button>
                       </div>
                     </TooltipTrigger>
@@ -249,6 +298,14 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
                 >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={reorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
                     <span>Reorder</span>
                 </Button>
                 )}
@@ -269,7 +326,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     ))}
                   </div>
                 </div>
-                {hasActiveOrder ? (
+                {(activeOrderLoading || hasActiveOrder) ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -283,11 +340,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                         <Button
                           type="button"
                           disabled={true}
-                          className="h-14 px-6 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
+                          className="h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280', width: '158px' }}
                         >
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <LottieComponent
+                              animationData={lockReorderAnimation}
+                              loop={false}
+                              autoplay={true}
+                              style={{ width: '20px', height: '20px' }}
+                            />
+                          </div>
                           <span>Reorder</span>
-                          <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                         </Button>
                       </div>
                     </TooltipTrigger>
@@ -307,6 +371,14 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
                 >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={reorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
                     <span>Reorder</span>
                 </Button>
                 )}
@@ -316,7 +388,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <div className="text-xs text-slate-400 flex-1">
                   This order was cancelled.
                 </div>
-                {hasActiveOrder ? (
+                {(activeOrderLoading || hasActiveOrder) ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -330,11 +402,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                         <Button
                           type="button"
                           disabled={true}
-                          className="h-14 px-6 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
+                          className="h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280', width: '158px' }}
                         >
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <LottieComponent
+                              animationData={lockReorderAnimation}
+                              loop={false}
+                              autoplay={true}
+                              style={{ width: '20px', height: '20px' }}
+                            />
+                          </div>
                           <span>Reorder</span>
-                          <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                         </Button>
                       </div>
                     </TooltipTrigger>
@@ -354,6 +433,14 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
                 >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={reorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
                     <span>Reorder</span>
                 </Button>
                 )}
@@ -363,7 +450,7 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <div className="text-xs text-slate-400 flex-1">
                   Thank you for using Benjamin.
                 </div>
-                {hasActiveOrder ? (
+                {(activeOrderLoading || hasActiveOrder) ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -377,11 +464,18 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                         <Button
                           type="button"
                           disabled={true}
-                          className="h-14 px-6 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280' }}
+                          className="h-14 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          style={{ backgroundColor: '#D1D5DB', color: '#6B7280', width: '158px' }}
                         >
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <LottieComponent
+                              animationData={lockReorderAnimation}
+                              loop={false}
+                              autoplay={true}
+                              style={{ width: '20px', height: '20px' }}
+                            />
+                          </div>
                           <span>Reorder</span>
-                          <Lock className="w-4 h-4" style={{ color: '#6B7280' }} />
                         </Button>
                       </div>
                     </TooltipTrigger>
@@ -401,6 +495,14 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   onClick={handleReorder}
                     className="flex-shrink-0 h-14 px-6 bg-black text-white hover:bg-black/90 flex items-center justify-center gap-2"
                 >
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <LottieComponent
+                        animationData={reorderAnimation}
+                        loop={false}
+                        autoplay={true}
+                        style={{ width: '20px', height: '20px' }}
+                      />
+                    </div>
                     <span>Reorder</span>
                 </Button>
                 )}

@@ -6,6 +6,8 @@ import {
   CUSTOMER_TIMELINE_STEPS,
   type CustomerFacingStep,
 } from "@/lib/customerStatus";
+import LottieComponent from "lottie-react";
+import progressLoaderAnimation from "@/assets/animations/progressloader.json";
 
 type TimelineStep = {
   id: string;
@@ -262,9 +264,14 @@ export function OrderProgressTimeline({
                   {!isCanceled && (
                     <>
                       {isCurrent ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-black text-[#13F287] text-xs font-medium whitespace-nowrap">
-                          In Progress
-                        </span>
+                        <div className="inline-flex items-center justify-center w-8 h-8">
+                          <LottieComponent
+                            animationData={progressLoaderAnimation}
+                            loop={true}
+                            autoplay={true}
+                            style={{ width: '32px', height: '32px' }}
+                          />
+                        </div>
                       ) : showAsCompleted ? (
                         <span
                           className={cn(

@@ -197,12 +197,12 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
   }, [] as OrderMessage[][]);
 
   return (
-    <div className={cn("flex flex-col h-full", variant === 'admin' && 'mt-6')}>
+    <div className={cn("flex flex-col h-full min-h-0", variant === 'admin' && 'mt-6')}>
       {/* Messages List - Scrollable area */}
       <div 
         ref={messagesContainerRef}
         className={cn(
-          "flex-1 overflow-y-auto px-4 py-4",
+          "flex-1 overflow-y-auto px-4 py-4 min-h-0",
           containerStyles
         )}
         style={{
@@ -320,15 +320,20 @@ export const OrderChatThread: React.FC<OrderChatThreadProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Fixed Bottom Section - Pills and Input - Full width responsive */}
-      <div className={cn(
-        "flex-shrink-0 border-t w-full",
-        isDark 
-          ? "border-slate-700 bg-[#020817]"
-          : isAdmin
-          ? "border-[#2A2D35] bg-[#0B1020]"
-          : "border-slate-200 bg-white"
-      )}>
+      {/* Fixed Bottom Section - Pills and Input - Adjusts with keyboard */}
+      <div 
+        className={cn(
+          "flex-shrink-0 border-t w-full",
+          isDark 
+            ? "border-slate-700 bg-[#020817]"
+            : isAdmin
+            ? "border-[#2A2D35] bg-[#0B1020]"
+            : "border-slate-200 bg-white"
+        )}
+        style={{
+          paddingBottom: 'max(16px, env(safe-area-inset-bottom))'
+        }}
+      >
         {/* Chat Closed Banner - Only show for customer/runner, not admin */}
         {!canSend && role !== 'admin' && (
           <div className={cn(

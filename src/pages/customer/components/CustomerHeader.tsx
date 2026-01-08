@@ -1,6 +1,6 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { EllipsisVertical, ArrowLeft } from "@/lib/icons";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BenjaminLogo } from "@/components/common/BenjaminLogo";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,9 +24,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { Avatar } from "@/components/common/Avatar";
 import { useQueryClient } from "@tanstack/react-query";
-import { Clock, MapPinPen, LogOut, X, Star } from "@/lib/icons";
-import { Landmark, CheckCircle2 } from "lucide-react";
+import { LogOut, X, Star } from "@/lib/icons";
+import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LottieComponent from "lottie-react";
+import ordersMenuAnimation from "@/assets/animations/ordersmenu.json";
+import addressesMenuAnimation from "@/assets/animations/addressesmenu.json";
+import bankMenuAnimation from "@/assets/animations/bankmenu.json";
 
 export function CustomerHeader({
   title,
@@ -47,11 +51,15 @@ export function CustomerHeader({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { profile } = useProfile(user?.id);
   const queryClient = useQueryClient();
+
+  // Refs for Lottie animations
+  const ordersLottieRef = useRef<any>(null);
+  const addressesLottieRef = useRef<any>(null);
+  const bankLottieRef = useRef<any>(null);
 
   // Refetch profile when menu opens to ensure fresh avatar
   useEffect(() => {
@@ -59,6 +67,25 @@ export function CustomerHeader({
       queryClient.refetchQueries({ queryKey: ['profile', user.id] });
     }
   }, [isMenuOpen, user?.id, queryClient]);
+
+  // Play animations once when menu opens
+  useEffect(() => {
+    if (isMenuOpen) {
+      // Small delay to ensure animations are mounted
+      const timer = setTimeout(() => {
+        if (ordersLottieRef.current) {
+          ordersLottieRef.current.goToAndPlay(0);
+        }
+        if (addressesLottieRef.current) {
+          addressesLottieRef.current.goToAndPlay(0);
+        }
+        if (bankLottieRef.current) {
+          bankLottieRef.current.goToAndPlay(0);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isMenuOpen]);
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true);
@@ -77,7 +104,6 @@ export function CustomerHeader({
   };
 
   const isCustomer = profile?.role.includes('customer');
-  const isHomePage = location.pathname === "/customer/home" || location.pathname === "/customer";
 
   const kycStatus = profile?.kyc_status;
   const isKycVerified = kycStatus === "verified";
@@ -195,7 +221,15 @@ export function CustomerHeader({
                 onClick={() => handleMenuItemClick("/customer/deliveries")}
                 className="w-full flex items-center gap-3 pt-0 pb-3.5 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-transparent"
               >
-                <Clock className="h-5 w-5 text-slate-900 flex-shrink-0" />
+                <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center">
+                  <LottieComponent
+                    lottieRef={ordersLottieRef}
+                    animationData={ordersMenuAnimation}
+                    loop={false}
+                    autoplay={false}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                </div>
                 <span className="flex flex-col items-start text-left">
                   <span className="text-base font-medium text-slate-900">
                     My Orders
@@ -216,7 +250,15 @@ export function CustomerHeader({
                 onClick={() => handleMenuItemClick("/customer/addresses")}
                 className="w-full flex items-center gap-3 py-3.5 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-transparent"
               >
-                <MapPinPen className="h-5 w-5 text-slate-900 flex-shrink-0" />
+                <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center">
+                  <LottieComponent
+                    lottieRef={addressesLottieRef}
+                    animationData={addressesMenuAnimation}
+                    loop={false}
+                    autoplay={false}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                </div>
                 <span className="flex flex-col items-start text-left">
                   <span className="text-base font-medium text-slate-900">
                     Manage Addresses
@@ -237,7 +279,15 @@ export function CustomerHeader({
                 onClick={() => handleMenuItemClick("/customer/banks")}
                 className="w-full flex items-center gap-3 py-3.5 rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-colors border border-transparent"
               >
-                <Landmark className="h-5 w-5 text-slate-900 flex-shrink-0" />
+                <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center">
+                  <LottieComponent
+                    lottieRef={bankLottieRef}
+                    animationData={bankMenuAnimation}
+                    loop={false}
+                    autoplay={false}
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                </div>
                 <span className="flex flex-col items-start text-left">
                   <span className="text-base font-medium text-slate-900">
                     My Bank Accounts
