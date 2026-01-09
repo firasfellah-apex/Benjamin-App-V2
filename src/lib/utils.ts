@@ -69,3 +69,18 @@ export function getOrderDuration(
     return `${diffSeconds}s`;
   }
 }
+
+/**
+ * Format phone number to (123) 456-7890 format
+ * Strips all non-digits and formats as user types
+ * 
+ * @param value - Raw phone number string (may contain formatting)
+ * @returns Formatted phone number string: (123) 456-7890
+ */
+export function formatPhoneNumber(value: string): string {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers.length === 0) return '';
+  if (numbers.length <= 3) return `(${numbers}`;
+  if (numbers.length <= 6) return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
+  return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
+}

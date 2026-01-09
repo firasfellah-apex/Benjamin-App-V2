@@ -31,6 +31,7 @@ import LottieComponent from "lottie-react";
 import ordersMenuAnimation from "@/assets/animations/ordersmenu.json";
 import addressesMenuAnimation from "@/assets/animations/addressesmenu.json";
 import bankMenuAnimation from "@/assets/animations/bankmenu.json";
+import { useCustomerRating } from "@/hooks/useCustomerRating";
 
 export function CustomerHeader({
   title,
@@ -55,6 +56,7 @@ export function CustomerHeader({
   const { user, logout } = useAuth();
   const { profile } = useProfile(user?.id);
   const queryClient = useQueryClient();
+  const { avg_rating, rating_count, isLoading: isLoadingRating } = useCustomerRating();
 
   // Refs for Lottie animations
   const ordersLottieRef = useRef<any>(null);
@@ -201,10 +203,18 @@ export function CustomerHeader({
               </span>
 
               {/* Rating pill */}
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal" style={{ backgroundColor: '#FFFBEB', color: '#F2AB58' }}>
-                <Star className="h-3.5 w-3.5 fill-[#F2AB58]" style={{ color: '#F2AB58' }} />
-                <span>5.0</span>
-              </span>
+              {!isLoadingRating && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal" style={{ backgroundColor: '#FFFBEB', color: '#F2AB58' }}>
+                  <Star className="h-3.5 w-3.5 fill-[#F2AB58]" style={{ color: '#F2AB58' }} />
+                  <span>
+                    {rating_count === 0
+                      ? "New"
+                      : rating_count >= 5 && avg_rating !== null
+                      ? avg_rating.toFixed(1)
+                      : "New"}
+                  </span>
+                </span>
+              )}
             </div>
           </button>
         )}

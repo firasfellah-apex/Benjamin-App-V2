@@ -23,6 +23,7 @@ import { AvatarCropModal } from "@/components/common/AvatarCropModal";
 import { useCustomerRating } from "@/hooks/useCustomerRating";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { AccountSummaryCard } from "@/components/account/AccountSummaryCard";
+import { formatPhoneNumber } from "@/lib/utils";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -52,13 +53,19 @@ export default function Account() {
       setFormData({
         first_name: profile.first_name || "",
         last_name: profile.last_name || "",
-        phone: profile.phone || "",
+        phone: profile.phone ? formatPhoneNumber(profile.phone) : "",
       });
     }
   }, [profile]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Format phone number as user types
+    if (field === "phone") {
+      const formatted = formatPhoneNumber(value);
+      setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSave = async () => {
@@ -74,10 +81,12 @@ export default function Account() {
 
     setIsSaving(true);
     try {
+      // Strip formatting from phone number before saving (store only digits)
+      const phoneDigits = formData.phone.replace(/\D/g, '');
       await saveProfile(user.id, {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
-        phone: formData.phone.trim() || null,
+        phone: phoneDigits || null,
       });
       toast.success("Profile updated successfully!");
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -268,7 +277,7 @@ export default function Account() {
     const initialData = {
       first_name: profile.first_name || "",
       last_name: profile.last_name || "",
-      phone: profile.phone || "",
+      phone: profile.phone ? formatPhoneNumber(profile.phone) : "",
     };
 
     const hasChanges =
@@ -467,26 +476,28 @@ export default function Account() {
                     onClick={handleSave}
                     disabled={isSaving}
                   >
-                    {isSaving ? "Saving..." : "Save changes"}
+                    {isSaving ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               )}
             </CustomerCard>
 
-            {/* Divider */}
-            <div className="h-px bg-slate-200 -mx-6" />
+            {/* Classic Divider */}
+            <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
 
             {/* Account Status Section */}
             <div className="space-y-3">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                 Account status
               </h3>
-              <AccountSummaryCard
-                bankConnected={hasActiveBank}
-                ratingAvg={avg_rating}
-                ratingCount={rating_count}
-                isLoadingRating={isLoadingRating}
-              />
+              <div className="space-y-3">
+                <AccountSummaryCard
+                  bankConnected={hasActiveBank}
+                  ratingAvg={avg_rating}
+                  ratingCount={rating_count}
+                  isLoadingRating={isLoadingRating}
+                />
+              </div>
             </div>
 
             {/* DEV: Debug Panel - Collapsed accordion at bottom, only in development */}
