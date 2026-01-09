@@ -183,6 +183,7 @@ export function RequestFlowMapLayer({ lat, lng, label }: RequestFlowMapLayerProp
           center={center}
           zoom={17}
           showGoogleLogo
+          minimal={true}
           gestureHandling="cooperative"
           fallback={
             <div 

@@ -27,14 +27,19 @@ export function BenjaminMap({
   draggable = false,
   onMarkerDrag,
   showGoogleLogo = false,
-  gestureHandling = "auto",
+  gestureHandling,
 }: BenjaminMapProps) {
   const { isReady, isError } = useGoogleMaps();
   const mapDivRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const dragListenerRef = useRef<any>(null);
-  const gestureHandlingRef = useRef<string | undefined>(gestureHandling);
+  // For small embedded/preview maps inside scrollable lists, default to cooperative (2-finger pan)
+  // so a single-finger gesture scrolls the page instead of moving the map.
+  const effectiveGestureHandling: BenjaminMapProps["gestureHandling"] =
+    gestureHandling ?? (minimal ? "cooperative" : "auto");
+
+  const gestureHandlingRef = useRef<string | undefined>(effectiveGestureHandling);
 
   useEffect(() => {
     const g = (window as any).google as any;
@@ -95,17 +100,17 @@ export function BenjaminMap({
     ] : [];
 
     // Track gestureHandling to detect changes - Google Maps requires gestureHandling at creation time
-    const shouldRecreateMap = gestureHandlingRef.current !== gestureHandling && mapInstanceRef.current;
+    const shouldRecreateMap = gestureHandlingRef.current !== effectiveGestureHandling && mapInstanceRef.current;
 
     // Recreate map if gestureHandling changed (Google Maps requires it at creation time)
     if (shouldRecreateMap) {
-      console.log("[BenjaminMap] gestureHandling changed, recreating map:", gestureHandlingRef.current, "->", gestureHandling);
+      console.log("[BenjaminMap] gestureHandling changed, recreating map:", gestureHandlingRef.current, "->", effectiveGestureHandling);
       if (markerRef.current) {
         markerRef.current.setMap(null);
         markerRef.current = null;
       }
       mapInstanceRef.current = null;
-      gestureHandlingRef.current = gestureHandling;
+      gestureHandlingRef.current = effectiveGestureHandling;
     }
 
     // Just create once – no fancy ref tracking
@@ -114,7 +119,7 @@ export function BenjaminMap({
         center,
         zoom,
         minimal,
-        gestureHandling,
+        gestureHandling: effectiveGestureHandling,
       });
 
       const mapOptions: any = {
@@ -129,30 +134,30 @@ export function BenjaminMap({
         zoomControlOptions: {
           position: g.maps.ControlPosition.RIGHT_CENTER,
         },
-        gestureHandling: gestureHandling, // Configure gesture handling (cooperative = 2-finger pan) - MUST be set at creation
+        gestureHandling: effectiveGestureHandling, // Configure gesture handling (cooperative = 2-finger pan) - MUST be set at creation
       };
 
-      console.log("[BenjaminMap] Creating map with gestureHandling:", gestureHandling);
+      console.log("[BenjaminMap] Creating map with gestureHandling:", effectiveGestureHandling);
 
       if (minimal && minimalStyles.length > 0) {
         mapOptions.styles = minimalStyles;
       }
 
       mapInstanceRef.current = new MapCtor(mapDivRef.current, mapOptions);
-      gestureHandlingRef.current = gestureHandling;
+      gestureHandlingRef.current = effectiveGestureHandling;
     } else {
       // Update existing map
       mapInstanceRef.current.setCenter(center);
       mapInstanceRef.current.setZoom(zoom ?? 15);
       
       // Update zoom controls and gesture handling
-      console.log("[BenjaminMap] Updating map options with gestureHandling:", gestureHandling);
+      console.log("[BenjaminMap] Updating map options with gestureHandling:", effectiveGestureHandling);
       mapInstanceRef.current.setOptions({
         zoomControl: true,
         zoomControlOptions: {
           position: g.maps.ControlPosition.RIGHT_CENTER,
         },
-        gestureHandling: gestureHandling, // Update gesture handling if prop changed
+        gestureHandling: effectiveGestureHandling, // Update gesture handling if prop changed
       });
       
       // Update styles if minimal prop changed
@@ -401,7 +406,7 @@ export function BenjaminMap({
         markerRef.current = null;
       }
     };
-  }, [isReady, center.lat, center.lng, zoom, isError, marker?.lat, marker?.lng, minimal, draggable, onMarkerDrag, showGoogleLogo, gestureHandling]);
+  }, [isReady, center.lat, center.lng, zoom, isError, marker?.lat, marker?.lng, minimal, draggable, onMarkerDrag, showGoogleLogo, effectiveGestureHandling]);
 
   const showSkeleton =
     !isReady ||
