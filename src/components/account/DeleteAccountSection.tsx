@@ -20,6 +20,26 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+// Accordion variants matching QuickReorderModal bank dropdown
+const ACCORDION_VARIANTS = {
+  collapsed: { 
+    height: 0, 
+    opacity: 0,
+    transition: { 
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      opacity: { duration: 0.2 }
+    }
+  },
+  open: { 
+    height: "auto", 
+    opacity: 1,
+    transition: { 
+      height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+      opacity: { duration: 0.4, delay: 0.1 }
+    }
+  }
+};
+
 interface DeleteAccountSectionProps {
   onDelete: () => Promise<void>;
   isDeleting: boolean;
@@ -46,10 +66,7 @@ export function DeleteAccountSection({ onDelete, isDeleting }: DeleteAccountSect
           <div className="w-full flex items-center justify-between gap-3">
             <CollapsibleTrigger asChild>
               <button className="flex-1 flex items-center justify-start text-left">
-                <div className="flex flex-col items-start gap-0.5">
-                  <span className="text-sm font-semibold text-gray-900">Delete Account</span>
-                  <span className="text-xs text-slate-400">Permanently remove your account and data.</span>
-                </div>
+                <span className="text-sm font-semibold text-gray-900">Delete Account</span>
               </button>
             </CollapsibleTrigger>
             <div className="flex-shrink-0">
@@ -73,20 +90,28 @@ export function DeleteAccountSection({ onDelete, isDeleting }: DeleteAccountSect
             </div>
           </div>
 
-          <CollapsibleContent>
-            <div className="pt-4 pb-4 space-y-4 border-t border-slate-200">
-              <p className="text-sm text-slate-600 pt-3">
-                This permanently deletes your account and signs you out. Completed orders may be retained for legal/compliance reasons.
-              </p>
-              <Button
-                onClick={handleDeleteClick}
-                disabled={isDeleting}
-                className="w-full h-14 text-white hover:opacity-90"
-                style={{ backgroundColor: '#E84855' }}
-              >
-                {isDeleting ? "Deleting..." : "Delete Account"}
-              </Button>
-            </div>
+          <CollapsibleContent asChild>
+            <motion.div
+              variants={ACCORDION_VARIANTS}
+              initial="collapsed"
+              animate={isOpen ? "open" : "collapsed"}
+              className="overflow-hidden"
+              style={{ transform: "translateZ(0)" }}
+            >
+              <div className="pt-4 pb-4 space-y-4">
+                <p className="text-sm text-slate-600">
+                  This permanently deletes your account and signs you out. Completed orders may be retained for legal/compliance reasons.
+                </p>
+                <Button
+                  onClick={handleDeleteClick}
+                  disabled={isDeleting}
+                  className="w-full h-14 text-white hover:opacity-90"
+                  style={{ backgroundColor: '#E84855' }}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Account"}
+                </Button>
+              </div>
+            </motion.div>
           </CollapsibleContent>
         </div>
       </Collapsible>
