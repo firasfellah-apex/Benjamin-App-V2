@@ -1272,29 +1272,33 @@ export default function CashRequest() {
     {
       id: "page-1",
       content: (
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">The hand-off</h2>
-          <p className="text-base text-slate-600 leading-relaxed">
-            When your runner arrives, you'll see a 4-digit PIN.
-          </p>
-          <p className="text-base text-slate-600 leading-relaxed">
-            Share it in person to receive your cash.
-          </p>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-slate-900">The hand-off</h2>
+            <p className="text-base text-slate-600 leading-relaxed">
+              When your runner arrives, you'll see a 4-digit PIN.
+            </p>
+            <p className="text-base text-slate-600 leading-relaxed">
+              Share it in person to receive your cash.
+            </p>
+          </div>
         </div>
       ),
     },
     {
       id: "page-2",
       content: (
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Counted vs Discreet</h2>
-          <div className="space-y-3 text-left">
-            <p className="text-base text-slate-600 leading-relaxed">
-              <span className="font-semibold text-slate-900">Counted:</span> Count together before confirming
-            </p>
-            <p className="text-base text-slate-600 leading-relaxed">
-              <span className="font-semibold text-slate-900">Discreet:</span> Quick hand-off, no counting
-            </p>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-slate-900">Counted vs Discreet</h2>
+            <div className="space-y-3">
+              <p className="text-base text-slate-600 leading-relaxed">
+                <span className="font-semibold text-slate-900">Counted:</span> Count together before confirming
+              </p>
+              <p className="text-base text-slate-600 leading-relaxed">
+                <span className="font-semibold text-slate-900">Discreet:</span> Quick hand-off, no counting
+              </p>
+            </div>
           </div>
         </div>
       ),
@@ -1302,11 +1306,13 @@ export default function CashRequest() {
     {
       id: "page-3",
       content: (
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Staying safe</h2>
-          <p className="text-base text-slate-600 leading-relaxed">
-            Only share your PIN in person. Benjamin will never ask for it remotely.
-          </p>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-slate-900">Staying safe</h2>
+            <p className="text-base text-slate-600 leading-relaxed">
+              Only share your PIN in person. Benjamin will never ask for it remotely.
+            </p>
+          </div>
         </div>
       ),
     },

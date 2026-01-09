@@ -8,6 +8,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BenjaminMap } from "@/components/maps/BenjaminMap";
+import { X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface RequestFlowMapLayerProps {
   lat?: number;
@@ -23,6 +25,7 @@ export function RequestFlowMapLayer({ lat, lng, label }: RequestFlowMapLayerProp
     top: 200,
     height: 400,
   });
+  const [showGestureHint, setShowGestureHint] = useState(true);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -146,6 +149,16 @@ export function RequestFlowMapLayer({ lat, lng, label }: RequestFlowMapLayerProp
     }
   }, [safeTop, safeHeight, center, label]);
 
+  // Auto-dismiss gesture hint after 5 seconds
+  useEffect(() => {
+    if (showGestureHint) {
+      const timer = setTimeout(() => {
+        setShowGestureHint(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showGestureHint]);
+
   return (
     <div
       ref={containerRef}
@@ -171,6 +184,7 @@ export function RequestFlowMapLayer({ lat, lng, label }: RequestFlowMapLayerProp
           customerPosition={center}
           zoom={17}
           showGoogleLogo
+          gestureHandling="cooperative"
           height={`${safeHeight}px`}
           fallback={
             <div 
@@ -196,6 +210,30 @@ export function RequestFlowMapLayer({ lat, lng, label }: RequestFlowMapLayerProp
             </div>
           }
         />
+        
+        {/* Gesture hint overlay - industry standard subtle instruction */}
+        <AnimatePresence>
+          {showGestureHint && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="absolute top-3 right-3 z-30 bg-black/75 backdrop-blur-sm text-white text-xs px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 max-w-[180px]"
+              style={{ pointerEvents: 'auto' }}
+            >
+              <span className="flex-shrink-0">👆👆</span>
+              <span className="flex-1">Use two fingers to move map</span>
+              <button
+                onClick={() => setShowGestureHint(false)}
+                className="flex-shrink-0 hover:opacity-70 transition-opacity"
+                aria-label="Dismiss hint"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

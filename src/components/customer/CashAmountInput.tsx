@@ -31,6 +31,8 @@ export default function CashAmountInput({
   const [error, setError] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMultipleOf20Message, setShowMultipleOf20Message] = useState(false);
+  const multipleOf20TimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
@@ -54,6 +56,9 @@ export default function CashAmountInput({
       draggingRef.current = false;
       activePointerIdRef.current = null;
       onDragEnd?.();
+      if (multipleOf20TimeoutRef.current) {
+        clearTimeout(multipleOf20TimeoutRef.current);
+      }
     };
   }, []);
 
@@ -70,6 +75,29 @@ export default function CashAmountInput({
     if (/^\d*$/.test(raw)) {
       setInput(raw);
       setError("");
+      
+      // Check if entered value is not a multiple of 20
+      const num = Number(raw);
+      if (raw && !isNaN(num) && num >= min && num <= max && num % step !== 0) {
+        // Show message within the box
+        setShowMultipleOf20Message(true);
+        
+        // Clear any existing timeout
+        if (multipleOf20TimeoutRef.current) {
+          clearTimeout(multipleOf20TimeoutRef.current);
+        }
+        
+        // Auto-hide after 4 seconds
+        multipleOf20TimeoutRef.current = setTimeout(() => {
+          setShowMultipleOf20Message(false);
+        }, 4000);
+      } else {
+        // Hide message if value is valid
+        setShowMultipleOf20Message(false);
+        if (multipleOf20TimeoutRef.current) {
+          clearTimeout(multipleOf20TimeoutRef.current);
+        }
+      }
     }
   };
 
@@ -111,6 +139,12 @@ export default function CashAmountInput({
     }
 
     if (num % step !== 0) {
+      // Hide the inline message when validating on blur/enter
+      setShowMultipleOf20Message(false);
+      if (multipleOf20TimeoutRef.current) {
+        clearTimeout(multipleOf20TimeoutRef.current);
+      }
+      
       setError(`Please enter in $${step} increments (e.g. $140, $160).`);
       const nearest = Math.round(num / step) * step;
       const clamped = Math.min(max, Math.max(min, nearest));
@@ -188,22 +222,34 @@ export default function CashAmountInput({
               </p>
             </div>
           ) : (
-            <div className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center gap-1" style={{ height: '96px', borderRadius: '12px' }}>
-              <span className="text-4xl font-semibold text-slate-900">$</span>
-              <input
-                ref={inputRef}
-                type="tel"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={input.replace(/,/g, "")}
-                onChange={handleInputChange}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
-                style={{ maxWidth: '200px' }}
-                aria-label="Cash amount"
-                autoFocus
-              />
+            <div className="bg-[#F7F7F7] px-6 py-6 flex flex-col items-center justify-center gap-1 relative" style={{ height: '96px', borderRadius: '12px' }}>
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-4xl font-semibold text-slate-900">$</span>
+                <input
+                  ref={inputRef}
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={input.replace(/,/g, "")}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  onKeyDown={handleKeyDown}
+                  className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
+                  style={{ maxWidth: '200px' }}
+                  aria-label="Cash amount"
+                  autoFocus
+                />
+              </div>
+              {showMultipleOf20Message && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="text-xs text-slate-500 text-center mt-1 absolute bottom-2 left-0 right-0"
+                >
+                  Amount must be a multiple of $20
+                </motion.p>
+              )}
             </div>
           )}
         </div>

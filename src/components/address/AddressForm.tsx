@@ -633,7 +633,7 @@ export const AddressForm = forwardRef<AddressFormRef, AddressFormProps>(
               Address Preview
             </Label>
             <p className="text-xs text-gray-500">
-              Move pin to exact location
+              Move pin to exact location.
             </p>
           </div>
           <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: "200px" }}>

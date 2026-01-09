@@ -14,11 +14,17 @@ const ACTIVE_STATUSES = ['Pending', 'Runner Accepted', 'Runner at ATM', 'Cash Wi
 
 export function useActiveCustomerOrder() {
   const { user } = useAuth();
-  const { profile } = useProfile(user?.id);
+  const { profile, isReady: profileReady } = useProfile(user?.id);
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for profile to be ready before checking
+    if (!profileReady) {
+      setIsLoading(true);
+      return;
+    }
+
     if (!profile) {
       setIsLoading(false);
       setHasActiveOrder(false);
@@ -26,6 +32,7 @@ export function useActiveCustomerOrder() {
     }
 
     const checkActiveOrders = async () => {
+      setIsLoading(true); // Ensure loading state is set at start
       try {
         const { data, error } = await supabase
           .from('orders')
@@ -68,7 +75,7 @@ export function useActiveCustomerOrder() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [profile]);
+  }, [profile, profileReady]);
 
   return { hasActiveOrder, isLoading };
 }

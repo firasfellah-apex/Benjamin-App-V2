@@ -495,12 +495,59 @@ export function QuickReorderModal({
     const isOpen = openSection === "amount";
     const [isEditing, setIsEditing] = useState(false);
     const [inputValue, setInputValue] = useState(String(amount));
+    const [showMultipleOf20Message, setShowMultipleOf20Message] = useState(false);
+    const multipleOf20TimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
       if (!isEditing) setInputValue(String(amount));
     }, [amount, isEditing]);
 
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (multipleOf20TimeoutRef.current) {
+          clearTimeout(multipleOf20TimeoutRef.current);
+        }
+      };
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value.replace(/,/g, "");
+      if (/^\d*$/.test(raw)) {
+        setInputValue(raw);
+        
+        // Check if entered value is not a multiple of 20
+        const num = Number(raw);
+        if (raw && !isNaN(num) && num >= 100 && num <= 1000 && num % 20 !== 0) {
+          // Show message within the box
+          setShowMultipleOf20Message(true);
+          
+          // Clear any existing timeout
+          if (multipleOf20TimeoutRef.current) {
+            clearTimeout(multipleOf20TimeoutRef.current);
+          }
+          
+          // Auto-hide after 4 seconds
+          multipleOf20TimeoutRef.current = setTimeout(() => {
+            setShowMultipleOf20Message(false);
+          }, 4000);
+        } else {
+          // Hide message if value is valid
+          setShowMultipleOf20Message(false);
+          if (multipleOf20TimeoutRef.current) {
+            clearTimeout(multipleOf20TimeoutRef.current);
+          }
+        }
+      }
+    };
+
     const handleInputBlur = () => {
+      // Hide the inline message when validating on blur
+      setShowMultipleOf20Message(false);
+      if (multipleOf20TimeoutRef.current) {
+        clearTimeout(multipleOf20TimeoutRef.current);
+      }
+      
       const num = Number(inputValue.replace(/,/g, ""));
       if (isNaN(num) || num < 100) {
         setInputValue(String(100));
@@ -563,7 +610,7 @@ export function QuickReorderModal({
                       }, 0);
                     }
                   }}
-                  className="bg-[#F7F7F7] px-6 py-6 flex items-center justify-center cursor-text hover:opacity-80 transition-opacity"
+                  className="bg-[#F7F7F7] px-6 py-6 flex flex-col items-center justify-center cursor-text hover:opacity-80 transition-opacity relative"
                   style={{ height: '96px', borderRadius: '12px' }}
                 >
                   {!isEditing ? (
@@ -571,22 +618,34 @@ export function QuickReorderModal({
                       ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                     </p>
                   ) : (
-                    <div className="flex items-center justify-center gap-1">
-                      <span className="text-4xl font-semibold text-slate-900">$</span>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={inputValue.replace(/,/g, "")}
-                        onChange={(e) => setInputValue(e.target.value.replace(/,/g, ""))}
-                        onBlur={handleInputBlur}
-                        onKeyDown={(e) => e.key === "Enter" && handleInputBlur()}
-                        className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
-                        style={{ maxWidth: '200px' }}
-                        aria-label="Cash amount"
-                        autoFocus
-                      />
-                    </div>
+                    <>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-4xl font-semibold text-slate-900">$</span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={inputValue.replace(/,/g, "")}
+                          onChange={handleInputChange}
+                          onBlur={handleInputBlur}
+                          onKeyDown={(e) => e.key === "Enter" && handleInputBlur()}
+                          className="text-4xl font-semibold text-slate-900 text-center border-0 border-b-2 border-black focus:outline-none focus:ring-0 focus:border-black pb-1 bg-transparent min-w-0 flex-1"
+                          style={{ maxWidth: '200px' }}
+                          aria-label="Cash amount"
+                          autoFocus
+                        />
+                      </div>
+                      {showMultipleOf20Message && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="text-xs text-slate-500 text-center mt-1 absolute bottom-2 left-0 right-0"
+                        >
+                          Amount must be a multiple of $20
+                        </motion.p>
+                      )}
+                    </>
                   )}
                 </div>
 
