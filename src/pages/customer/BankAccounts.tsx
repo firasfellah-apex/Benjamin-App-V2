@@ -50,6 +50,7 @@ export default function BankAccounts() {
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [bankAccountToDisconnect, setBankAccountToDisconnect] = useState<{ id: string; institutionName: string; last4: string; logoUrl: string | null } | null>(null);
   const [isSettingPrimary, setIsSettingPrimary] = useState<string | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const { setBottomSlot } = useCustomerBottomSlot();
   
   // Ref to track help button position - MUST be before any conditional returns
@@ -150,6 +151,7 @@ export default function BankAccounts() {
     
     console.log('[Disconnect Bank] Starting disconnect process for:', bankAccountToDisconnect.id);
     setIsDisconnecting(true);
+    setDisconnectError(null); // Clear any previous errors
     
     try {
       const result = await disconnectBankAccount(bankAccountToDisconnect.id);
@@ -180,10 +182,12 @@ export default function BankAccounts() {
         toast.success('Bank account disconnected');
         setShowDisconnectDialog(false);
         setBankAccountToDisconnect(null);
+        setDisconnectError(null);
       } else {
         // Show the specific error message from the API
         const errorMessage = result.error || 'Failed to disconnect bank account';
-        console.log('[Disconnect Bank] Showing error toast:', errorMessage);
+        console.log('[Disconnect Bank] Showing error:', errorMessage);
+        setDisconnectError(errorMessage);
         toast.error(errorMessage, {
           duration: 5000, // Show for 5 seconds
         });
@@ -192,7 +196,8 @@ export default function BankAccounts() {
     } catch (error) {
       console.error('[Disconnect Bank] Exception caught:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to disconnect bank account';
-      console.log('[Disconnect Bank] Showing error toast from catch:', errorMessage);
+      console.log('[Disconnect Bank] Showing error from catch:', errorMessage);
+      setDisconnectError(errorMessage);
       toast.error(errorMessage, {
         duration: 5000, // Show for 5 seconds
       });
@@ -787,6 +792,16 @@ export default function BankAccounts() {
                 )}
               </AlertDialogDescription>
             </AlertDialogHeader>
+            
+            {/* Error message display */}
+            {disconnectError && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm font-medium text-red-900">
+                  {disconnectError}
+                </p>
+              </div>
+            )}
+            
             <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
               <Button
                 onClick={confirmDisconnect}
@@ -801,6 +816,7 @@ export default function BankAccounts() {
                 onClick={() => {
                   setShowDisconnectDialog(false);
                   setBankAccountToDisconnect(null);
+                  setDisconnectError(null);
                 }}
                 disabled={isDisconnecting}
                 className="w-full h-14"
