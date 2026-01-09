@@ -22,7 +22,7 @@ import { useAvatar } from "@/hooks/use-avatar";
 import { AvatarCropModal } from "@/components/common/AvatarCropModal";
 import { useCustomerRating } from "@/hooks/useCustomerRating";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
-import { CheckCircle2, Star } from "lucide-react";
+import { AccountSummaryCard } from "@/components/account/AccountSummaryCard";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -379,74 +379,6 @@ export default function Account() {
                 </div>
               </div>
 
-            {/* STATUS: Verification + Rating */}
-            <CustomerCard className="space-y-4 px-0">
-              {/* Verification Status */}
-              <div className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-2">
-                  {hasActiveBank ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <div className="h-5 w-5 rounded-full border-2 border-slate-300" />
-                  )}
-                  <span className="text-sm font-medium text-slate-900">
-                    {hasActiveBank ? "Verified" : "Not verified"}
-                  </span>
-                </div>
-                {hasActiveBank && (
-                  <span className="text-xs text-slate-500">Bank connected</span>
-                )}
-              </div>
-
-              {/* Rating */}
-              <div className="flex items-center justify-between py-2 border-t border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
-                  <span className="text-sm font-medium text-slate-900">
-                    {isLoadingRating ? (
-                      <span className="text-slate-400">Loading...</span>
-                    ) : rating_count < 5 ? (
-                      <span>New</span>
-                    ) : avg_rating !== null ? (
-                      <>
-                        {avg_rating.toFixed(1)} ★
-                      </>
-                    ) : (
-                      <span className="text-slate-400">No ratings yet</span>
-                    )}
-                  </span>
-                </div>
-                {!isLoadingRating && rating_count >= 5 && (
-                  <span className="text-xs text-slate-500">
-                    ({rating_count} {rating_count === 1 ? 'delivery' : 'deliveries'})
-                  </span>
-                )}
-              </div>
-            </CustomerCard>
-
-            {/* DEV: Debug Panel */}
-            {import.meta.env.DEV && (
-              <CustomerCard className="space-y-3 px-0 bg-slate-50 border-slate-200">
-                <div className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                  Dev Debug
-                </div>
-                <div className="space-y-2 text-xs text-slate-600">
-                  <div>
-                    <span className="font-medium">Rating:</span>{" "}
-                    {isLoadingRating ? "Loading..." : `${avg_rating ?? "null"} (${rating_count} ratings)`}
-                  </div>
-                  <div>
-                    <span className="font-medium">Bank Accounts:</span>{" "}
-                    {isLoadingBanks ? "Loading..." : `${bankAccounts.length} (${hasAnyBank ? "connected" : "not connected"})`}
-                  </div>
-                  <div>
-                    <span className="font-medium">Active Banks:</span>{" "}
-                    {bankAccounts.filter(ba => ba.is_active).length}
-                  </div>
-                </div>
-              </CustomerCard>
-            )}
-
             {/* PROFILE FORM: always-on inputs */}
             <CustomerCard className="space-y-5 px-0">
               <div className="space-y-4">
@@ -540,6 +472,45 @@ export default function Account() {
                 </div>
               )}
             </CustomerCard>
+
+            {/* Divider */}
+            <div className="h-px bg-slate-200 -mx-6" />
+
+            {/* Account Status Section */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Account status
+              </h3>
+              <AccountSummaryCard
+                bankConnected={hasActiveBank}
+                ratingAvg={avg_rating}
+                ratingCount={rating_count}
+                isLoadingRating={isLoadingRating}
+              />
+            </div>
+
+            {/* DEV: Debug Panel - Collapsed accordion at bottom, only in development */}
+            {import.meta.env.DEV && (
+              <details className="mt-6">
+                <summary className="text-xs font-medium text-slate-500 cursor-pointer hover:text-slate-700 select-none">
+                  Debug
+                </summary>
+                <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs text-slate-600">
+                  <div>
+                    <span className="font-medium">Rating:</span>{" "}
+                    {isLoadingRating ? "Loading..." : `${avg_rating ?? "null"} (${rating_count} ratings)`}
+                  </div>
+                  <div>
+                    <span className="font-medium">Bank Accounts:</span>{" "}
+                    {isLoadingBanks ? "Loading..." : `${bankAccounts.length} (${hasAnyBank ? "connected" : "not connected"})`}
+                  </div>
+                  <div>
+                    <span className="font-medium">Active Banks:</span>{" "}
+                    {bankAccounts.filter(ba => ba.is_active).length}
+                  </div>
+                </div>
+              </details>
+            )}
           </div>
         }
       />

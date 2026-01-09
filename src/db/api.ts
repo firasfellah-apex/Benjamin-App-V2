@@ -3823,11 +3823,13 @@ export async function getCustomerRating(customerUserId: string): Promise<{
 
     // Query completed orders where customer was rated by runner
     // Only count orders with customer_rating_by_runner between 1-5
+    // Status filter: "Completed" is the canonical terminal status for delivered orders
+    // (See: OrderStatus type in src/types/types.ts and RUNNER_TERMINAL_STATUSES in src/lib/orderStatus.ts)
     const { data: orders, error } = await supabase
       .from("orders")
       .select("customer_rating_by_runner")
       .eq("customer_id", customerUserId)
-      .eq("status", "Completed")
+      .eq("status", "Completed") // Canonical status for completed/delivered orders
       .not("customer_rating_by_runner", "is", null)
       .gte("customer_rating_by_runner", 1)
       .lte("customer_rating_by_runner", 5);
