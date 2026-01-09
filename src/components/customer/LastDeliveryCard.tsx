@@ -21,6 +21,7 @@ import { QuickReorderModal } from "@/components/customer/QuickReorderModal";
 import { useActiveCustomerOrder } from "@/hooks/useActiveCustomerOrder";
 import { Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import LottieComponent from "lottie-react";
 import reorderAnimation from "@/assets/animations/reorder.json";
 import lockReorderAnimation from "@/assets/animations/lockreorder.json";
@@ -191,7 +192,9 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                   </div>
                   <span>Rate Runner</span>
                 </Button>
-                {(activeOrderLoading || hasActiveOrder) ? (
+                {activeOrderLoading ? (
+                  <Skeleton className="h-14 w-[158px] rounded-full" />
+                ) : hasActiveOrder ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -253,7 +256,9 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <div className="flex items-center justify-between flex-1">
                   <span className="text-xs text-slate-600">This delivery is being investigated.</span>
                 </div>
-                {(activeOrderLoading || hasActiveOrder) ? (
+                {activeOrderLoading ? (
+                  <Skeleton className="h-14 w-[158px] rounded-full" />
+                ) : hasActiveOrder ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -326,7 +331,9 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                     ))}
                   </div>
                 </div>
-                {(activeOrderLoading || hasActiveOrder) ? (
+                {activeOrderLoading ? (
+                  <Skeleton className="h-14 w-[158px] rounded-full" />
+                ) : hasActiveOrder ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -388,7 +395,9 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <div className="text-xs text-slate-400 flex-1">
                   This order was cancelled.
                 </div>
-                {(activeOrderLoading || hasActiveOrder) ? (
+                {activeOrderLoading ? (
+                  <Skeleton className="h-14 w-[158px] rounded-full" />
+                ) : hasActiveOrder ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div
@@ -450,7 +459,9 @@ export function LastDeliveryCard({ order, onRateRunner, hasIssue = false }: Last
                 <div className="text-xs text-slate-400 flex-1">
                   Thank you for using Benjamin.
                 </div>
-                {(activeOrderLoading || hasActiveOrder) ? (
+                {activeOrderLoading ? (
+                  <Skeleton className="h-14 w-[158px] rounded-full" />
+                ) : hasActiveOrder ? (
                   <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
                     <TooltipTrigger asChild>
                       <div

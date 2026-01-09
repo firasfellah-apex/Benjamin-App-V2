@@ -381,7 +381,7 @@ export default function BankAccounts() {
     {
       id: "page-1",
       content: (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-6 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
           <div className="w-[220px] h-[220px] flex-shrink-0">
             <img
               src={bank1Illustration}
@@ -402,7 +402,7 @@ export default function BankAccounts() {
     {
       id: "page-2",
       content: (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-6 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
           <div className="w-[220px] h-[220px] flex-shrink-0">
             <img
               src={bank2Illustration}
@@ -423,7 +423,7 @@ export default function BankAccounts() {
     {
       id: "page-3",
       content: (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-6 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
           <div className="w-[220px] h-[220px] flex-shrink-0">
             <img
               src={bank3Illustration}

@@ -167,7 +167,10 @@ export function BankingHelpStories({
             onTouchStart={handlePause}
             onTouchEnd={handleResume}
           >
-            <div className="relative w-full h-full max-w-md mx-auto bg-white">
+            <div className="relative w-full h-full max-w-md mx-auto bg-transparent">
+              {/* Fixed Background Gradient - stays constant, never changes */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287] pointer-events-none" />
+              
               {/* Progress Bars - Instagram style (edge-to-edge) */}
               <div className="absolute top-0 left-0 right-0 z-10 flex gap-2 px-3 pt-3">
                 {pages.map((_, index) => (
@@ -216,8 +219,8 @@ export function BankingHelpStories({
                 <X className="h-5 w-5 text-slate-900" strokeWidth={2} />
               </IconButton>
 
-              {/* Content Area */}
-              <div className="h-full flex items-center justify-center pt-16 pb-12 px-8">
+              {/* Content Area - only content rotates, background stays fixed */}
+              <div className="absolute inset-0">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentPage?.id}
@@ -225,7 +228,7 @@ export function BankingHelpStories({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.2 }}
-                    className="w-full"
+                    className="absolute inset-0"
                   >
                     {currentPage?.content}
                   </motion.div>
