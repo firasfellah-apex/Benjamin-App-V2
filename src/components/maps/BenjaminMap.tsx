@@ -100,14 +100,20 @@ export function BenjaminMap({
     ] : [];
 
     // Track gestureHandling to detect changes - Google Maps requires gestureHandling at creation time
-    const shouldRecreateMap = gestureHandlingRef.current !== effectiveGestureHandling && mapInstanceRef.current;
+    // Only recreate if the effective gesture handling actually changed
+    const currentEffective = gestureHandlingRef.current;
+    const shouldRecreateMap = currentEffective !== effectiveGestureHandling && mapInstanceRef.current;
 
     // Recreate map if gestureHandling changed (Google Maps requires it at creation time)
     if (shouldRecreateMap) {
-      console.log("[BenjaminMap] gestureHandling changed, recreating map:", gestureHandlingRef.current, "->", effectiveGestureHandling);
+      console.log("[BenjaminMap] gestureHandling changed, recreating map:", currentEffective, "->", effectiveGestureHandling);
       if (markerRef.current) {
         markerRef.current.setMap(null);
         markerRef.current = null;
+      }
+      if (dragListenerRef.current && g?.maps?.event) {
+        g.maps.event.removeListener(dragListenerRef.current);
+        dragListenerRef.current = null;
       }
       mapInstanceRef.current = null;
       gestureHandlingRef.current = effectiveGestureHandling;
@@ -150,14 +156,15 @@ export function BenjaminMap({
       mapInstanceRef.current.setCenter(center);
       mapInstanceRef.current.setZoom(zoom ?? 15);
       
-      // Update zoom controls and gesture handling
-      console.log("[BenjaminMap] Updating map options with gestureHandling:", effectiveGestureHandling);
+      // Note: gestureHandling cannot be changed after map creation - it must be set at creation time
+      // If gestureHandling changed, the map should have been recreated above
+      // Only update zoom controls and styles here
       mapInstanceRef.current.setOptions({
         zoomControl: true,
         zoomControlOptions: {
           position: g.maps.ControlPosition.RIGHT_CENTER,
         },
-        gestureHandling: effectiveGestureHandling, // Update gesture handling if prop changed
+        // Do NOT update gestureHandling here - it requires recreation
       });
       
       // Update styles if minimal prop changed
