@@ -34,6 +34,7 @@ export function BenjaminMap({
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const dragListenerRef = useRef<any>(null);
+  const gestureHandlingRef = useRef<string | undefined>(gestureHandling);
 
   useEffect(() => {
     const g = (window as any).google as any;
@@ -93,12 +94,27 @@ export function BenjaminMap({
       },
     ] : [];
 
+    // Track gestureHandling to detect changes - Google Maps requires gestureHandling at creation time
+    const shouldRecreateMap = gestureHandlingRef.current !== gestureHandling && mapInstanceRef.current;
+
+    // Recreate map if gestureHandling changed (Google Maps requires it at creation time)
+    if (shouldRecreateMap) {
+      console.log("[BenjaminMap] gestureHandling changed, recreating map:", gestureHandlingRef.current, "->", gestureHandling);
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+        markerRef.current = null;
+      }
+      mapInstanceRef.current = null;
+      gestureHandlingRef.current = gestureHandling;
+    }
+
     // Just create once – no fancy ref tracking
     if (!mapInstanceRef.current) {
       console.log("[BenjaminMap DEBUG] creating map instance", {
         center,
         zoom,
         minimal,
+        gestureHandling,
       });
 
       const mapOptions: any = {
@@ -113,20 +129,24 @@ export function BenjaminMap({
         zoomControlOptions: {
           position: g.maps.ControlPosition.RIGHT_CENTER,
         },
-        gestureHandling: gestureHandling, // Configure gesture handling (cooperative = 2-finger pan)
+        gestureHandling: gestureHandling, // Configure gesture handling (cooperative = 2-finger pan) - MUST be set at creation
       };
+
+      console.log("[BenjaminMap] Creating map with gestureHandling:", gestureHandling);
 
       if (minimal && minimalStyles.length > 0) {
         mapOptions.styles = minimalStyles;
       }
 
       mapInstanceRef.current = new MapCtor(mapDivRef.current, mapOptions);
+      gestureHandlingRef.current = gestureHandling;
     } else {
       // Update existing map
       mapInstanceRef.current.setCenter(center);
       mapInstanceRef.current.setZoom(zoom ?? 15);
       
       // Update zoom controls and gesture handling
+      console.log("[BenjaminMap] Updating map options with gestureHandling:", gestureHandling);
       mapInstanceRef.current.setOptions({
         zoomControl: true,
         zoomControlOptions: {
