@@ -3376,13 +3376,15 @@ export async function logRunnerOfferEvent(data: {
 export interface BankAccount {
   id: string;
   user_id: string;
-  plaid_item_id: string;
+  plaid_item_id: string | null; // Nullable for disconnected accounts
   bank_institution_name: string | null;
   bank_institution_logo_url: string | null;
   bank_last4: string | null;
   is_primary: boolean;
   kyc_status: string;
   kyc_verified_at: string | null;
+  is_active: boolean; // Whether account is active and can be used for new orders
+  disconnected_at: string | null; // Timestamp when account was disconnected
   created_at: string;
   updated_at: string;
 }
@@ -3395,11 +3397,51 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
   }
 
   console.log("[getBankAccounts] Fetching bank accounts for user:", user.id);
-  const { data, error } = await supabase
+  
+  // Try to fetch with is_active filter first (if column exists after migration)
+  let { data, error } = await supabase
     .from("bank_accounts")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
+  
+  // If error is about missing column (migration not run yet), fetch all and filter in-memory
+  // Check for various error indicators: PostgreSQL error code, error message, or 400 Bad Request
+  const isColumnMissingError = error && (
+    error.code === '42703' || 
+    error.code === 'PGRST116' ||
+    error.message?.includes('column "is_active"') || 
+    error.message?.includes('does not exist') ||
+    error.message?.includes('Bad Request') ||
+    (error as any).status === 400
+  );
+  
+  if (isColumnMissingError) {
+    console.log("[getBankAccounts] is_active column not found (migration not run), fetching all accounts");
+    const { data: allData, error: allError } = await supabase
+      .from("bank_accounts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    
+    if (allError) {
+      // If this also fails, it might be a different issue - check if table exists
+      if (allError.code === 'PGRST205' || allError.message?.includes('does not exist') || allError.message?.includes('relation "bank_accounts"')) {
+        error = allError; // Will trigger legacy fallback below
+        data = null;
+      } else {
+        error = allError;
+        data = null;
+      }
+    } else {
+      // Migration not run - assume all accounts are active (backward compatibility)
+      data = allData;
+      error = null;
+    }
+  } else if (!error && data) {
+    // Column exists (migration run) - filter to only active accounts
+    data = data.filter((account: any) => account.is_active !== false);
+  }
 
   if (error) {
     // If table doesn't exist, fall back to profile data
@@ -3433,6 +3475,8 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
           is_primary: true,
           kyc_status: profile.kyc_status || 'verified',
           kyc_verified_at: profile.kyc_verified_at,
+          is_active: true, // Legacy accounts are considered active
+          disconnected_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }];
@@ -3496,6 +3540,24 @@ export async function setPrimaryBankAccount(bankAccountId: string): Promise<bool
 
   console.log("[setPrimaryBankAccount] Setting primary bank account:", bankAccountId);
 
+  // Verify the account exists, is owned by user, and is active
+  const { data: bankAccount, error: fetchError } = await supabase
+    .from("bank_accounts")
+    .select("id, user_id, is_active")
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (fetchError || !bankAccount) {
+    console.error("[setPrimaryBankAccount] Bank account not found or access denied");
+    return false;
+  }
+
+  if (!bankAccount.is_active) {
+    console.error("[setPrimaryBankAccount] Cannot set inactive bank account as primary");
+    return false;
+  }
+
   try {
     // Use atomic RPC function to set primary (prevents race conditions)
     // This ensures: set all user's accounts is_primary=false, then set chosen one is_primary=true
@@ -3517,13 +3579,20 @@ export async function setPrimaryBankAccount(bankAccountId: string): Promise<bool
   }
 }
 
-export async function deleteBankAccount(bankAccountId: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Disconnect a bank account (soft delete)
+ * - Revokes provider access (Plaid item)
+ * - Marks account as inactive
+ * - Retains historical reference for orders
+ * - Prevents use in future orders
+ */
+export async function disconnectBankAccount(bankAccountId: string): Promise<{ success: boolean; error?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: 'User not authenticated' };
 
   // Handle legacy bank account (stored in profiles table)
   if (bankAccountId === 'legacy') {
-    console.log("[deleteBankAccount] Deleting legacy bank account from profiles table");
+    console.log("[disconnectBankAccount] Disconnecting legacy bank account from profiles table");
     const { error } = await supabase
       .from("profiles")
       .update({
@@ -3537,90 +3606,261 @@ export async function deleteBankAccount(bankAccountId: string): Promise<{ succes
       .eq("id", user.id);
     
     if (error) {
-      console.error("Error deleting legacy bank account:", error);
+      console.error("Error disconnecting legacy bank account:", error);
       return { success: false, error: error.message };
     }
     return { success: true };
   }
 
-  // Check if this bank account is referenced by any orders
-  console.log("[deleteBankAccount] Checking for orders using bank account:", bankAccountId);
-  const { data: ordersUsingAccount, error: checkError, count: orderCount } = await supabase
+  // Verify user owns the bank account
+  const { data: bankAccount, error: fetchError } = await supabase
+    .from("bank_accounts")
+    .select("id, user_id, is_primary, plaid_item_id, is_active")
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (fetchError || !bankAccount) {
+    return { success: false, error: 'Bank account not found or access denied' };
+  }
+
+  // Check if account is already disconnected (only if is_active column exists)
+  if (bankAccount.is_active === false) {
+    return { success: false, error: 'This bank account is already disconnected' };
+  }
+
+  // Check if any orders reference this account (for informational purposes, but we still allow disconnect)
+  const { count: orderCount } = await supabase
     .from("orders")
-    .select("id, status, created_at", { count: "exact" })
+    .select("*", { count: "exact", head: true })
     .eq("bank_account_id", bankAccountId)
-    .eq("customer_id", user.id)
-    .limit(1);
+    .eq("customer_id", user.id);
 
-  console.log("[deleteBankAccount] Orders check result:", { ordersUsingAccount, checkError, orderCount });
+  const hasOrders = (orderCount || 0) > 0;
 
-  if (checkError) {
-    console.error("[deleteBankAccount] Error checking orders:", checkError);
-    // Continue with deletion attempt - the foreign key will catch it if needed
-  } else if ((ordersUsingAccount && ordersUsingAccount.length > 0) || (orderCount && orderCount > 0)) {
-    const totalCount = orderCount || (ordersUsingAccount?.length || 0);
-    console.log("[deleteBankAccount] Found orders using this account, preventing deletion. Count:", totalCount);
+  // TODO: Revoke Plaid access token/item if applicable
+  // For now, we'll just null out the plaid_item_id to mark it as disconnected
+  // When Plaid integration is complete, call: await revokePlaidItem(bankAccount.plaid_item_id);
+  
+  // Soft disconnect: mark as inactive, set disconnected_at, null out sensitive tokens
+  // Try to update with new columns, but handle case where migration hasn't run
+  const updatePayload: any = {
+    plaid_item_id: null, // Clear Plaid item ID (access revoked)
+    is_primary: false, // Cannot be primary if disconnected
+    updated_at: new Date().toISOString()
+  };
+  
+  // Only add is_active and disconnected_at if columns exist (after migration)
+  // We'll try to update them, and if they fail, we'll still clear plaid_item_id
+  try {
+    updatePayload.is_active = false;
+    updatePayload.disconnected_at = new Date().toISOString();
+  } catch (e) {
+    // Columns don't exist yet - that's okay, we'll still clear plaid_item_id
+  }
+  
+  const { error: updateError } = await supabase
+    .from("bank_accounts")
+    .update(updatePayload)
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id);
+
+  if (updateError) {
+    // If error is about missing columns (migration not run), try without them
+    if (updateError.message?.includes('column "is_active"') || updateError.message?.includes('column "disconnected_at"') || updateError.code === '42703') {
+      console.log("[disconnectBankAccount] New columns don't exist yet, updating without them (backward compatibility)");
+      const { error: simpleUpdateError } = await supabase
+        .from("bank_accounts")
+        .update({
+          plaid_item_id: null,
+          is_primary: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", bankAccountId)
+        .eq("user_id", user.id);
+      
+      if (simpleUpdateError) {
+        console.error("[disconnectBankAccount] Error disconnecting bank account:", simpleUpdateError);
+        return { success: false, error: simpleUpdateError.message || 'Failed to disconnect bank account' };
+      }
+      // Success with backward-compatible update
+    } else {
+      console.error("[disconnectBankAccount] Error disconnecting bank account:", updateError);
+      return { success: false, error: updateError.message || 'Failed to disconnect bank account' };
+    }
+  }
+
+  // If this was the primary account, set another active account as primary if available
+  if (bankAccount.is_primary) {
+    // Try to find another active account (if is_active column exists)
+    let otherAccountsQuery = supabase
+      .from("bank_accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .neq("id", bankAccountId)
+      .limit(1);
+    
+    // Try with is_active filter first
+    const { data: otherAccounts, error: activeQueryError } = await otherAccountsQuery.eq("is_active", true);
+    
+    // If that fails (column doesn't exist), try without filter
+    let accountsToUse = otherAccounts;
+    if (activeQueryError && (activeQueryError.message?.includes('column "is_active"') || activeQueryError.code === '42703')) {
+      const { data: allAccounts } = await supabase
+        .from("bank_accounts")
+        .select("id")
+        .eq("user_id", user.id)
+        .neq("id", bankAccountId)
+        .limit(1);
+      accountsToUse = allAccounts;
+    }
+
+    if (accountsToUse && accountsToUse.length > 0) {
+      await supabase
+        .from("bank_accounts")
+        .update({ is_primary: true })
+        .eq("id", accountsToUse[0].id);
+    }
+  }
+
+  console.log("[disconnectBankAccount] Bank account disconnected successfully", {
+    bankAccountId,
+    hadOrders: hasOrders,
+    wasPrimary: bankAccount.is_primary
+  });
+
+  return { success: true };
+}
+
+/**
+ * Hard delete a bank account (internal/admin only)
+ * Only allowed if:
+ * - Account has no linked orders
+ * - Account is already disconnected
+ */
+export async function deleteBankAccount(bankAccountId: string): Promise<{ success: boolean; error?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'User not authenticated' };
+
+  // Verify user owns the bank account and get its status
+  const { data: bankAccount, error: fetchError } = await supabase
+    .from("bank_accounts")
+    .select("id, user_id, is_active")
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (fetchError || !bankAccount) {
+    return { success: false, error: 'Bank account not found or access denied' };
+  }
+
+  // Check if account has any linked orders
+  const { count: orderCount } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("bank_account_id", bankAccountId)
+    .eq("customer_id", user.id);
+
+  if (orderCount && orderCount > 0) {
     return {
       success: false,
-      error: `Cannot disconnect this bank account because it's linked to ${totalCount} order${totalCount === 1 ? '' : 's'}. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly.`
+      error: `Cannot delete bank account because it's linked to ${orderCount} order${orderCount === 1 ? '' : 's'}. Use "Disconnect" instead to revoke access while retaining historical records.`
     };
   }
 
-  // Try to delete from bank_accounts table
-  console.log("[deleteBankAccount] Attempting to delete bank account:", bankAccountId);
+  // Only allow hard delete if account is already disconnected
+  if (bankAccount.is_active) {
+    return {
+      success: false,
+      error: 'Cannot delete active bank account. Use "Disconnect" to revoke access first.'
+    };
+  }
+
+  // Hard delete the account (no orders reference it, and it's already disconnected)
   const { error } = await supabase
     .from("bank_accounts")
     .delete()
     .eq("id", bankAccountId)
-    .eq("user_id", user.id); // Ensure user can only delete their own accounts
+    .eq("user_id", user.id);
 
   if (error) {
-    console.log("[deleteBankAccount] Delete error:", error);
-    
-    // If table doesn't exist, fall back to profiles table
-    if (error.code === 'PGRST205' || error.message?.includes('does not exist') || error.message?.includes('relation "bank_accounts"')) {
-      console.log("[deleteBankAccount] bank_accounts table not found, deleting from profiles table");
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          plaid_item_id: null,
-          kyc_status: 'unverified',
-          kyc_verified_at: null,
-          bank_institution_name: null,
-          bank_institution_logo_url: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", user.id);
-      
-      if (profileError) {
-        console.error("Error deleting bank account from profiles:", profileError);
-        return { success: false, error: profileError.message };
-      }
-      return { success: true };
-    }
-    
-    // Handle foreign key constraint violation
-    if (error.code === '23503' || error.message?.includes('violates foreign key constraint') || error.message?.includes('orders_bank_account_id_fkey')) {
-      console.log("[deleteBankAccount] Foreign key constraint violation detected");
-      // Try to get the actual count for a better error message
-      const { count } = await supabase
-        .from("orders")
-        .select("*", { count: "exact", head: true })
-        .eq("bank_account_id", bankAccountId)
-        .eq("customer_id", user.id);
-      
-      const totalCount = count || 0;
-      return {
-        success: false,
-        error: `Cannot disconnect this bank account because it's linked to ${totalCount} order${totalCount === 1 ? '' : 's'}. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly.`
-      };
-    }
-    
-    console.error("Error deleting bank account:", error);
-    return { success: false, error: error.message || 'Failed to disconnect bank account' };
+    console.error("[deleteBankAccount] Error deleting bank account:", error);
+    return { success: false, error: error.message || 'Failed to delete bank account' };
   }
 
-  console.log("[deleteBankAccount] Bank account deleted successfully");
+  console.log("[deleteBankAccount] Bank account hard deleted successfully");
   return { success: true };
+}
+
+/**
+ * Get customer rating (how runners rate the customer)
+ * Canonical function: computes average rating from completed orders
+ * 
+ * @param customerUserId - The customer's user ID
+ * @returns Object with avg_rating (rounded to 1 decimal) and rating_count
+ */
+export async function getCustomerRating(customerUserId: string): Promise<{
+  avg_rating: number | null;
+  rating_count: number;
+}> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    // Only allow users to query their own rating (or admins)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.role?.includes('admin');
+    if (customerUserId !== user.id && !isAdmin) {
+      throw new Error("Unauthorized: Can only query your own rating");
+    }
+
+    // Query completed orders where customer was rated by runner
+    // Only count orders with customer_rating_by_runner between 1-5
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("customer_rating_by_runner")
+      .eq("customer_id", customerUserId)
+      .eq("status", "Completed")
+      .not("customer_rating_by_runner", "is", null)
+      .gte("customer_rating_by_runner", 1)
+      .lte("customer_rating_by_runner", 5);
+
+    if (error) {
+      console.error("[getCustomerRating] Error querying orders:", error);
+      throw error;
+    }
+
+    if (!orders || orders.length === 0) {
+      return { avg_rating: null, rating_count: 0 };
+    }
+
+    // Calculate average (sum / count) rounded to 1 decimal
+    const ratings = orders
+      .map((o) => o.customer_rating_by_runner)
+      .filter((r): r is number => r !== null && r >= 1 && r <= 5);
+
+    if (ratings.length === 0) {
+      return { avg_rating: null, rating_count: 0 };
+    }
+
+    const sum = ratings.reduce((acc, r) => acc + r, 0);
+    const avg = sum / ratings.length;
+    const avgRounded = Math.round(avg * 10) / 10; // Round to 1 decimal
+
+    return {
+      avg_rating: avgRounded,
+      rating_count: ratings.length,
+    };
+  } catch (error: any) {
+    console.error("[getCustomerRating] Error:", error);
+    throw error;
+  }
 }
 

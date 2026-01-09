@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getBankAccounts, deleteBankAccount, type BankAccount } from "@/db/api";
+import { getBankAccounts, disconnectBankAccount as apiDisconnectBankAccount, type BankAccount } from "@/db/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function useBankAccounts() {
@@ -40,8 +40,8 @@ export function useInvalidateBankAccounts() {
   };
 }
 
-// Helper function to disconnect a bank account
+// Helper function to disconnect a bank account (soft delete - revokes access, retains history)
 export async function disconnectBankAccount(bankAccountId: string): Promise<{ success: boolean; error?: string }> {
-  return await deleteBankAccount(bankAccountId);
+  return await apiDisconnectBankAccount(bankAccountId);
 }
 

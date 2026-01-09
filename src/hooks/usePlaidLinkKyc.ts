@@ -97,6 +97,11 @@ export function usePlaidLinkKyc(onCompleted?: () => void): UsePlaidLinkKycResult
     [onCompleted, queryClient, navigate, draft, returnTo]
   );
 
+  // Note: usePlaidLink must be called unconditionally (React hooks rule)
+  // The "embedded more than once" warning in development is due to React StrictMode
+  // which intentionally mounts components twice to detect side effects.
+  // This is expected behavior in development and won't occur in production.
+  // The warning is harmless and Plaid Link handles multiple initializations gracefully.
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess,

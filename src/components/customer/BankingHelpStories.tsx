@@ -167,19 +167,19 @@ export function BankingHelpStories({
             onTouchStart={handlePause}
             onTouchEnd={handleResume}
           >
-            <div className="relative w-full h-full max-w-md mx-auto bg-transparent">
-              {/* Fixed Background Gradient - stays constant, never changes */}
-              <div className="absolute inset-0 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287] pointer-events-none" />
+            <div className="relative w-full h-full max-w-md mx-auto bg-black">
+              {/* Fixed Black Background - stays constant, never changes */}
+              <div className="absolute inset-0 bg-black pointer-events-none" />
               
               {/* Progress Bars - Instagram style (edge-to-edge) */}
               <div className="absolute top-0 left-0 right-0 z-10 flex gap-2 px-3 pt-3">
                 {pages.map((_, index) => (
                   <div
                     key={index}
-                    className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden"
+                    className="flex-1 h-1 bg-slate-700 rounded-full overflow-hidden"
                   >
                     <motion.div
-                      className="h-full bg-slate-900 rounded-full"
+                      className="h-full bg-green-500 rounded-full"
                       initial={{ width: index < currentPageIndex ? "100%" : "0%" }}
                       animate={{
                         width:
@@ -195,13 +195,13 @@ export function BankingHelpStories({
                 ))}
               </div>
 
-              {/* Close Button - positioned same as help button */}
+              {/* Close Button - positioned same as help button, styled like map layer close button */}
               <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose();
                 }}
-                className="absolute z-20"
+                className="absolute z-20 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white"
                 style={
                   closeButtonPosition
                     ? {
@@ -216,7 +216,7 @@ export function BankingHelpStories({
                 aria-label="Close"
                 size="lg"
               >
-                <X className="h-5 w-5 text-slate-900" strokeWidth={2} />
+                <X className="h-5 w-5" strokeWidth={2} />
               </IconButton>
 
               {/* Content Area - only content rotates, background stays fixed */}

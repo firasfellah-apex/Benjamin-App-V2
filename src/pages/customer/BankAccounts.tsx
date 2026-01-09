@@ -398,7 +398,7 @@ export default function BankAccounts() {
       id: "page-1",
       content: (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
-          <div className="w-[220px] h-[220px] flex-shrink-0">
+          <div className="w-[330px] h-[330px] flex-shrink-0">
             <img
               src={bank1Illustration}
               alt="Bank security illustration"
@@ -406,8 +406,8 @@ export default function BankAccounts() {
             />
           </div>
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-slate-900">Why link your bank?</h2>
-            <p className="text-base text-slate-600 leading-relaxed">
+            <h2 className="text-2xl font-semibold text-white">Why link your bank?</h2>
+            <p className="text-base text-white leading-relaxed">
               Linking your bank confirms it's really you.
               It prevents anyone else from requesting cash in your name — and keeps both you and your Benjamin runner protected.
             </p>
@@ -419,7 +419,7 @@ export default function BankAccounts() {
       id: "page-2",
       content: (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
-          <div className="w-[220px] h-[220px] flex-shrink-0">
+          <div className="w-[330px] h-[330px] flex-shrink-0">
             <img
               src={bank2Illustration}
               alt="Data encryption illustration"
@@ -427,8 +427,8 @@ export default function BankAccounts() {
             />
           </div>
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-slate-900">What Benjamin sees?</h2>
-            <p className="text-base text-slate-600 leading-relaxed">
+            <h2 className="text-2xl font-semibold text-white">What Benjamin sees?</h2>
+            <p className="text-base text-white leading-relaxed">
               Benjamin never sees your bank login.
               Plaid encrypts your information and shares only a secure verification token — your passwords and credentials never touch Benjamin.
             </p>
@@ -440,7 +440,7 @@ export default function BankAccounts() {
       id: "page-3",
       content: (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6 flex flex-col items-center justify-center text-center space-y-6">
-          <div className="w-[220px] h-[220px] flex-shrink-0">
+          <div className="w-[330px] h-[330px] flex-shrink-0">
             <img
               src={bank3Illustration}
               alt="Cash transaction illustration"
@@ -448,8 +448,8 @@ export default function BankAccounts() {
             />
           </div>
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-slate-900">What happens after you connect?</h2>
-            <p className="text-base text-slate-600 leading-relaxed">
+            <h2 className="text-2xl font-semibold text-white">What happens after you connect?</h2>
+            <p className="text-base text-white leading-relaxed">
               Once your bank is verified, you can request cash instantly.
               Your linked account helps confirm your identity and keep fraud low — so orders are approved faster.
             </p>
@@ -759,10 +759,12 @@ export default function BankAccounts() {
           <div className="px-6 py-6 space-y-4">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-xl font-semibold text-slate-900 text-center">
-                Disconnect Bank Account?
+                Disconnect bank account?
               </AlertDialogTitle>
               <AlertDialogDescription className="text-center text-slate-600">
-                Are you sure you want to disconnect this bank account? This action cannot be undone.
+                <p className="mb-4">
+                  This account will no longer be connected to Benjamin and won't be used for future orders. We'll keep a secure, read-only record for past orders in case refunds or adjustments are needed.
+                </p>
                 {bankAccountToDisconnect && (
                   <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <div className="flex items-center gap-3 justify-center">
