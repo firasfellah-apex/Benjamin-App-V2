@@ -209,7 +209,12 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
   });
 
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    console.log('📩 PUSH RECEIVED:', JSON.stringify(notification));
+    // FOREGROUND PATH: App is in foreground, show in-app toast
+    console.log('[Push Notifications] 📩 FOREGROUND PUSH RECEIVED:', {
+      title: notification.title,
+      body: notification.body,
+      data: notification.data,
+    });
     
     // Extract notification data
     const notificationData = notification.data as Record<string, any> | undefined;
@@ -254,7 +259,7 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
       );
     }
     
-    // Show in-app toast notification
+    // Show in-app toast notification (foreground only)
     toast({
       title,
       description,
@@ -264,7 +269,31 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
   });
 
   PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-    console.log('👉 PUSH ACTION:', JSON.stringify(notification));
+    // TAP ACTION PATH: User tapped notification from background
+    console.log('[Push Notifications] 👉 TAP ACTION (background notification tapped):', {
+      title: notification.notification.title,
+      body: notification.notification.body,
+      data: notification.notification.data,
+    });
+    
+    // Extract notification data for navigation
+    const notificationData = notification.notification.data as Record<string, any> | undefined;
+    const orderId = notificationData?.order_id;
+    const messageId = notificationData?.message_id;
+    
+    // Navigate to relevant screen if applicable
+    if (orderId) {
+      const isRunner = window.location.pathname.startsWith('/runner');
+      if (messageId) {
+        // Navigate to chat
+        const chatPath = isRunner ? `/runner/chat/${orderId}` : `/customer/chat/${orderId}`;
+        window.location.href = chatPath;
+      } else {
+        // Navigate to order detail
+        const orderPath = isRunner ? `/runner/orders/${orderId}` : `/customer/deliveries/${orderId}`;
+        window.location.href = orderPath;
+      }
+    }
   });
 
   // If we already had a token cached from pre-login, try flushing immediately.
