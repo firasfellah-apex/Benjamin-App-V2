@@ -13,6 +13,8 @@ export function useUnreadMessages(orderId: string | null) {
   const [unreadCount, setUnreadCount] = useState(0);
   // Unique ID per hook instance to avoid channel name collisions
   const instanceIdRef = useRef<string>(`${Math.random().toString(36).substring(2, 9)}`);
+  const realtimeFailedRef = useRef(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!orderId || !user) {
@@ -21,6 +23,7 @@ export function useUnreadMessages(orderId: string | null) {
     }
 
     let cancelled = false;
+    realtimeFailedRef.current = false;
 
     // Load unread count
     const loadUnreadCount = async () => {
@@ -131,13 +134,36 @@ export function useUnreadMessages(orderId: string | null) {
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('[UnreadMessages] Subscribed for order', orderId);
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[UnreadMessages] Channel error for order', orderId);
+          realtimeFailedRef.current = false;
+          // Clear polling if realtime is working
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Log error only once per session to avoid spam
+          if (!realtimeFailedRef.current && import.meta.env.DEV) {
+            console.warn(`[UnreadMessages] Channel error for order ${orderId}: ${status}. Falling back to polling every 5 seconds.`);
+          }
+          realtimeFailedRef.current = true;
+          
+          // Fallback: poll unread counts every 5 seconds if realtime fails
+          if (!pollIntervalRef.current) {
+            pollIntervalRef.current = setInterval(() => {
+              if (!cancelled) {
+                loadUnreadCount();
+              }
+            }, 5000);
+          }
         }
       });
 
     return () => {
       cancelled = true;
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [orderId, user?.id]);

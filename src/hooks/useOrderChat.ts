@@ -152,8 +152,13 @@ export function useOrderChat({ orderId, orderStatus, role }: UseOrderChatOptions
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('[Chat] Subscribed for order', orderId);
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[Chat] Channel error for order', orderId);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Log error only once per session to avoid spam
+          if (import.meta.env.DEV) {
+            console.warn(`[Chat] Channel error for order ${orderId}: ${status}. Messages will still load via polling.`);
+          }
+          // Note: Messages will still load via initial fetch and polling
+          // Realtime is a performance optimization, not critical for functionality
         }
       });
 
