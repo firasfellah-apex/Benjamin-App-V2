@@ -30,6 +30,12 @@ export function BankingHelpStories({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const pausedRef = useRef(false);
+  
+  // Swipe gesture state
+  const touchStartYRef = useRef<number | null>(null);
+  const touchCurrentYRef = useRef<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const SWIPE_THRESHOLD = 100; // Minimum pixels to swipe down to close
 
   const currentPage = pages[currentPageIndex];
 
@@ -106,15 +112,15 @@ export function BankingHelpStories({
   }, [currentPageIndex]);
 
   // Pause on touch/click start, resume on end
-  const handlePause = () => {
+  const handlePause = useCallback(() => {
     pausedRef.current = true;
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-  };
+  }, []);
 
-  const handleResume = () => {
+  const handleResume = useCallback(() => {
     if (pausedRef.current && startTimeRef.current) {
       // Adjust start time to account for pause
       const elapsed = Date.now() - startTimeRef.current;
@@ -137,7 +143,57 @@ export function BankingHelpStories({
         handleNext();
       }
     }
-  };
+  }, [duration, handleNext]);
+
+  // Swipe down gesture handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0].clientY;
+    touchCurrentYRef.current = e.touches[0].clientY;
+    handlePause(); // Pause story progress while swiping
+  }, [handlePause]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartYRef.current === null) return;
+    
+    touchCurrentYRef.current = e.touches[0].clientY;
+    const deltaY = touchCurrentYRef.current - touchStartYRef.current;
+    
+    // Only allow downward swipes (positive deltaY)
+    if (deltaY > 0) {
+      setSwipeOffset(deltaY);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (touchStartYRef.current === null || touchCurrentYRef.current === null) {
+      handleResume();
+      return;
+    }
+    
+    const deltaY = touchCurrentYRef.current - touchStartYRef.current;
+    
+    // If swiped down enough, close the stories
+    if (deltaY > SWIPE_THRESHOLD) {
+      onClose();
+    } else {
+      // Reset swipe offset and resume
+      setSwipeOffset(0);
+      handleResume();
+    }
+    
+    // Reset touch refs
+    touchStartYRef.current = null;
+    touchCurrentYRef.current = null;
+  }, [onClose, SWIPE_THRESHOLD, handleResume]);
+
+  // Reset swipe offset when closing
+  useEffect(() => {
+    if (!isOpen) {
+      setSwipeOffset(0);
+      touchStartYRef.current = null;
+      touchCurrentYRef.current = null;
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -157,17 +213,32 @@ export function BankingHelpStories({
 
           {/* Stories Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, scale: 0.95, y: 0 }}
+            animate={{ 
+              opacity: swipeOffset > 0 ? Math.max(0.3, 1 - swipeOffset / 500) : 1, 
+              scale: swipeOffset > 0 ? Math.max(0.8, 1 - swipeOffset / 1000) : 1, 
+              y: swipeOffset,
+            }}
+            exit={{ opacity: 0, scale: 0.95, y: "100%" }}
+            transition={{ 
+              duration: swipeOffset > 0 ? 0 : 0.3,
+              type: swipeOffset > 0 ? "spring" : "tween",
+              spring: { stiffness: 300, damping: 30 },
+            }}
             className="fixed inset-0 z-[101] flex items-center justify-center"
             onMouseDown={handlePause}
             onMouseUp={handleResume}
-            onTouchStart={handlePause}
-            onTouchEnd={handleResume}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{ 
+              touchAction: "pan-y",
+              userSelect: "none",
+            }}
           >
-            <div className="relative w-full h-full max-w-md mx-auto bg-black">
+            <div 
+              className="relative w-full h-full max-w-md mx-auto bg-black"
+            >
               {/* Fixed Black Background - stays constant, never changes */}
               <div className="absolute inset-0 bg-black pointer-events-none" />
               
