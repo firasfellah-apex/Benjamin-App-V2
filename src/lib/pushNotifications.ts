@@ -68,29 +68,45 @@ async function clearPendingToken() {
   }
 }
 
-async function savePushTokenToSupabase(token: string, appRole: AppRole): Promise<void> {
+async function savePushTokenToSupabase(token: string, appRole: AppRole): Promise<boolean> {
   const platform = getPlatform();
 
   const { data: { user }, error: userErr } = await supabase.auth.getUser();
 
   if (userErr) {
-    console.warn('[Push Notifications] getUser error; caching token for later upsert:', userErr.message);
+    if (platform === 'ios') {
+      console.warn('[Push][iOS] getUser error; caching token for later upsert:', userErr.message);
+    } else {
+      console.warn('[Push Notifications] getUser error; caching token for later upsert:', userErr.message);
+    }
     await storePendingToken({ token, platform, appRole, savedAt: new Date().toISOString() });
-    return;
+    return false;
   }
 
   if (!user) {
-    console.warn('[Push Notifications] No user yet; caching token for post-login upsert');
+    if (platform === 'ios') {
+      console.warn('[Push][iOS] No user yet; caching token for post-login upsert');
+    } else {
+      console.warn('[Push Notifications] No user yet; caching token for post-login upsert');
+    }
     await storePendingToken({ token, platform, appRole, savedAt: new Date().toISOString() });
-    return;
+    return false;
   }
 
-  console.log('[Push Notifications] 💾 Attempting to save token to Supabase:', {
-    userId: user.id,
-    platform,
-    appRole,
-    tokenPreview: token.substring(0, 20) + '...',
-  });
+  if (platform === 'ios') {
+    console.log('[Push][iOS] 💾 Attempting to save token to Supabase:', {
+      userId: user.id,
+      appRole,
+      tokenPreview: token.substring(0, 20) + '...',
+    });
+  } else {
+    console.log('[Push Notifications] 💾 Attempting to save token to Supabase:', {
+      userId: user.id,
+      platform,
+      appRole,
+      tokenPreview: token.substring(0, 20) + '...',
+    });
+  }
 
   const { error } = await supabase
     .from('user_push_tokens')
@@ -108,19 +124,28 @@ async function savePushTokenToSupabase(token: string, appRole: AppRole): Promise
     );
 
   if (error) {
-    console.error('[Push Notifications] ❌ Error saving push token; caching for retry:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-      fullError: JSON.stringify(error, null, 2),
-    });
+    if (platform === 'ios') {
+      console.error('[Push][iOS] ❌ Error saving push token; caching for retry:', {
+        message: error.message,
+        code: error.code,
+      });
+    } else {
+      console.error('[Push Notifications] ❌ Error saving push token; caching for retry:', {
+        message: error.message,
+        code: error.code,
+      });
+    }
     await storePendingToken({ token, platform, appRole, savedAt: new Date().toISOString() });
-    return;
+    return false;
   }
 
-  console.log('[Push Notifications] ✅ Token saved to Supabase');
+  if (platform === 'ios') {
+    console.log('[Push][iOS] ✅ Token saved to Supabase');
+  } else {
+    console.log('[Push Notifications] ✅ Token saved to Supabase');
+  }
   await clearPendingToken();
+  return true;
 }
 
 let authListenerAttached = false;
@@ -180,13 +205,27 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
   let permStatus: PermissionStatus;
   try {
     permStatus = await PushNotifications.requestPermissions();
+    const platform = getPlatform();
+    if (platform === 'ios') {
+      console.log('[Push][iOS] permission:', permStatus.receive);
+    }
   } catch (e) {
-    console.warn('[Push Notifications] requestPermissions failed:', e);
+    const platform = getPlatform();
+    if (platform === 'ios') {
+      console.error('[Push][iOS] requestPermissions failed:', e);
+    } else {
+      console.warn('[Push Notifications] requestPermissions failed:', e);
+    }
     return;
   }
 
   if (permStatus.receive !== 'granted') {
-    console.warn('[Push Notifications] Permission not granted');
+    const platform = getPlatform();
+    if (platform === 'ios') {
+      console.warn('[Push][iOS] Permission not granted');
+    } else {
+      console.warn('[Push Notifications] Permission not granted');
+    }
     return;
   }
 
@@ -200,12 +239,32 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
   // NOTE: addListener returns a handle; we keep it simple since initialize is guarded.
   PushNotifications.addListener('registration', async (token: Token) => {
     const tokenValue = (token as any)?.value ?? String(token);
-    console.log('✅ PUSH TOKEN:', tokenValue);
-    await savePushTokenToSupabase(tokenValue, appRole);
+    const platform = getPlatform();
+    
+    if (platform === 'ios') {
+      console.log('[Push][iOS] token:', tokenValue.substring(0, 20) + '...');
+    } else {
+      console.log('[Push][Android] token:', tokenValue.substring(0, 20) + '...');
+    }
+    
+    const saved = await savePushTokenToSupabase(tokenValue, appRole);
+    
+    if (platform === 'ios') {
+      if (saved) {
+        console.log('[Push][iOS] saved: ok');
+      } else {
+        console.error('[Push][iOS] saved: error (check logs above)');
+      }
+    }
   });
 
   PushNotifications.addListener('registrationError', (error) => {
-    console.error('[Push Notifications] Registration error:', error);
+    const platform = getPlatform();
+    if (platform === 'ios') {
+      console.error('[Push][iOS] registration error:', error);
+    } else {
+      console.error('[Push][Android] registration error:', error);
+    }
   });
 
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
@@ -220,7 +279,6 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
     const notificationData = notification.data as Record<string, any> | undefined;
     const orderId = notificationData?.order_id;
     const messageId = notificationData?.message_id;
-    const eventType = notificationData?.event_type;
     
     // Prevent spam: don't toast if user is already in that chat
     if (orderId) {
@@ -240,7 +298,7 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
     const description = notification.body || '';
     
     // Build action button for message notifications
-    let actionButton: React.ReactElement | undefined;
+    let actionButton: React.ReactElement<typeof ToastAction> | undefined;
     if (isMessageNotification && orderId) {
       // Determine app role from current path
       const isRunner = window.location.pathname.startsWith('/runner');
@@ -256,7 +314,7 @@ export async function initializePushNotifications(appRole: AppRole = 'customer')
           },
         },
         'Open chat'
-      );
+      ) as any;
     }
     
     // Show in-app toast notification (foreground only)

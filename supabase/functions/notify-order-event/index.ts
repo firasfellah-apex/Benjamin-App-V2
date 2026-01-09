@@ -316,6 +316,162 @@ async function sendAndroidPush(params: {
   }
 }
 
+// ============================================================================
+// APNs (Apple Push Notification service) Helpers for iOS Push Notifications
+// ============================================================================
+
+// Create and sign JWT for APNs authentication
+async function createAPNsJWT(keyId: string, teamId: string, keyContent: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    alg: 'ES256',
+    kid: keyId,
+  };
+  
+  const claim = {
+    iss: teamId,
+    iat: now,
+    exp: now + 3600, // 1 hour expiration
+  };
+  
+  // Encode header and claim
+  const headerB64 = base64UrlEncode(
+    new TextEncoder().encode(JSON.stringify(header))
+  );
+  const claimB64 = base64UrlEncode(
+    new TextEncoder().encode(JSON.stringify(claim))
+  );
+  
+  const unsignedJWT = `${headerB64}.${claimB64}`;
+  
+  // Import EC private key (APNs uses ES256/ECDSA, not RSA)
+  // APNs .p8 key is in PKCS#8 format
+  const keyData = keyContent
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
+  
+  const binaryString = atob(keyData);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  // Import as EC private key (P-256 curve for ES256)
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    bytes,
+    {
+      name: 'ECDSA',
+      namedCurve: 'P-256',
+    },
+    false,
+    ['sign']
+  );
+  
+  // Sign with ES256 (ECDSA with SHA-256)
+  const signature = await crypto.subtle.sign(
+    {
+      name: 'ECDSA',
+      hash: 'SHA-256',
+    },
+    privateKey,
+    new TextEncoder().encode(unsignedJWT)
+  );
+  
+  const signatureB64 = base64UrlEncode(new Uint8Array(signature));
+  
+  return `${unsignedJWT}.${signatureB64}`;
+}
+
+// Send iOS push notification via APNs HTTP/2 API
+async function sendIOSPush(params: {
+  token: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+}): Promise<{ success: boolean; error?: string }> {
+  const keyId = Deno.env.get("APNS_KEY_ID");
+  const teamId = Deno.env.get("APNS_TEAM_ID");
+  const bundleId = Deno.env.get("APNS_BUNDLE_ID");
+  const keyContent = Deno.env.get("APNS_KEY_CONTENT");
+  const environment = Deno.env.get("APNS_ENVIRONMENT") || "production";
+  
+  if (!keyId || !teamId || !bundleId || !keyContent) {
+    return {
+      success: false,
+      error: "APNs configuration missing. Required: APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, APNS_KEY_CONTENT",
+    };
+  }
+  
+  try {
+    // Create APNs JWT
+    const jwt = await createAPNsJWT(keyId, teamId, keyContent);
+    
+    // Determine APNs endpoint
+    const apnsUrl = environment === "development"
+      ? "https://api.sandbox.push.apple.com"
+      : "https://api.push.apple.com";
+    
+    // Build APNs payload
+    const payload: any = {
+      aps: {
+        alert: {
+          title: params.title,
+          body: params.body,
+        },
+        sound: "default",
+      },
+    };
+    
+    // Add custom data payload (APNs allows arbitrary keys at root level)
+    if (params.data && Object.keys(params.data).length > 0) {
+      for (const [key, value] of Object.entries(params.data)) {
+        payload[key] = String(value);
+      }
+    }
+    
+    // Send via APNs HTTP/2 API
+    const response = await fetch(`${apnsUrl}/3/device/${params.token}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${jwt}`,
+        "apns-topic": bundleId,
+        "apns-push-type": "alert",
+        "apns-priority": "10",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[APNs] Send failed: ${response.status} ${errorText}`);
+      return {
+        success: false,
+        error: `APNs API error: ${response.status} ${errorText}`,
+      };
+    }
+    
+    const apnsId = response.headers.get("apns-id");
+    console.log(`[APNs] ✅ Push sent successfully:`, {
+      provider: "APNs",
+      platform: "ios",
+      tokenPreview: params.token.substring(0, 20) + "...",
+      apnsId: apnsId || "unknown",
+      environment,
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[APNs] ❌ Error sending push:`, error);
+    return {
+      success: false,
+      error: error.message || 'Unknown APNs error',
+    };
+  }
+}
+
 // Send push notification via FCM (Android) or APNs (iOS)
 async function sendPushNotification(params: {
   token: string;
@@ -343,17 +499,32 @@ async function sendPushNotification(params: {
     }
   }
   
-  // iOS and Web are not yet implemented
-  // For now, log and return success (mock mode)
-  console.log("[Notify] Would send push (not Android):", {
+  // Handle iOS devices via APNs
+  if (params.platform === 'ios') {
+    try {
+      return await sendIOSPush({
+        token: params.token,
+        title: params.title,
+        body: params.body,
+        data: params.data,
+      });
+    } catch (error: any) {
+      // Log error but don't break the function
+      console.error(`[Notify] iOS push error:`, error);
+      return {
+        success: false,
+        error: error.message || 'Failed to send iOS push',
+      };
+    }
+  }
+  
+  // Web platform - not supported
+  console.log("[Notify] Web platform push not supported:", {
     platform: params.platform,
     tokenPreview: params.token.substring(0, 20) + "...",
-    title: params.title,
-    body: params.body,
-    data: params.data
   });
   
-  return { success: true };
+  return { success: false, error: "Web platform push notifications not supported" };
 }
 
 Deno.serve(async (req) => {
