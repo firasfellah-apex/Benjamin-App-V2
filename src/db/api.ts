@@ -3544,26 +3544,22 @@ export async function deleteBankAccount(bankAccountId: string): Promise<{ succes
   }
 
   // Check if this bank account is referenced by any orders
-  const { data: ordersUsingAccount, error: checkError } = await supabase
+  console.log("[deleteBankAccount] Checking for orders using bank account:", bankAccountId);
+  const { data: ordersUsingAccount, error: checkError, count: orderCount } = await supabase
     .from("orders")
-    .select("id, status, created_at")
+    .select("id, status, created_at", { count: "exact" })
     .eq("bank_account_id", bankAccountId)
     .eq("customer_id", user.id)
     .limit(1);
 
+  console.log("[deleteBankAccount] Orders check result:", { ordersUsingAccount, checkError, orderCount });
+
   if (checkError) {
     console.error("[deleteBankAccount] Error checking orders:", checkError);
     // Continue with deletion attempt - the foreign key will catch it if needed
-  } else if (ordersUsingAccount && ordersUsingAccount.length > 0) {
-    const orderCount = ordersUsingAccount.length;
-    // Get total count for better error message
-    const { count } = await supabase
-      .from("orders")
-      .select("*", { count: "exact", head: true })
-      .eq("bank_account_id", bankAccountId)
-      .eq("customer_id", user.id);
-    
-    const totalCount = count || orderCount;
+  } else if ((ordersUsingAccount && ordersUsingAccount.length > 0) || (orderCount && orderCount > 0)) {
+    const totalCount = orderCount || (ordersUsingAccount?.length || 0);
+    console.log("[deleteBankAccount] Found orders using this account, preventing deletion. Count:", totalCount);
     return {
       success: false,
       error: `Cannot disconnect this bank account because it's linked to ${totalCount} order${totalCount === 1 ? '' : 's'}. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly.`
@@ -3571,6 +3567,7 @@ export async function deleteBankAccount(bankAccountId: string): Promise<{ succes
   }
 
   // Try to delete from bank_accounts table
+  console.log("[deleteBankAccount] Attempting to delete bank account:", bankAccountId);
   const { error } = await supabase
     .from("bank_accounts")
     .delete()
@@ -3578,6 +3575,8 @@ export async function deleteBankAccount(bankAccountId: string): Promise<{ succes
     .eq("user_id", user.id); // Ensure user can only delete their own accounts
 
   if (error) {
+    console.log("[deleteBankAccount] Delete error:", error);
+    
     // If table doesn't exist, fall back to profiles table
     if (error.code === 'PGRST205' || error.message?.includes('does not exist') || error.message?.includes('relation "bank_accounts"')) {
       console.log("[deleteBankAccount] bank_accounts table not found, deleting from profiles table");
@@ -3602,9 +3601,18 @@ export async function deleteBankAccount(bankAccountId: string): Promise<{ succes
     
     // Handle foreign key constraint violation
     if (error.code === '23503' || error.message?.includes('violates foreign key constraint') || error.message?.includes('orders_bank_account_id_fkey')) {
+      console.log("[deleteBankAccount] Foreign key constraint violation detected");
+      // Try to get the actual count for a better error message
+      const { count } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("bank_account_id", bankAccountId)
+        .eq("customer_id", user.id);
+      
+      const totalCount = count || 0;
       return {
         success: false,
-        error: "Cannot disconnect this bank account because it's linked to existing orders. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly."
+        error: `Cannot disconnect this bank account because it's linked to ${totalCount} order${totalCount === 1 ? '' : 's'}. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly.`
       };
     }
     
@@ -3612,6 +3620,7 @@ export async function deleteBankAccount(bankAccountId: string): Promise<{ succes
     return { success: false, error: error.message || 'Failed to disconnect bank account' };
   }
 
+  console.log("[deleteBankAccount] Bank account deleted successfully");
   return { success: true };
 }
 

@@ -153,6 +153,7 @@ export default function BankAccounts() {
     
     try {
       const result = await disconnectBankAccount(bankAccountToDisconnect.id);
+      console.log('[Disconnect Bank] Result:', result);
       
       if (result.success) {
         // Invalidate bank accounts cache
@@ -182,12 +183,19 @@ export default function BankAccounts() {
       } else {
         // Show the specific error message from the API
         const errorMessage = result.error || 'Failed to disconnect bank account';
-        toast.error(errorMessage);
+        console.log('[Disconnect Bank] Showing error toast:', errorMessage);
+        toast.error(errorMessage, {
+          duration: 5000, // Show for 5 seconds
+        });
+        // Don't close the dialog on error so user can see the message
       }
     } catch (error) {
-      console.error('[Disconnect Bank] Error:', error);
+      console.error('[Disconnect Bank] Exception caught:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to disconnect bank account';
-      toast.error(errorMessage);
+      console.log('[Disconnect Bank] Showing error toast from catch:', errorMessage);
+      toast.error(errorMessage, {
+        duration: 5000, // Show for 5 seconds
+      });
     } finally {
       setIsDisconnecting(false);
     }
