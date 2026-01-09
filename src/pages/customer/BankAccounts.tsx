@@ -28,6 +28,9 @@ import { useBankAccounts, useInvalidateBankAccounts, disconnectBankAccount } fro
 import { useCustomerBottomSlot } from "@/contexts/CustomerBottomSlotContext";
 import { useOrderDraftStore } from "@/stores/useOrderDraftStore";
 import identityConfirmationIllustration from '@/assets/illustrations/IdentityConfirmation.png';
+import bank1Illustration from '@/assets/illustrations/bank1.png';
+import bank2Illustration from '@/assets/illustrations/bank2.png';
+import bank3Illustration from '@/assets/illustrations/bank3.png';
 import easyTransfersIllustration from '@/assets/illustrations/EasyTransfers.png';
 import everyoneSafeIllustration from '@/assets/illustrations/EveryoneSafe.png';
 import bankingRegulationIllustration from '@/assets/illustrations/BankingRegulation.png';
@@ -378,33 +381,63 @@ export default function BankAccounts() {
     {
       id: "page-1",
       content: (
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">Why link your bank?</h2>
-          <p className="text-base text-slate-600 leading-relaxed">
-            Linking your bank proves it's really you. It stops someone else from ordering cash in your name and keeps both you and your runner protected.
-          </p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-6 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287]">
+          <div className="w-[220px] h-[220px] flex-shrink-0">
+            <img
+              src={bank1Illustration}
+              alt="Bank security illustration"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-slate-900">Why link your bank?</h2>
+            <p className="text-base text-slate-600 leading-relaxed">
+              Linking your bank confirms it's really you.
+              It prevents anyone else from requesting cash in your name — and keeps both you and your Benjamin runner protected.
+            </p>
+          </div>
         </div>
       ),
     },
     {
       id: "page-2",
       content: (
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">What Benjamin sees</h2>
-          <p className="text-base text-slate-600 leading-relaxed">
-            Benjamin never sees your bank login. Plaid encrypts your details and only shares a secure token with us — your passwords and credentials never touch Benjamin.
-          </p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-6 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287]">
+          <div className="w-[220px] h-[220px] flex-shrink-0">
+            <img
+              src={bank2Illustration}
+              alt="Data encryption illustration"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-slate-900">What Benjamin sees?</h2>
+            <p className="text-base text-slate-600 leading-relaxed">
+              Benjamin never sees your bank login.
+              Plaid encrypts your information and shares only a secure verification token — your passwords and credentials never touch Benjamin.
+            </p>
+          </div>
         </div>
       ),
     },
     {
       id: "page-3",
       content: (
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-slate-900">What happens after you connect</h2>
-          <p className="text-base text-slate-600 leading-relaxed">
-            Once your bank is verified, you can request cash instantly. We use your linked account to confirm identity and keep fraud low, so orders get approved faster.
-          </p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-6 bg-gradient-to-b from-white via-[#E8F5E9] to-[#13F287]">
+          <div className="w-[220px] h-[220px] flex-shrink-0">
+            <img
+              src={bank3Illustration}
+              alt="Cash transaction illustration"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-slate-900">What happens after you connect?</h2>
+            <p className="text-base text-slate-600 leading-relaxed">
+              Once your bank is verified, you can request cash instantly.
+              Your linked account helps confirm your identity and keep fraud low — so orders are approved faster.
+            </p>
+          </div>
         </div>
       ),
     },
