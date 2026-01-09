@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,6 +17,15 @@ export function useUnreadMessages(orderId: string | null) {
   const instanceIdRef = useRef<string>(`${Math.random().toString(36).substring(2, 9)}`);
   const realtimeFailedRef = useRef(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isAppActiveRef = useRef(true);
+
+  // Helper to clear polling interval
+  const clearPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!orderId || !user) {
@@ -24,9 +35,11 @@ export function useUnreadMessages(orderId: string | null) {
 
     let cancelled = false;
     realtimeFailedRef.current = false;
+    isAppActiveRef.current = true;
 
     // Load unread count
     const loadUnreadCount = async () => {
+      if (cancelled) return;
       try {
         // Get all messages for this order
         const { data: messages, error: messagesError } = await supabase
@@ -136,10 +149,7 @@ export function useUnreadMessages(orderId: string | null) {
           console.log('[UnreadMessages] Subscribed for order', orderId);
           realtimeFailedRef.current = false;
           // Clear polling if realtime is working
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
+          clearPolling();
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           // Log error only once per session to avoid spam
           if (!realtimeFailedRef.current && import.meta.env.DEV) {
@@ -147,24 +157,49 @@ export function useUnreadMessages(orderId: string | null) {
           }
           realtimeFailedRef.current = true;
           
-          // Fallback: poll unread counts every 5 seconds if realtime fails
-          if (!pollIntervalRef.current) {
+          // Fallback: poll unread counts every 5 seconds if realtime fails (only if app is active)
+          if (isAppActiveRef.current && !pollIntervalRef.current) {
             pollIntervalRef.current = setInterval(() => {
-              if (!cancelled) {
+              if (!cancelled && isAppActiveRef.current) {
                 loadUnreadCount();
+              } else {
+                clearPolling();
               }
             }, 5000);
           }
         }
       });
 
+    // Listen for app state changes (background/foreground) on native platforms
+    let appStateListener: any = null;
+    if (Capacitor.isNativePlatform()) {
+      appStateListener = App.addListener('appStateChange', ({ isActive }) => {
+        isAppActiveRef.current = isActive;
+        if (isActive) {
+          // App came to foreground - restart polling if realtime failed
+          if (realtimeFailedRef.current && !pollIntervalRef.current && !cancelled) {
+            pollIntervalRef.current = setInterval(() => {
+              if (!cancelled && isAppActiveRef.current) {
+                loadUnreadCount();
+              } else {
+                clearPolling();
+              }
+            }, 5000);
+          }
+        } else {
+          // App went to background - stop polling to save battery
+          clearPolling();
+        }
+      });
+    }
+
     return () => {
       cancelled = true;
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      clearPolling();
       supabase.removeChannel(channel);
+      if (appStateListener) {
+        appStateListener.remove();
+      }
     };
   }, [orderId, user?.id]);
 
