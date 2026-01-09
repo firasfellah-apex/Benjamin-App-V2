@@ -23,19 +23,22 @@ import { AvatarCropModal } from "@/components/common/AvatarCropModal";
 import { useCustomerRating } from "@/hooks/useCustomerRating";
 import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { AccountSummaryCard } from "@/components/account/AccountSummaryCard";
+import { DeleteAccountSection } from "@/components/account/DeleteAccountSection";
+import { deleteMyAccount } from "@/db/api";
 import { formatPhoneNumber } from "@/lib/utils";
 
 export default function Account() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { profile, isReady } = useProfile(user?.id);
   const queryClient = useQueryClient();
   const { uploading: avatarUploading, uploadAvatar, removeAvatar } = useAvatar();
   const { avg_rating, rating_count, isLoading: isLoadingRating } = useCustomerRating();
   const { bankAccounts, hasAnyBank, isLoading: isLoadingBanks } = useBankAccounts();
   
-  // Check for active bank accounts (connected)
+  // Check for active bank accounts (connected) - used for identity verification
   const hasActiveBank = bankAccounts.some(ba => ba.is_active !== false);
+  const isVerified = hasActiveBank; // Identity verification is based on bank connection
   
   const [isAvatarEditing, setIsAvatarEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,6 +50,7 @@ export default function Account() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedImageSrc, setSelectedImageSrc] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -243,6 +247,31 @@ export default function Account() {
     // Clear file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user?.id) {
+      toast.error("You must be logged in to delete your account");
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteMyAccount(user.id);
+      if (result.success) {
+        toast.success("Account deleted successfully");
+        // Sign out and redirect to home
+        await logout();
+        navigate("/");
+      } else {
+        toast.error(result.error || "Failed to delete account");
+      }
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      toast.error(error?.message || "An error occurred while deleting your account");
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -482,23 +511,31 @@ export default function Account() {
               )}
             </CustomerCard>
 
-            {/* Classic Divider */}
+            {/* Full-width Divider after Phone Number section */}
             <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
 
             {/* Account Status Section */}
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                Account status
-              </h3>
-              <div className="space-y-3">
-                <AccountSummaryCard
-                  bankConnected={hasActiveBank}
-                  ratingAvg={avg_rating}
-                  ratingCount={rating_count}
-                  isLoadingRating={isLoadingRating}
-                />
-              </div>
-            </div>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+              ACCOUNT STATUS
+            </h3>
+            <AccountSummaryCard
+              isVerified={isVerified}
+              ratingAvg={avg_rating}
+              ratingCount={rating_count}
+              isLoadingRating={isLoadingRating}
+            />
+
+            {/* Thick Divider */}
+            <div className="h-[6px] bg-[#F7F7F7] -mx-6" />
+
+            {/* Account Actions Section */}
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-3">
+              ACCOUNT ACTIONS
+            </h3>
+            <DeleteAccountSection
+              onDelete={handleDeleteAccount}
+              isDeleting={isDeletingAccount}
+            />
 
             {/* DEV: Debug Panel - Collapsed accordion at bottom, only in development */}
             {import.meta.env.DEV && (
@@ -518,6 +555,10 @@ export default function Account() {
                   <div>
                     <span className="font-medium">Active Banks:</span>{" "}
                     {bankAccounts.filter(ba => ba.is_active).length}
+                  </div>
+                  <div>
+                    <span className="font-medium">Identity Verified:</span>{" "}
+                    {isVerified ? "Yes" : "No"}
                   </div>
                 </div>
               </details>

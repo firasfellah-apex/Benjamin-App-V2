@@ -3866,3 +3866,48 @@ export async function getCustomerRating(customerUserId: string): Promise<{
   }
 }
 
+/**
+ * Delete user account (soft delete)
+ * Sets deleted_at timestamp and marks profile as deleted
+ * Does NOT delete orders (preserves compliance history)
+ * Marks linked bank accounts as inactive
+ */
+export async function deleteMyAccount(userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Soft delete the profile
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (profileError) {
+      console.error("[deleteMyAccount] Error soft-deleting profile:", profileError);
+      return { success: false, error: profileError.message || "Failed to delete account" };
+    }
+
+    // Mark all linked bank accounts as inactive (do not hard delete)
+    const { error: bankError } = await supabase
+      .from("bank_accounts")
+      .update({
+        is_active: false,
+        disconnected_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("is_active", true);
+
+    if (bankError) {
+      console.warn("[deleteMyAccount] Warning: Error marking bank accounts inactive:", bankError);
+      // Don't fail the whole operation if bank update fails
+    }
+
+    console.log("[deleteMyAccount] Account soft-deleted successfully");
+    return { success: true };
+  } catch (error: any) {
+    console.error("[deleteMyAccount] Error:", error);
+    return { success: false, error: error.message || "Failed to delete account" };
+  }
+}
+
