@@ -157,7 +157,7 @@ history/*.json
 
 # Local files
 *.local
-package-lock.json
+# package-lock.json
 node_modules
 .vite
 dist
