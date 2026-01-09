@@ -19,9 +19,9 @@ function CustomerLayoutContent({ children }: { children: ReactNode }) {
   const { bottomSlot } = useCustomerBottomSlot();
 
   return (
-    <div className="flex h-full flex-col bg-white min-h-0">
+    <div className="flex h-full flex-col bg-white min-h-0 w-full overflow-hidden">
       {/* Main content – header/title/divider are fixed, only content scrolls */}
-      <MobilePageShell className="flex-1 flex flex-col min-h-0">
+      <MobilePageShell className="flex-1 flex flex-col min-h-0 w-full overflow-hidden">
         {children}
       </MobilePageShell>
 

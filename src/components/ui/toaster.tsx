@@ -8,6 +8,15 @@ import {
   ToastViewport,
 } from "@/components/ui/toast";
 
+/**
+ * Toaster Component
+ * 
+ * Layout-neutral toast notification system for foreground push notifications.
+ * - Uses Radix UI Toast with automatic portal rendering (renders to document.body)
+ * - ToastViewport uses fixed positioning and high z-index (z-[9999])
+ * - Mounted outside all layout containers in main.tsx
+ * - Never participates in flex layout calculations
+ */
 export function Toaster() {
   const { toasts } = useToast();
 
@@ -27,6 +36,7 @@ export function Toaster() {
           </Toast>
         );
       })}
+      {/* ToastViewport is portaled to document.body with fixed positioning - layout-neutral */}
       <ToastViewport />
     </ToastProvider>
   );

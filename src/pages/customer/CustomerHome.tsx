@@ -713,30 +713,28 @@ export default function CustomerHome() {
         topContent={topContent}
         customBottomPadding={customBottomPadding}
       >
-        {/* Show trust cards list below View All Deliveries, even when there's a last delivery */}
-        {lastCompletedOrder && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-3">
-              {trustCards.map((card) => (
-                <CustomerCard key={card.id} className="overflow-hidden px-0 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
-                      <img
-                        src={card.image}
-                        alt={card.title}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <div className="flex-1 pr-6">
-                      <p className="text-sm font-semibold text-slate-900 leading-snug">{card.title}</p>
-                      <p className="text-xs text-slate-600 leading-relaxed mt-1">{card.body}</p>
-                    </div>
+        {/* Show trust cards list below View All Deliveries, always visible */}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-3">
+            {trustCards.map((card) => (
+              <CustomerCard key={card.id} className="overflow-hidden px-0 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-[75px] h-[75px] flex items-center justify-center">
+                    <img
+                      src={card.image}
+                      alt={card.title}
+                      className="w-full h-full object-contain"
+                    />
                   </div>
-                </CustomerCard>
-              ))}
-            </div>
+                  <div className="flex-1 pr-6">
+                    <p className="text-sm font-semibold text-slate-900 leading-snug">{card.title}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed mt-1">{card.body}</p>
+                  </div>
+                </div>
+              </CustomerCard>
+            ))}
           </div>
-        )}
+        </div>
       </CustomerScreen>
       
       {/* Completion Rating Modal */}

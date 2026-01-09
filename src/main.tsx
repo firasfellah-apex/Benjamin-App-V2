@@ -19,7 +19,7 @@ import { queryClient } from "./lib/queryClient";
 import { getEnv } from "./lib/env";
 import { initSentry } from "./lib/sentry";
 import { initializePushNotifications } from "./lib/pushNotifications";
-import { Toaster } from "@/components/ui/toaster";
+import { ToasterPortal } from "@/components/ui/ToasterPortal";
 
 // Initialize Sentry error tracking (must be before React render)
 initSentry();
@@ -82,7 +82,8 @@ createRoot(document.getElementById("root")!).render(
         </AppWrapper>
       </GoogleMapsProvider>
     </QueryClientProvider>
-    <Toaster />
+    {/* Toaster portaled to document.body - completely layout-neutral */}
+    <ToasterPortal />
   </StrictMode>
 );
 

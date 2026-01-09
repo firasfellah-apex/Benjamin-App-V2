@@ -64,7 +64,8 @@ export function CustomerScreen({
       className={cn(
         // Treat this as the app viewport for that screen
         // Header/title/divider are fixed, only main content scrolls
-        "flex h-full flex-col bg-white min-h-0",
+        // Use h-full to fill parent (which should have constrained height)
+        "flex h-full flex-col bg-white min-h-0 w-full",
         "text-slate-900",
         className
       )}
@@ -108,6 +109,7 @@ export function CustomerScreen({
         style={{
           paddingBottom: customBottomPadding || "calc(24px + max(24px, env(safe-area-inset-bottom)) + 96px)",
           WebkitOverflowScrolling: "touch", // important for iOS
+          height: 0, // Critical flexbox trick: forces flex-1 to work with overflow-y-auto
         }}
       >
         {topContent}
