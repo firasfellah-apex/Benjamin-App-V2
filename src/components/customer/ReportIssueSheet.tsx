@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -96,17 +97,33 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
     }
   };
 
-  return (
+  // Render as portal to document.body to ensure it's positioned relative to viewport, not parent
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
-          {/* light local backdrop (so it feels nested in the rating modal) */}
+          {/* Full-screen backdrop - covers entire screen including top header */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] bg-black/40"
+            className="fixed inset-0 bg-black/50 z-[9999]"
             onClick={onClose}
+            style={{ 
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh',
+              margin: 0,
+              padding: 0,
+              zIndex: 9999,
+            }}
           />
 
           <motion.div
@@ -114,11 +131,12 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed bottom-0 left-0 right-0 z-[120] bg-white rounded-t-3xl shadow-2xl max-h-[70vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-[10000] bg-white rounded-t-3xl shadow-2xl max-h-[70vh] overflow-hidden"
+            style={{
+              zIndex: 10000,
+            }}
           >
-            <div className="flex items-center justify-between px-6 pt-4 pb-2 relative">
-              <div className="h-1 w-10 bg-slate-200 rounded-full mx-auto" />
-
+            <div className="flex items-center justify-end px-6 pt-4 pb-2 relative">
               <div className="absolute top-4 right-4 z-10">
                 <IconButton
                   type="button"
@@ -138,14 +156,14 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
                   We're sorry something felt off
                 </h2>
                 <p className="text-sm text-slate-500">
-                  This doesn't affect your runner right away. It simply flags this delivery for the Benjamin team to review.
+                  Thanks for letting us know — we'll take a closer look and make sure everything's handled properly.
                 </p>
               </div>
 
               {/* Issue chips */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700">
-                  What felt off? <span className="text-slate-400 text-xs">(you can pick more than one)</span>
+                  What felt off? <span className="text-slate-400 text-sm font-medium">(you can pick more than one)</span>
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {ISSUE_OPTIONS.map((option) => {
@@ -179,7 +197,7 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
               {/* Notes */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700">
-                  Anything else we should know? <span className="text-slate-400">(optional)</span>
+                  Anything else we should know? <span className="text-slate-400 text-sm font-medium">(optional)</span>
                 </p>
                 <textarea
                   rows={3}
@@ -198,7 +216,7 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
                   onClick={handleSubmit}
                   className="w-full h-14 text-base font-medium"
                 >
-                  {submitting ? 'Sending...' : 'Send to Benjamin'}
+                  {submitting ? 'Submitting...' : 'Submit Report'}
                 </Button>
                 <button
                   type="button"
@@ -213,6 +231,7 @@ export function ReportIssueSheet({ open, order, onClose, initialCategory, lockCa
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
