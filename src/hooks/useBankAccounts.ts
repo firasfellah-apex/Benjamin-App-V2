@@ -41,7 +41,7 @@ export function useInvalidateBankAccounts() {
 }
 
 // Helper function to disconnect a bank account
-export async function disconnectBankAccount(bankAccountId: string): Promise<boolean> {
+export async function disconnectBankAccount(bankAccountId: string): Promise<{ success: boolean; error?: string }> {
   return await deleteBankAccount(bankAccountId);
 }
 

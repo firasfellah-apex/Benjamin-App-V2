@@ -152,9 +152,9 @@ export default function BankAccounts() {
     setIsDisconnecting(true);
     
     try {
-      const success = await disconnectBankAccount(bankAccountToDisconnect.id);
+      const result = await disconnectBankAccount(bankAccountToDisconnect.id);
       
-      if (success) {
+      if (result.success) {
         // Invalidate bank accounts cache
         invalidateBankAccounts();
         
@@ -180,11 +180,14 @@ export default function BankAccounts() {
         setShowDisconnectDialog(false);
         setBankAccountToDisconnect(null);
       } else {
-        throw new Error('Failed to disconnect bank account');
+        // Show the specific error message from the API
+        const errorMessage = result.error || 'Failed to disconnect bank account';
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('[Disconnect Bank] Error:', error);
-      toast.error('Failed to disconnect bank account');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to disconnect bank account';
+      toast.error(errorMessage);
     } finally {
       setIsDisconnecting(false);
     }

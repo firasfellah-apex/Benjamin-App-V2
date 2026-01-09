@@ -3517,9 +3517,9 @@ export async function setPrimaryBankAccount(bankAccountId: string): Promise<bool
   }
 }
 
-export async function deleteBankAccount(bankAccountId: string): Promise<boolean> {
+export async function deleteBankAccount(bankAccountId: string): Promise<{ success: boolean; error?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return { success: false, error: 'User not authenticated' };
 
   // Handle legacy bank account (stored in profiles table)
   if (bankAccountId === 'legacy') {
@@ -3538,9 +3538,36 @@ export async function deleteBankAccount(bankAccountId: string): Promise<boolean>
     
     if (error) {
       console.error("Error deleting legacy bank account:", error);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
+    return { success: true };
+  }
+
+  // Check if this bank account is referenced by any orders
+  const { data: ordersUsingAccount, error: checkError } = await supabase
+    .from("orders")
+    .select("id, status, created_at")
+    .eq("bank_account_id", bankAccountId)
+    .eq("customer_id", user.id)
+    .limit(1);
+
+  if (checkError) {
+    console.error("[deleteBankAccount] Error checking orders:", checkError);
+    // Continue with deletion attempt - the foreign key will catch it if needed
+  } else if (ordersUsingAccount && ordersUsingAccount.length > 0) {
+    const orderCount = ordersUsingAccount.length;
+    // Get total count for better error message
+    const { count } = await supabase
+      .from("orders")
+      .select("*", { count: "exact", head: true })
+      .eq("bank_account_id", bankAccountId)
+      .eq("customer_id", user.id);
+    
+    const totalCount = count || orderCount;
+    return {
+      success: false,
+      error: `Cannot disconnect this bank account because it's linked to ${totalCount} order${totalCount === 1 ? '' : 's'}. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly.`
+    };
   }
 
   // Try to delete from bank_accounts table
@@ -3568,14 +3595,23 @@ export async function deleteBankAccount(bankAccountId: string): Promise<boolean>
       
       if (profileError) {
         console.error("Error deleting bank account from profiles:", profileError);
-        return false;
+        return { success: false, error: profileError.message };
       }
-      return true;
+      return { success: true };
     }
+    
+    // Handle foreign key constraint violation
+    if (error.code === '23503' || error.message?.includes('violates foreign key constraint') || error.message?.includes('orders_bank_account_id_fkey')) {
+      return {
+        success: false,
+        error: "Cannot disconnect this bank account because it's linked to existing orders. Bank accounts used for orders cannot be disconnected to ensure refunds are processed correctly."
+      };
+    }
+    
     console.error("Error deleting bank account:", error);
-    return false;
+    return { success: false, error: error.message || 'Failed to disconnect bank account' };
   }
 
-  return true;
+  return { success: true };
 }
 
