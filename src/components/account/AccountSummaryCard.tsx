@@ -97,23 +97,39 @@ export function AccountSummaryCard({
             <span className="text-sm font-medium text-slate-400">Loading...</span>
           ) : (
             <>
-              {/* Use same pill style as menu */}
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal" style={{ backgroundColor: '#FFFBEB', color: '#F2AB58' }}>
-                  <Star className="h-3.5 w-3.5 fill-[#F2AB58]" style={{ color: '#F2AB58' }} />
-                  <span>
+              {/* Use same pill style as menu, with tooltip */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-pointer">
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal" style={{ backgroundColor: '#FFFBEB', color: '#F2AB58' }}>
+                      <Star className="h-3.5 w-3.5 fill-[#F2AB58]" style={{ color: '#F2AB58' }} />
+                      <span>
+                        {ratingCount === 0
+                          ? "New"
+                          : ratingCount >= 5 && ratingAvg !== null
+                          ? ratingAvg.toFixed(1)
+                          : "New"}
+                      </span>
+                    </span>
+                    {/* Show count in muted text for ratings >= 5 */}
+                    {ratingCount >= 5 && ratingAvg !== null && (
+                      <span className="text-xs text-slate-400">({ratingCount})</span>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="bg-black text-white text-xs rounded-lg shadow-lg w-max max-w-xs px-3 py-2.5 border-0 z-[100]"
+                >
+                  <p className="leading-relaxed">
                     {ratingCount === 0
-                      ? "New"
-                      : ratingCount >= 5 && ratingAvg !== null
-                      ? ratingAvg.toFixed(1)
-                      : "New"}
-                  </span>
-                </span>
-                {/* Show count in muted text for ratings >= 5 */}
-                {ratingCount >= 5 && ratingAvg !== null && (
-                  <span className="text-xs text-slate-400">({ratingCount})</span>
-                )}
-              </div>
+                      ? "This rating is the average of runner ratings after completed deliveries. Not enough ratings yet."
+                      : ratingCount < 5
+                      ? `This rating is the average of runner ratings after completed deliveries. Based on ${ratingCount} ${ratingCount === 1 ? 'rating' : 'ratings'}.`
+                      : `This rating is the average of runner ratings after completed deliveries. Based on ${ratingCount} ratings.`}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
               {/* Show subtext below pill for new users */}
               {ratingCount < 5 && (
                 <>

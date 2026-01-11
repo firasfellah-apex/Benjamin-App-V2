@@ -12,8 +12,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRunnerJobs } from '../state/runnerJobsStore';
 import { Button } from '@/components/ui/button';
 import { SlideToConfirm } from '@/components/customer/SlideToConfirm';
+import { SlideToSkip } from '@/components/runner/SlideToSkip';
 import { toast } from 'sonner';
-import { resolveDeliveryStyleFromOrder, getDeliveryStyleCopy, getDeliveryStyleShortHint } from '@/lib/deliveryStyle';
+// Delivery style helpers removed from imports - delivery type hidden until after cash-out
 
 export function NewJobModal() {
   const { pendingOffer, acceptOffer, skipOffer, online } = useRunnerJobs();
@@ -163,26 +164,13 @@ export function NewJobModal() {
                 </div>
               </div>
 
-              {/* Delivery Area */}
+              {/* Delivery Area - NO delivery type shown in pre-accept UI */}
               {pendingOffer.dropoffApprox.neighborhood ? (
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5">
                   <MapPin className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-slate-400 mb-1">Delivery Area</div>
                     <div className="text-sm font-medium text-white">{pendingOffer.dropoffApprox.neighborhood}</div>
-                    {/* Delivery Style Pill */}
-                    {(() => {
-                      const deliveryStyle = resolveDeliveryStyleFromOrder(pendingOffer.order);
-                      const styleCopy = getDeliveryStyleCopy(deliveryStyle);
-                      return (
-                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
-                          <span className="text-[11px] font-medium text-slate-200">
-                            {styleCopy.label}
-                          </span>
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
               ) : (
@@ -191,35 +179,10 @@ export function NewJobModal() {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-slate-400 mb-1">Delivery Area</div>
                     <div className="text-sm font-medium text-white">—</div>
-                    {/* Delivery Style Pill */}
-                    {(() => {
-                      const deliveryStyle = resolveDeliveryStyleFromOrder(pendingOffer.order);
-                      const styleCopy = getDeliveryStyleCopy(deliveryStyle);
-                      return (
-                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
-                          <span className="text-[11px] font-medium text-slate-200">
-                            {styleCopy.label}
-                          </span>
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
               )}
             </div>
-            
-            {/* Delivery Style Short Hint */}
-            {(() => {
-              const deliveryStyle = resolveDeliveryStyleFromOrder(pendingOffer.order);
-              return (
-                <div className="mt-2 text-center">
-                  <p className="text-[11px] text-slate-400">
-                    {getDeliveryStyleShortHint(deliveryStyle)}
-                  </p>
-                </div>
-              );
-            })()}
 
             {/* Total Travel and Est. Time - Side by side */}
             <div className="grid grid-cols-2 gap-3">
@@ -245,15 +208,15 @@ export function NewJobModal() {
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            {/* Skip Button - Red, above Accept */}
-            <Button
-              onClick={handleSkip}
-              disabled={isAccepting}
-              variant="ghost"
-              className="w-full h-[56px] rounded-[12px] px-5 bg-red-500/20 text-white border border-red-500/30 hover:bg-red-500/30 hover:border-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="text-[15px] font-medium">Skip</span>
-            </Button>
+            {/* Slide-to-Skip Button - Red, above Accept */}
+            <SlideToSkip
+              onSkip={handleSkip}
+              disabled={isAccepting || timeRemaining === 0}
+              label="Slide to Skip"
+              confirmedLabel="Skipped"
+              trackClassName="rounded-[12px] bg-red-500/20 border border-red-500/30"
+              handleClassName="rounded-[12px]"
+            />
 
             {/* Slide-to-Confirm Accept Button */}
             <SlideToConfirm

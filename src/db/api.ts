@@ -3248,10 +3248,26 @@ export async function rateCustomerByRunner(orderId: string, rating: number): Pro
     throw new Error("You can only rate customers for completed deliveries.");
   }
 
-  // Check if already rated (handle case where column might not exist)
+  // Check if already rated and if edit window has expired
   const existingRating = (order as any).customer_rating_by_runner;
+  const ratedAt = (order as any).customer_rating_by_runner_at;
+  
   if (existingRating !== null && existingRating !== undefined) {
-    throw new Error("You have already rated this customer.");
+    // If rated_at exists, check if edit window (5 minutes) has expired
+    if (ratedAt) {
+      const ratedTime = new Date(ratedAt).getTime();
+      const now = Date.now();
+      const editWindowMs = 5 * 60 * 1000; // 5 minutes
+      const timeSinceRating = now - ratedTime;
+      
+      if (timeSinceRating > editWindowMs) {
+        throw new Error("Rating edit window has expired. You can only edit ratings within 5 minutes of submission.");
+      }
+      // Edit window is still open - allow edit
+    } else {
+      // No timestamp - assume old rating (before migration), don't allow edit
+      throw new Error("You have already rated this customer.");
+    }
   }
 
   // Verify runner is assigned to this order
@@ -3265,10 +3281,23 @@ export async function rateCustomerByRunner(orderId: string, rating: number): Pro
     throw new Error("You can only rate customers for orders you've completed.");
   }
 
-  // Update rating
+  // Update rating and timestamp
+  // If this is the first rating, set timestamp. If editing within window, update timestamp.
+  const updatePayload: any = {
+    customer_rating_by_runner: rating,
+  };
+  
+  // Set timestamp if not already set, or update it if editing within window
+  if (!ratedAt) {
+    updatePayload.customer_rating_by_runner_at = new Date().toISOString();
+  } else {
+    // Keep existing timestamp for edit window calculation
+    // Don't update timestamp on edits - window is based on original submission time
+  }
+  
   const { error } = await supabase
     .from("orders")
-    .update({ customer_rating_by_runner: rating })
+    .update(updatePayload)
     .eq("id", orderId)
     .eq("runner_id", user.id) // Extra security check
     .eq("status", "Completed"); // Extra security check
@@ -3613,6 +3642,7 @@ export async function disconnectBankAccount(bankAccountId: string): Promise<{ su
   }
 
   // Verify user owns the bank account
+  // Don't filter by is_active - we need to allow disconnect of non-primary accounts
   const { data: bankAccount, error: fetchError } = await supabase
     .from("bank_accounts")
     .select("id, user_id, is_primary, plaid_item_id, is_active")
@@ -3620,8 +3650,27 @@ export async function disconnectBankAccount(bankAccountId: string): Promise<{ su
     .eq("user_id", user.id)
     .single();
 
-  if (fetchError || !bankAccount) {
-    return { success: false, error: 'Bank account not found or access denied' };
+  if (fetchError) {
+    // Log detailed error for debugging
+    console.error("[disconnectBankAccount] Error fetching bank account:", {
+      bankAccountId,
+      userId: user.id,
+      error: fetchError,
+      code: fetchError.code,
+      message: fetchError.message,
+    });
+    
+    if (fetchError.code === 'PGRST116') {
+      return { success: false, error: 'Bank account not found' };
+    }
+    if (fetchError.code === '42501' || fetchError.message?.includes('permission') || fetchError.message?.includes('policy')) {
+      return { success: false, error: 'Access denied. You can only disconnect your own bank accounts.' };
+    }
+    return { success: false, error: fetchError.message || 'Bank account not found or access denied' };
+  }
+
+  if (!bankAccount) {
+    return { success: false, error: 'Bank account not found' };
   }
 
   // Check if account is already disconnected (only if is_active column exists)
@@ -3874,6 +3923,12 @@ export async function getCustomerRating(customerUserId: string): Promise<{
  */
 export async function deleteMyAccount(userId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    // Verify user owns this account
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== userId) {
+      return { success: false, error: "Unauthorized: You can only delete your own account" };
+    }
+
     // Soft delete the profile
     const { error: profileError } = await supabase
       .from("profiles")
@@ -3889,21 +3944,33 @@ export async function deleteMyAccount(userId: string): Promise<{ success: boolea
     }
 
     // Mark all linked bank accounts as inactive (do not hard delete)
-    const { error: bankError } = await supabase
-      .from("bank_accounts")
-      .update({
-        is_active: false,
-        disconnected_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId)
-      .eq("is_active", true);
+    // Try with is_active filter, fallback if column doesn't exist
+    try {
+      const { error: bankError } = await supabase
+        .from("bank_accounts")
+        .update({
+          is_active: false,
+          disconnected_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("is_active", true);
 
-    if (bankError) {
-      console.warn("[deleteMyAccount] Warning: Error marking bank accounts inactive:", bankError);
-      // Don't fail the whole operation if bank update fails
+      if (bankError && !bankError.message?.includes('column "is_active"') && bankError.code !== '42703') {
+        console.warn("[deleteMyAccount] Warning: Error marking bank accounts inactive:", bankError);
+      }
+    } catch (bankUpdateError) {
+      // Column might not exist - that's okay, continue
+      console.warn("[deleteMyAccount] Could not update bank accounts (column may not exist):", bankUpdateError);
     }
 
-    console.log("[deleteMyAccount] Account soft-deleted successfully");
+    // Sign out the user (revoke session)
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      console.warn("[deleteMyAccount] Warning: Error signing out user:", signOutError);
+      // Don't fail the whole operation if sign out fails - profile is already deleted
+    }
+
+    console.log("[deleteMyAccount] Account soft-deleted successfully and user signed out");
     return { success: true };
   } catch (error: any) {
     console.error("[deleteMyAccount] Error:", error);

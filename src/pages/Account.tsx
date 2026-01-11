@@ -261,18 +261,22 @@ export default function Account() {
       const result = await deleteMyAccount(user.id);
       if (result.success) {
         toast.success("Account deleted successfully");
-        // Sign out and redirect to home
+        // Clear local state and query cache
+        queryClient.clear();
+        // Sign out (deleteMyAccount already signs out, but ensure local state is cleared)
         await logout();
-        navigate("/");
+        // Redirect to login/auth screen
+        navigate("/login", { replace: true });
       } else {
         toast.error(result.error || "Failed to delete account");
+        setIsDeletingAccount(false); // Only reset if failed
       }
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast.error(error?.message || "An error occurred while deleting your account");
-    } finally {
-      setIsDeletingAccount(false);
+      setIsDeletingAccount(false); // Reset on error
     }
+    // Note: Don't reset isDeletingAccount on success - user is being signed out
   };
 
   // Loading state
@@ -332,7 +336,7 @@ export default function Account() {
 
         <CustomerScreen
           title="My Account"
-          subtitle="Manage your profile and settings"
+          subtitle="Manage your profile and settings."
           showBack
           onBack={handleBack}
           fixedContent={fixedContent}

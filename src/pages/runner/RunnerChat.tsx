@@ -143,11 +143,9 @@ export default function RunnerChat() {
             <h1 className="text-lg font-semibold text-white truncate">
               {customerName}
             </h1>
-            {order.customer_address && (
-              <p className="text-xs text-slate-400 truncate">
-                {order.customer_address.split(',')[0]}
-              </p>
-            )}
+            <p className="text-xs text-slate-400 truncate">
+              Coordinate the handoff and exact meetup point.
+            </p>
           </div>
         </div>
 

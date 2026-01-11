@@ -137,13 +137,11 @@ export default function CustomerChat() {
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
-      {/* Fixed Header - stays at absolute top when keyboard rises */}
+      {/* Fixed Header - stays at top, never scrolls */}
       <div 
-        className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white fixed top-0 left-0 right-0 z-50" 
+        className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white shrink-0 z-50" 
         style={{ 
-          paddingTop: 'max(12px, env(safe-area-inset-top))',
-          top: 0,
-          position: 'fixed'
+          paddingTop: `max(12px, env(safe-area-inset-top, 0px))`,
         }}
       >
         <IconButton
@@ -177,13 +175,8 @@ export default function CustomerChat() {
       {/* Chat Content - scrolls beneath fixed header, adjusts for keyboard */}
       <div 
         className="flex-1 overflow-hidden bg-slate-50 flex flex-col min-h-0"
-        style={{ 
-          paddingTop: 'calc(73px + max(0px, env(safe-area-inset-top)))',
-          // Height adjusts automatically with keyboard via flexbox
-          height: '100%'
-        }}
       >
-        <div className="flex-1 overflow-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {(() => {
             if (import.meta.env.DEV) {
               console.log('[CustomerChat] Rendering OrderChatThread with:', {

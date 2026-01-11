@@ -32,7 +32,10 @@ export default function CashAmountInput({
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showMultipleOf20Message, setShowMultipleOf20Message] = useState(false);
+  const [showTapToEditMessage, setShowTapToEditMessage] = useState(false);
   const multipleOf20TimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tapToEditTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasShownTapToEditRef = useRef(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
@@ -58,6 +61,9 @@ export default function CashAmountInput({
       onDragEnd?.();
       if (multipleOf20TimeoutRef.current) {
         clearTimeout(multipleOf20TimeoutRef.current);
+      }
+      if (tapToEditTimeoutRef.current) {
+        clearTimeout(tapToEditTimeoutRef.current);
       }
     };
   }, []);
@@ -174,11 +180,32 @@ export default function CashAmountInput({
   const handleDisplayClick = () => {
     setIsEditing(true);
     setInput(String(value));
+    setShowTapToEditMessage(false); // Hide helper when user starts editing
+    if (tapToEditTimeoutRef.current) {
+      clearTimeout(tapToEditTimeoutRef.current);
+    }
     setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     }, 0);
   };
+  
+  // Show "Tap here to edit" helper on first open of input
+  useEffect(() => {
+    if (isEditing && !hasShownTapToEditRef.current) {
+      hasShownTapToEditRef.current = true;
+      setShowTapToEditMessage(true);
+      // Auto-hide after 4 seconds
+      tapToEditTimeoutRef.current = setTimeout(() => {
+        setShowTapToEditMessage(false);
+      }, 4000);
+    }
+    return () => {
+      if (tapToEditTimeoutRef.current) {
+        clearTimeout(tapToEditTimeoutRef.current);
+      }
+    };
+  }, [isEditing]);
 
   // Handle quick pick
   const handleQuickPick = (amount: number) => {
@@ -240,14 +267,15 @@ export default function CashAmountInput({
                   autoFocus
                 />
               </div>
-              {showMultipleOf20Message && (
+              {/* Show "Tap here to edit" helper on first open, or validation message if invalid */}
+              {(showTapToEditMessage || showMultipleOf20Message) && (
                 <motion.p
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   className="text-xs text-slate-500 text-center mt-1 absolute bottom-2 left-0 right-0"
                 >
-                  Amount must be a multiple of $20
+                  {showMultipleOf20Message ? "Amount must be a multiple of $20" : "Tap here to edit"}
                 </motion.p>
               )}
             </div>

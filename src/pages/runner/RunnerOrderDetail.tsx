@@ -449,7 +449,15 @@ export default function RunnerOrderDetail() {
     );
   }
 
+  // Check if rating exists and if edit window (5 minutes) has expired
   const hasRatedCustomer = !!order.customer_rating_by_runner;
+  const ratedAt = (order as any).customer_rating_by_runner_at;
+  const canEditRating = hasRatedCustomer && ratedAt && (() => {
+    const ratedTime = new Date(ratedAt).getTime();
+    const now = Date.now();
+    const editWindowMs = 5 * 60 * 1000; // 5 minutes
+    return (now - ratedTime) <= editWindowMs;
+  })();
   const isCompleted = order.status === "Completed";
   
   // Format completed date
@@ -612,13 +620,18 @@ export default function RunnerOrderDetail() {
               <RatingStars
                 size="md"
                 value={order.customer_rating_by_runner ?? 0}
-                readOnly={hasRatedCustomer || submittingCustomerRating}
+                readOnly={!canEditRating && (hasRatedCustomer || submittingCustomerRating)}
                 onChange={
-                  hasRatedCustomer || submittingCustomerRating
+                  (!canEditRating && hasRatedCustomer) || submittingCustomerRating
                     ? undefined
                     : handleRateCustomer
                 }
               />
+              {canEditRating && (
+                <p className="text-xs text-slate-400 mt-2">
+                  You can edit your rating for a few more minutes.
+                </p>
+              )}
             </div>
           </section>
         )}
